@@ -4,32 +4,36 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 
 model User {
-  id          String       @id @default(uuid())
-  email       String       @unique
-  password    String
-  createdAt   DateTime     @default(now())
-  memberships Membership[]
+  id           String       @id @default(cuid())
+  email        String       @unique
+  passwordHash String
+  createdAt    DateTime     @default(now())
+
+  memberships  Membership[]
 }
 
 model Association {
-  id          String       @id @default(uuid())
-  name        String
-  createdAt   DateTime     @default(now())
-  memberships Membership[]
+  id           String       @id @default(cuid())
+  name         String
+  description  String?
+  slug         String?      @unique
+  createdAt    DateTime     @default(now())
+
+  memberships  Membership[]
 }
 
 model Membership {
-  id            String      @id @default(uuid())
-  userId        String
-  associationId String
-  role          String
+  id             String       @id @default(cuid())
+  userId         String
+  associationId  String
+  role           String
+  createdAt      DateTime     @default(now())
 
-  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  association   Association @relation(fields: [associationId], references: [id], onDelete: Cascade)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  association    Association  @relation(fields: [associationId], references: [id], onDelete: Cascade)
 
   @@unique([userId, associationId])
 }
