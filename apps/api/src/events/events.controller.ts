@@ -1,4 +1,15 @@
-import { Body, Controller, Get, Param, Post, Req, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
+
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { EventsService } from './events.service';
@@ -27,5 +38,19 @@ export class EventsController {
   @Get(':id/registrations')
   registrations(@Req() req: any, @Param('id') id: string) {
     return this.eventsService.registrations(req.user, id);
+  }
+
+  @Patch(':id')
+  update(
+    @Req() req: any,
+    @Param('id') id: string,
+    @Body() dto: any,
+  ) {
+    return this.eventsService.update(req.user, id, dto);
+  }
+
+  @Delete(':id')
+  remove(@Req() req: any, @Param('id') id: string) {
+    return this.eventsService.remove(req.user, id);
   }
 }

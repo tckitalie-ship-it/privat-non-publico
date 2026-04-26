@@ -109,4 +109,63 @@ export class EventsService {
       },
     });
   }
+
+  async update(user: any, eventId: string, dto: any) {
+    if (!user.associationId) {
+      throw new ForbiddenException('No active association selected');
+    }
+
+    if (!['OWNER', 'ADMIN'].includes(user.role)) {
+      throw new ForbiddenException('Only OWNER or ADMIN can update events');
+    }
+
+    const event = await this.prisma.event.findUnique({
+      where: { id: eventId },
+    });
+
+    if (!event) {
+      throw new NotFoundException('Event not found');
+    }
+
+    if (event.associationId !== user.associationId) {
+      throw new ForbiddenException();
+    }
+
+    return this.prisma.event.update({
+      where: { id: eventId },
+      data: {
+        title: dto.title,
+        description: dto.description,
+        location: dto.location,
+        startsAt: dto.startsAt ? new Date(dto.startsAt) : undefined,
+        endsAt: dto.endsAt ? new Date(dto.endsAt) : undefined,
+      },
+    });
+  }
+
+  async remove(user: any, eventId: string) {
+    if (!user.associationId) {
+      throw new ForbiddenException('No active association selected');
+    }
+
+    if (!['OWNER', 'ADMIN'].includes(user.role)) {
+      throw new ForbiddenException('Only OWNER or ADMIN can delete events');
+    }
+
+    const event = await this.prisma.event.findUnique({
+      where: { id: eventId },
+    });
+
+    if (!event) {
+      throw new NotFoundException('Event not found');
+    }
+
+    if (event.associationId !== user.associationId) {
+      throw new ForbiddenException();
+    }
+
+    return this.prisma.event.delete({
+      where: { id: eventId },
+    });
+  }
 }
