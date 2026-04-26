@@ -2,170 +2,59 @@ import {
   BadRequestException,
   ForbiddenException,
   Injectable,
-  NotFoundException,
 } from '@nestjs/common';
+
 import { PrismaService } from '../prisma/prisma.service';
+import { CreateEventDto } from './dto/create-event.dto';
 
 @Injectable()
 export class EventsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async create(user: any, dto: any) {
+  async create(user: any, dto: CreateEventDto) {
     if (!user.associationId) {
-      throw new ForbiddenException('No active association selected');
+      throw new BadRequestException(
+        'No active association selected',
+      );
     }
 
-    if (!['OWNER', 'ADMIN'].includes(user.role)) {
-      throw new ForbiddenException('Only OWNER or ADMIN can create events');
+    if (
+      user.role !== 'OWNER' &&
+      user.role !== 'ADMIN'
+    ) {
+      throw new ForbiddenException(
+        'Insufficient role',
+      );
     }
 
     return this.prisma.event.create({
       data: {
-        associationId: user.associationId,
         title: dto.title,
         description: dto.description,
         location: dto.location,
         startsAt: new Date(dto.startsAt),
-        endsAt: dto.endsAt ? new Date(dto.endsAt) : null,
+        endsAt: dto.endsAt
+          ? new Date(dto.endsAt)
+          : null,
+        associationId: user.associationId,
       },
     });
   }
 
   async findAll(user: any) {
     if (!user.associationId) {
-      throw new ForbiddenException('No active association selected');
+      throw new BadRequestException(
+        'No active association selected',
+      );
     }
 
     return this.prisma.event.findMany({
-      where: { associationId: user.associationId },
-      orderBy: { startsAt: 'asc' },
-    });
-  }
-
-  async register(user: any, eventId: string) {
-    if (!user.associationId) {
-      throw new ForbiddenException('No active association selected');
-    }
-
-    const event = await this.prisma.event.findUnique({
-      where: { id: eventId },
-    });
-
-    if (!event) {
-      throw new NotFoundException('Event not found');
-    }
-
-    if (event.associationId !== user.associationId) {
-      throw new ForbiddenException();
-    }
-
-    const exists = await this.prisma.eventRegistration.findUnique({
       where: {
-        eventId_userId: {
-          eventId,
-          userId: user.id,
-        },
+        associationId: user.associationId,
       },
-    });
-
-    if (exists) {
-      throw new BadRequestException('Already registered');
-    }
-
-    return this.prisma.eventRegistration.create({
-      data: {
-        eventId,
-        userId: user.id,
+      orderBy: {
+        startsAt: 'asc',
       },
-    });
-  }
-
-  async registrations(user: any, eventId: string) {
-    if (!user.associationId) {
-      throw new ForbiddenException('No active association selected');
-    }
-
-    const event = await this.prisma.event.findUnique({
-      where: { id: eventId },
-    });
-
-    if (!event) {
-      throw new NotFoundException('Event not found');
-    }
-
-    if (event.associationId !== user.associationId) {
-      throw new ForbiddenException();
-    }
-
-    return this.prisma.eventRegistration.findMany({
-      where: { eventId },
-      include: {
-        user: {
-          select: {
-            id: true,
-            email: true,
-          },
-        },
-      },
-    });
-  }
-
-  async update(user: any, eventId: string, dto: any) {
-    if (!user.associationId) {
-      throw new ForbiddenException('No active association selected');
-    }
-
-    if (!['OWNER', 'ADMIN'].includes(user.role)) {
-      throw new ForbiddenException('Only OWNER or ADMIN can update events');
-    }
-
-    const event = await this.prisma.event.findUnique({
-      where: { id: eventId },
-    });
-
-    if (!event) {
-      throw new NotFoundException('Event not found');
-    }
-
-    if (event.associationId !== user.associationId) {
-      throw new ForbiddenException();
-    }
-
-    return this.prisma.event.update({
-      where: { id: eventId },
-      data: {
-        title: dto.title,
-        description: dto.description,
-        location: dto.location,
-        startsAt: dto.startsAt ? new Date(dto.startsAt) : undefined,
-        endsAt: dto.endsAt ? new Date(dto.endsAt) : undefined,
-      },
-    });
-  }
-
-  async remove(user: any, eventId: string) {
-    if (!user.associationId) {
-      throw new ForbiddenException('No active association selected');
-    }
-
-    if (!['OWNER', 'ADMIN'].includes(user.role)) {
-      throw new ForbiddenException('Only OWNER or ADMIN can delete events');
-    }
-
-    const event = await this.prisma.event.findUnique({
-      where: { id: eventId },
-    });
-
-    if (!event) {
-      throw new NotFoundException('Event not found');
-    }
-
-    if (event.associationId !== user.associationId) {
-      throw new ForbiddenException();
-    }
-
-    return this.prisma.event.delete({
-      where: { id: eventId },
     });
   }
 }

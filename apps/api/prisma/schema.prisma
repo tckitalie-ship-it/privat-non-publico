@@ -30,8 +30,8 @@ model Association {
   description String?
   memberships Membership[]
   invites Invite[]
-  invitations Invitation[]
   events Event[]
+  invitations Invitation[]
   createdAt   DateTime     @default(now())
 }
 
