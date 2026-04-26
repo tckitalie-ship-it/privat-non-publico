@@ -29,6 +29,7 @@ model Association {
   slug        String?
   description String?
   memberships Membership[]
+  invites Invite[]
   invitations Invitation[]
   events Event[]
   createdAt   DateTime     @default(now())
@@ -99,4 +100,15 @@ model EventRegistration {
   @@unique([eventId, userId])
   @@index([eventId])
   @@index([userId])
+}
+model Invite {
+  id            String      @id @default(uuid())
+  email         String
+  token         String      @unique
+  role          String      @default("member")
+  status        String      @default("PENDING")
+  associationId String
+  association   Association @relation(fields: [associationId], references: [id], onDelete: Cascade)
+  createdAt     DateTime    @default(now())
+  expiresAt     DateTime
 }

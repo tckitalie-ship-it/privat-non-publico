@@ -5,7 +5,6 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { randomUUID } from 'crypto';
-
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateInvitationDto } from './dto/create-invitation.dto';
 
@@ -22,15 +21,7 @@ export class InvitationsService {
       throw new ForbiddenException('Only OWNER or ADMIN can invite members');
     }
 
-    const association = await this.prisma.association.findUnique({
-      where: { id: currentUser.associationId },
-    });
-
-    if (!association) {
-      throw new NotFoundException('Association not found');
-    }
-
-    const existingInvitation = await this.prisma.invitation.findFirst({
+    const existingInvite = await this.prisma.invite.findFirst({
       where: {
         email: dto.email,
         associationId: currentUser.associationId,
@@ -38,17 +29,20 @@ export class InvitationsService {
       },
     });
 
-    if (existingInvitation) {
-      throw new BadRequestException('Pending invitation already exists');
+    if (existingInvite) {
+      throw new BadRequestException('Pending invite already exists');
     }
 
-    return this.prisma.invitation.create({
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 7);
+
+    return this.prisma.invite.create({
       data: {
         email: dto.email,
         role: dto.role,
         token: randomUUID(),
         associationId: currentUser.associationId,
-        invitedByUserId: currentUser.id,
+        expiresAt,
       },
     });
   }
@@ -58,7 +52,7 @@ export class InvitationsService {
       throw new ForbiddenException('No active association selected');
     }
 
-    return this.prisma.invitation.findMany({
+    return this.prisma.invite.findMany({
       where: {
         associationId: currentUser.associationId,
       },
@@ -73,55 +67,51 @@ export class InvitationsService {
       throw new BadRequestException('Token is required');
     }
 
-    const invitation = await this.prisma.invitation.findUnique({
+    const invite = await this.prisma.invite.findUnique({
       where: { token },
     });
 
-    if (!invitation) {
-      throw new NotFoundException('Invitation not found');
+    if (!invite) {
+      throw new NotFoundException('Invite not found');
     }
 
-    if (invitation.status !== 'PENDING') {
-      throw new BadRequestException('Invitation already used');
+    if (invite.status !== 'PENDING') {
+      throw new BadRequestException('Invite already used');
     }
 
-    if (invitation.email.toLowerCase() !== currentUser.email.toLowerCase()) {
-      throw new ForbiddenException('Invitation email mismatch');
+    if (invite.email.toLowerCase() !== currentUser.email.toLowerCase()) {
+      throw new ForbiddenException('Invite email mismatch');
     }
 
-    return this.prisma.$transaction(async (tx) => {
-      const existingMembership = await tx.membership.findUnique({
-        where: {
-          userId_associationId: {
-            userId: currentUser.id,
-            associationId: invitation.associationId,
-          },
-        },
-      });
-
-      if (existingMembership) {
-        throw new BadRequestException('User is already a member');
-      }
-
-      const membership = await tx.membership.create({
-        data: {
-          userId: currentUser.id,
-          associationId: invitation.associationId,
-          role: invitation.role,
-        },
-      });
-
-      await tx.invitation.update({
-        where: { id: invitation.id },
-        data: { status: 'ACCEPTED' },
-      });
-
-      return {
-        success: true,
-        associationId: invitation.associationId,
-        role: invitation.role,
-        membership,
-      };
+    const membership = await this.prisma.membership.findFirst({
+      where: {
+        userId: currentUser.id,
+        associationId: invite.associationId,
+      },
     });
+
+    if (membership) {
+      throw new BadRequestException('User is already a member');
+    }
+
+    const createdMembership = await this.prisma.membership.create({
+      data: {
+        userId: currentUser.id,
+        associationId: invite.associationId,
+        role: invite.role,
+      },
+    });
+
+    await this.prisma.invite.update({
+      where: { id: invite.id },
+      data: { status: 'ACCEPTED' },
+    });
+
+    return {
+      success: true,
+      associationId: invite.associationId,
+      role: invite.role,
+      membership: createdMembership,
+    };
   }
 }
