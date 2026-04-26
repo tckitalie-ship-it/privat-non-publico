@@ -3,11 +3,40 @@ import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
 export class MembershipsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+  ) {}
 
-  async findAllByAssociation(associationId: string) {
+  async create(dto: {
+    userId: string;
+    associationId: string;
+    role?: string;
+  }) {
+    return this.prisma.membership.create({
+      data: {
+        userId: dto.userId,
+        associationId: dto.associationId,
+        role: dto.role ?? 'member',
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+          },
+        },
+        association: true,
+      },
+    });
+  }
+
+  async findAllByAssociation(
+    associationId: string,
+  ) {
     return this.prisma.membership.findMany({
-      where: { associationId },
+      where: {
+        associationId,
+      },
       include: {
         user: {
           select: {

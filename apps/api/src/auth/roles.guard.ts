@@ -6,7 +6,16 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { ROLES_KEY } from './roles.decorator';
-import { JwtUser, MembershipRole } from './.types/jwt-user.type';
+import { MembershipRole } from './.types/jwt-user.type';
+
+type JwtRequestUser = {
+  id: string;
+  sub: string;
+  email: string;
+  associationId: string | null;
+  role: MembershipRole | null;
+};
+
 @Injectable()
 export class RolesGuard implements CanActivate {
   constructor(private readonly reflector: Reflector) {}
@@ -22,26 +31,21 @@ export class RolesGuard implements CanActivate {
     }
 
     const request = context.switchToHttp().getRequest();
-    const user = request.user as JwtUser;
-    const associationId = request.headers['x-association-id'];
+    const user = request.user as JwtRequestUser | undefined;
 
-    if (!user || !Array.isArray(user.memberships)) {
-      throw new ForbiddenException('No memberships found');
+    if (!user) {
+      throw new ForbiddenException('User not found');
     }
 
-    if (!associationId || typeof associationId !== 'string') {
+    if (!user.associationId) {
       throw new ForbiddenException('Association id is required');
     }
 
-    const membership = user.memberships.find(
-      (m) => m.associationId === associationId,
-    );
-
-    if (!membership) {
-      throw new ForbiddenException('Membership not found for association');
+    if (!user.role) {
+      throw new ForbiddenException('Role is required');
     }
 
-    if (!requiredRoles.includes(membership.role)) {
+    if (!requiredRoles.includes(user.role)) {
       throw new ForbiddenException('Insufficient role');
     }
 

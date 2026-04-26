@@ -1,45 +1,135 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
+import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service';
+import { UsersService } from '../users/users.service';
 import { LoginDto } from './dto/login.dto';
+
+type JwtPayload = {
+  sub: string;
+  email: string;
+  associationId: string | null;
+  role: string | null;
+};
 
 @Injectable()
 export class AuthService {
   constructor(
-    private readonly prisma: PrismaService,
+    private readonly usersService: UsersService,
     private readonly jwtService: JwtService,
+    private readonly prisma: PrismaService,
   ) {}
 
-  async login(dto: LoginDto) {
-    const { email, password } = dto;
+  async validateUser(email: string, password: string) {
+    const normalizedEmail = email.trim().toLowerCase();
 
-    // 1. Trova utente
     const user = await this.prisma.user.findUnique({
-      where: { email },
+      where: { email: normalizedEmail },
+      include: {
+        memberships: {
+          include: {
+            association: true,
+          },
+        },
+      },
     });
 
-    // 2. Controllo esistenza
     if (!user) {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    // 3. Verifica password (bcrypt)
-    const passwordValid = await bcrypt.compare(password, user.password);
+    const passwordOk = await bcrypt.compare(password, user.passwordHash);
 
-    if (!passwordValid) {
+    if (!passwordOk) {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    // 4. Payload JWT
-    const payload = {
+    const activeMembership = user.memberships[0] ?? null;
+
+    return {
+      id: user.id,
+      email: user.email,
+      activeMembership: activeMembership
+        ? {
+            associationId: activeMembership.associationId,
+            role: activeMembership.role,
+          }
+        : null,
+    };
+  }
+
+  async signToken(user: {
+    id: string;
+    email: string;
+    activeMembership?: {
+      associationId: string;
+      role: string;
+    } | null;
+  }) {
+    const payload: JwtPayload = {
       sub: user.id,
       email: user.email,
+      associationId: user.activeMembership?.associationId ?? null,
+      role: user.activeMembership?.role ?? null,
     };
 
-    // 5. Token
+    return this.jwtService.signAsync(payload);
+  }
+
+  async login(loginDto: LoginDto) {
+    const user = await this.validateUser(loginDto.email, loginDto.password);
+
     return {
-      access_token: await this.jwtService.signAsync(payload),
+      access_token: await this.signToken(user),
+      user,
+    };
+  }
+
+  async me(userId: string) {
+    return this.usersService.findById(userId);
+  }
+
+  async switchAssociation(userId: string, associationId: string) {
+    const membership = await this.prisma.membership.findFirst({
+      where: {
+        userId,
+        associationId,
+      },
+      include: {
+        association: true,
+      },
+    });
+
+    if (!membership) {
+      throw new UnauthorizedException('User is not member of this association');
+    }
+
+    const user = await this.prisma.user.findUnique({
+      where: {
+        id: userId,
+      },
+    });
+
+    if (!user) {
+      throw new UnauthorizedException();
+    }
+
+    const accessToken = await this.signToken({
+      id: user.id,
+      email: user.email,
+      activeMembership: {
+        associationId: membership.associationId,
+        role: membership.role,
+      },
+    });
+
+    return {
+      access_token: accessToken,
+      activeAssociation: {
+        id: membership.association.id,
+        name: membership.association.name,
+        role: membership.role,
+      },
     };
   }
 }

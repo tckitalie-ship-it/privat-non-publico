@@ -1,0 +1,14 @@
+import { Body, Controller, HttpCode, HttpStatus, Post } from '@nestjs/common';
+import { CreateMembershipDto } from './dto/create-membership.dto';
+import { MembershipsService } from './memberships.service';
+
+@Controller('memberships')
+export class MembershipsController {
+  constructor(private readonly membershipsService: MembershipsService) {}
+
+  @Post()
+  @HttpCode(HttpStatus.CREATED)
+  create(@Body() dto: CreateMembershipDto) {
+    return this.membershipsService.create(dto);
+  }
+}

@@ -4,36 +4,64 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  EXPIRED
 }
 
 model User {
-  id           String       @id @default(cuid())
-  email        String       @unique
-  passwordHash String
-  createdAt    DateTime     @default(now())
-
-  memberships  Membership[]
+  id              String       @id @default(uuid())
+  email           String       @unique
+  passwordHash    String
+  memberships     Membership[]
+  sentInvitations Invitation[]
+  createdAt       DateTime     @default(now())
 }
 
 model Association {
-  id           String       @id @default(cuid())
-  name         String
-  description  String?
-  slug         String?      @unique
-  createdAt    DateTime     @default(now())
-
-  memberships  Membership[]
+  id          String       @id @default(uuid())
+  name        String
+  slug        String?
+  description String?
+  memberships Membership[]
+  invitations Invitation[]
+  createdAt   DateTime     @default(now())
 }
 
 model Membership {
-  id             String       @id @default(cuid())
-  userId         String
-  associationId  String
-  role           String
-  createdAt      DateTime     @default(now())
+  id            String @id @default(uuid())
+  userId        String
+  associationId String
+  role          String @default("member")
 
-  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  association    Association  @relation(fields: [associationId], references: [id], onDelete: Cascade)
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  association Association @relation(fields: [associationId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
 
   @@unique([userId, associationId])
+}
+
+model Invitation {
+  id        String           @id @default(cuid())
+  email     String
+  role      String
+  token     String           @unique
+  status    InvitationStatus @default(PENDING)
+
+  associationId String
+  association   Association @relation(fields: [associationId], references: [id], onDelete: Cascade)
+
+  invitedByUserId String
+  invitedByUser   User   @relation(fields: [invitedByUserId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([associationId])
+  @@unique([email, associationId])
 }

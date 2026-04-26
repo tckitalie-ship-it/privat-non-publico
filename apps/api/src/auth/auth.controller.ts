@@ -1,15 +1,15 @@
-import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Post, Req, UseGuards } from '@nestjs/common';
+import { SwitchAssociationDto } from './dto/switch-association.dto';
+import { Request } from 'express';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { JwtAuthGuard } from './jwt-auth.guard';
-import { RolesGuard } from './roles.guard';
-import { Roles } from './roles.decorator';
-import { AssociationId } from './association-id.decorator';
-import { CurrentUser } from './current-user.decorator';
 
-type JwtUser = {
-  id: string;
-  email: string;
+type AuthenticatedRequest = Request & {
+  user: {
+    id: string;
+    email: string;
+  };
 };
 
 @Controller('auth')
@@ -17,24 +17,23 @@ export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   @Post('login')
-  login(@Body() dto: LoginDto) {
-    return this.authService.login(dto);
+  async login(@Body() loginDto: LoginDto) {
+    return this.authService.login(loginDto);
   }
-
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('OWNER')
+  @UseGuards(JwtAuthGuard)
+@Post('switch-association')
+async switchAssociation(
+  @Req() req: AuthenticatedRequest,
+  @Body() dto: SwitchAssociationDto,
+) {
+  return this.authService.switchAssociation(
+    req.user.id,
+    dto.associationId,
+  );
+}
+  @UseGuards(JwtAuthGuard)
   @Get('me')
-  me(@CurrentUser() user: JwtUser, @AssociationId() associationId: string) {
-    return {
-      user,
-      associationId,
-    };
-  }
-
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('ADMIN')
-  @Get('admin-test')
-  adminTest() {
-    return { message: 'Only ADMIN can see this' };
+  async me(@Req() req: AuthenticatedRequest) {
+    return this.authService.me(req.user.id);
   }
 }

@@ -8,15 +8,16 @@ import { CreateUserDto } from './dto/create-user.dto';
 export class UsersService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async create(dto: CreateUserDto) {
-    const email = dto.email.trim().toLowerCase();
-    const hashedPassword = await bcrypt.hash(dto.password, 10);
+  async create(createUserDto: CreateUserDto) {
+    const email = createUserDto.email.trim().toLowerCase();
+    const password = createUserDto.password.trim();
+    const passwordHash = await bcrypt.hash(password, 12);
 
     try {
       return await this.prisma.user.create({
         data: {
           email,
-          password: hashedPassword,
+          passwordHash,
         },
         select: {
           id: true,
@@ -34,5 +35,30 @@ export class UsersService {
 
       throw error;
     }
+  }
+
+  async findByEmail(email: string) {
+    return this.prisma.user.findUnique({
+      where: {
+        email: email.trim().toLowerCase(),
+      },
+      select: {
+        id: true,
+        email: true,
+        passwordHash: true,
+        createdAt: true,
+      },
+    });
+  }
+
+  async findById(id: string) {
+    return this.prisma.user.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        email: true,
+        createdAt: true,
+      },
+    });
   }
 }

@@ -1,9 +1,15 @@
-import { Body, Controller, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Post, Req, UseGuards } from '@nestjs/common';
+import { Request } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { CurrentUser } from '../auth/current-user.decorator';
-import type { JwtUser } from '../auth/.types/jwt-user.type';
 import { AssociationsService } from './associations.service';
 import { CreateAssociationDto } from './dto/create-association.dto';
+
+type AuthenticatedRequest = Request & {
+  user: {
+    id: string;
+    email: string;
+  };
+};
 
 @Controller('associations')
 export class AssociationsController {
@@ -12,9 +18,9 @@ export class AssociationsController {
   @UseGuards(JwtAuthGuard)
   @Post()
   create(
-@CurrentUser() user: JwtUser,
+    @Req() req: AuthenticatedRequest,
     @Body() dto: CreateAssociationDto,
   ) {
-    return this.associationsService.create(user.sub, dto);
+    return this.associationsService.create(req.user.id, dto);
   }
 }
