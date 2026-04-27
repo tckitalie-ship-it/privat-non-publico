@@ -1,4 +1,5 @@
 import { ForbiddenException, Injectable } from '@nestjs/common';
+import * as ExcelJS from 'exceljs';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateTransactionDto } from './dto/create-transaction.dto';
 
@@ -114,5 +115,45 @@ export class FinancesService {
       header.map(escapeCsv).join(','),
       ...rows.map((row) => row.map(escapeCsv).join(',')),
     ].join('\n');
+  }
+
+  async exportXlsx(currentUser: any) {
+    if (!currentUser.associationId) {
+      throw new ForbiddenException('No active association selected');
+    }
+
+    const transactions = await this.prisma.transaction.findMany({
+      where: {
+        associationId: currentUser.associationId,
+      },
+      orderBy: {
+        date: 'desc',
+      },
+    });
+
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet('Transactions');
+
+    sheet.columns = [
+      { header: 'Type', key: 'type', width: 15 },
+      { header: 'Category', key: 'category', width: 25 },
+      { header: 'Description', key: 'description', width: 30 },
+      { header: 'Amount', key: 'amount', width: 15 },
+      { header: 'Date', key: 'date', width: 25 },
+    ];
+
+    transactions.forEach((transaction) => {
+      sheet.addRow({
+        type: transaction.type,
+        category: transaction.category ?? '',
+        description: transaction.description ?? '',
+        amount: transaction.amountCents / 100,
+        date: transaction.date.toISOString(),
+      });
+    });
+
+    const buffer = await workbook.xlsx.writeBuffer();
+
+    return Buffer.from(buffer);
   }
 }

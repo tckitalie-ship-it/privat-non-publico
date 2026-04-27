@@ -20,10 +20,7 @@ export class FinancesController {
 
   @Post('transactions')
   @Roles('OWNER', 'ADMIN')
-  createTransaction(
-    @Req() req: any,
-    @Body() dto: CreateTransactionDto,
-  ) {
+  createTransaction(@Req() req: any, @Body() dto: CreateTransactionDto) {
     return this.financesService.createTransaction(req.user, dto);
   }
 
@@ -40,11 +37,19 @@ export class FinancesController {
   @Get('export.csv')
   @Roles('OWNER', 'ADMIN')
   @Header('Content-Type', 'text/csv')
-  @Header(
-    'Content-Disposition',
-    'attachment; filename="transactions.csv"',
-  )
+  @Header('Content-Disposition', 'attachment; filename="transactions.csv"')
   exportCsv(@Req() req: any) {
     return this.financesService.exportCsv(req.user);
+  }
+
+  @Get('export.xlsx')
+  @Roles('OWNER', 'ADMIN')
+  @Header(
+    'Content-Type',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  )
+  @Header('Content-Disposition', 'attachment; filename="transactions.xlsx"')
+  exportXlsx(@Req() req: any) {
+    return this.financesService.exportXlsx(req.user);
   }
 }
