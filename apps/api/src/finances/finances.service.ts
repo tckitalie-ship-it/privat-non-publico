@@ -64,4 +64,55 @@ export class FinancesService {
       transactionsCount: transactions.length,
     };
   }
+
+  async exportCsv(currentUser: any) {
+    if (!currentUser.associationId) {
+      throw new ForbiddenException('No active association selected');
+    }
+
+    const transactions = await this.prisma.transaction.findMany({
+      where: {
+        associationId: currentUser.associationId,
+      },
+      orderBy: {
+        date: 'desc',
+      },
+    });
+
+    const header = [
+      'id',
+      'type',
+      'category',
+      'description',
+      'amountCents',
+      'amount',
+      'date',
+      'createdAt',
+    ];
+
+    const escapeCsv = (value: unknown) => {
+      if (value === null || value === undefined) {
+        return '';
+      }
+
+      const stringValue = String(value).replace(/"/g, '""');
+      return `"${stringValue}"`;
+    };
+
+    const rows = transactions.map((transaction) => [
+      transaction.id,
+      transaction.type,
+      transaction.category ?? '',
+      transaction.description ?? '',
+      transaction.amountCents,
+      (transaction.amountCents / 100).toFixed(2),
+      transaction.date.toISOString(),
+      transaction.createdAt.toISOString(),
+    ]);
+
+    return [
+      header.map(escapeCsv).join(','),
+      ...rows.map((row) => row.map(escapeCsv).join(',')),
+    ].join('\n');
+  }
 }
