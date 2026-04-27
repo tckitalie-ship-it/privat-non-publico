@@ -7,20 +7,13 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum InvitationStatus {
-  PENDING
-  ACCEPTED
-  EXPIRED
-}
-
 model User {
-  id              String       @id @default(uuid())
-  email           String       @unique
-  passwordHash    String
+  id                 String              @id @default(uuid())
+  email              String              @unique
+  passwordHash       String
+  memberships        Membership[]
   eventRegistrations EventRegistration[]
-  memberships     Membership[]
-  sentInvitations Invitation[]
-  createdAt       DateTime     @default(now())
+  createdAt          DateTime            @default(now())
 }
 
 model Association {
@@ -29,9 +22,8 @@ model Association {
   slug        String?
   description String?
   memberships Membership[]
-  invites Invite[]
-  events Event[]
-  invitations Invitation[]
+  invites     Invite[]
+  events      Event[]
   createdAt   DateTime     @default(now())
 }
 
@@ -49,36 +41,31 @@ model Membership {
   @@unique([userId, associationId])
 }
 
-model Invitation {
-  id        String           @id @default(cuid())
-  email     String
-  role      String
-  token     String           @unique
-  status    InvitationStatus @default(PENDING)
-
+model Invite {
+  id            String      @id @default(uuid())
+  email         String
+  token         String      @unique
+  role          String
+  status        String      @default("PENDING")
   associationId String
   association   Association @relation(fields: [associationId], references: [id], onDelete: Cascade)
+  createdAt     DateTime    @default(now())
+  expiresAt     DateTime
 
-  invitedByUserId String
-  invitedByUser   User   @relation(fields: [invitedByUserId], references: [id], onDelete: Cascade)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([associationId])
   @@unique([email, associationId])
+  @@index([associationId])
 }
+
 model Event {
-  id            String   @id @default(cuid())
+  id            String    @id @default(cuid())
   associationId String
+  title         String
+  description   String?
+  location      String?
+  startsAt      DateTime
+  endsAt        DateTime?
 
-  title       String
-  description String?
-  location    String?
-  startsAt    DateTime
-  endsAt      DateTime?
-
-  association Association @relation(fields: [associationId], references: [id], onDelete: Cascade)
+  association   Association         @relation(fields: [associationId], references: [id], onDelete: Cascade)
   registrations EventRegistration[]
 
   createdAt DateTime @default(now())
@@ -88,27 +75,14 @@ model Event {
 }
 
 model EventRegistration {
-  id      String @id @default(cuid())
-  eventId String
-  userId  String
+  id        String   @id @default(cuid())
+  eventId   String
+  userId    String
+  status    String   @default("REGISTERED")
+  createdAt DateTime @default(now())
 
   event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
   user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  createdAt DateTime @default(now())
-
   @@unique([eventId, userId])
-  @@index([eventId])
-  @@index([userId])
-}
-model Invite {
-  id            String      @id @default(uuid())
-  email         String
-  token         String      @unique
-  role          String      @default("member")
-  status        String      @default("PENDING")
-  associationId String
-  association   Association @relation(fields: [associationId], references: [id], onDelete: Cascade)
-  createdAt     DateTime    @default(now())
-  expiresAt     DateTime
 }

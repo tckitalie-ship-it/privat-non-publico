@@ -4,13 +4,17 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { randomUUID } from 'crypto';
+import { JwtService } from '@nestjs/jwt';
+import { randomBytes } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateInvitationDto } from './dto/create-invitation.dto';
 
 @Injectable()
 export class InvitationsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly jwtService: JwtService,
+  ) {}
 
   async create(currentUser: any, dto: CreateInvitationDto) {
     if (!currentUser.associationId) {
@@ -21,9 +25,24 @@ export class InvitationsService {
       throw new ForbiddenException('Only OWNER or ADMIN can invite members');
     }
 
+    const email = dto.email.trim().toLowerCase();
+
+    const existingMembership = await this.prisma.membership.findFirst({
+      where: {
+        associationId: currentUser.associationId,
+        user: {
+          email,
+        },
+      },
+    });
+
+    if (existingMembership) {
+      throw new BadRequestException('User is already a member');
+    }
+
     const existingInvite = await this.prisma.invite.findFirst({
       where: {
-        email: dto.email,
+        email,
         associationId: currentUser.associationId,
         status: 'PENDING',
       },
@@ -38,9 +57,9 @@ export class InvitationsService {
 
     return this.prisma.invite.create({
       data: {
-        email: dto.email,
+        email,
         role: dto.role,
-        token: randomUUID(),
+        token: randomBytes(32).toString('hex'),
         associationId: currentUser.associationId,
         expiresAt,
       },
@@ -68,7 +87,9 @@ export class InvitationsService {
     }
 
     const invite = await this.prisma.invite.findUnique({
-      where: { token },
+      where: {
+        token,
+      },
     });
 
     if (!invite) {
@@ -79,39 +100,59 @@ export class InvitationsService {
       throw new BadRequestException('Invite already used');
     }
 
+    if (invite.expiresAt < new Date()) {
+      throw new BadRequestException('Invite expired');
+    }
+
     if (invite.email.toLowerCase() !== currentUser.email.toLowerCase()) {
       throw new ForbiddenException('Invite email mismatch');
     }
 
-    const membership = await this.prisma.membership.findFirst({
+    const existingMembership = await this.prisma.membership.findFirst({
       where: {
         userId: currentUser.id,
         associationId: invite.associationId,
       },
     });
 
-    if (membership) {
+    if (existingMembership) {
       throw new BadRequestException('User is already a member');
     }
 
-    const createdMembership = await this.prisma.membership.create({
-      data: {
-        userId: currentUser.id,
-        associationId: invite.associationId,
-        role: invite.role,
-      },
+    const membership = await this.prisma.$transaction(async (tx) => {
+      const createdMembership = await tx.membership.create({
+        data: {
+          userId: currentUser.id,
+          associationId: invite.associationId,
+          role: invite.role,
+        },
+      });
+
+      await tx.invite.update({
+        where: {
+          id: invite.id,
+        },
+        data: {
+          status: 'ACCEPTED',
+        },
+      });
+
+      return createdMembership;
     });
 
-    await this.prisma.invite.update({
-      where: { id: invite.id },
-      data: { status: 'ACCEPTED' },
+    const accessToken = this.jwtService.sign({
+      sub: currentUser.id,
+      email: currentUser.email,
+      associationId: invite.associationId,
+      role: invite.role,
     });
 
     return {
       success: true,
+      access_token: accessToken,
       associationId: invite.associationId,
       role: invite.role,
-      membership: createdMembership,
+      membership,
     };
   }
 }
