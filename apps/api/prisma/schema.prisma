@@ -17,14 +17,15 @@ model User {
 }
 
 model Association {
-  id          String       @id @default(uuid())
-  name        String
-  slug        String?
-  description String?
-  memberships Membership[]
-  invites     Invite[]
-  events      Event[]
-  createdAt   DateTime     @default(now())
+  id           String        @id @default(uuid())
+  name         String
+  slug         String?
+  description  String?
+  transactions Transaction[]
+  memberships  Membership[]
+  invites      Invite[]
+  events       Event[]
+  createdAt    DateTime      @default(now())
 }
 
 model Membership {
@@ -85,4 +86,22 @@ model EventRegistration {
   user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([eventId, userId])
+}
+
+model Transaction {
+  id            String   @id @default(cuid())
+  associationId String
+  type          String
+  category      String?
+  description   String?
+  amountCents   Int
+  date          DateTime @default(now())
+
+  association Association @relation(fields: [associationId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([associationId])
+  @@index([date])
 }
