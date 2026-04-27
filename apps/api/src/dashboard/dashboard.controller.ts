@@ -1,16 +1,19 @@
-import { Controller, Get, UseGuards } from '@nestjs/common';
-import { DashboardService } from './dashboard.service';
+import { Controller, Get, Req, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { RolesGuard } from '../auth/roles.guard';
-import { CurrentUser } from '../auth/current-user.decorator';
+import { DashboardService } from './dashboard.service';
 
 @Controller('dashboard')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard)
 export class DashboardController {
   constructor(private readonly dashboardService: DashboardService) {}
 
   @Get()
-  getDashboard(@CurrentUser() user: any) {
-    return this.dashboardService.getDashboard(user);
+  getDashboard(@Req() req: any) {
+    return this.dashboardService.getDashboard(req.user);
+  }
+
+  @Get('kpis')
+  getKpis(@Req() req: any) {
+    return this.dashboardService.getKpis(req.user);
   }
 }
