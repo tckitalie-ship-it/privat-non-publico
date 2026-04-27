@@ -8,13 +8,14 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { AssociationActiveGuard } from '../auth/association-active.guard';
 import { Roles } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
 import { CreateTransactionDto } from './dto/create-transaction.dto';
 import { FinancesService } from './finances.service';
 
 @Controller('finances')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, AssociationActiveGuard, RolesGuard)
 export class FinancesController {
   constructor(private readonly financesService: FinancesService) {}
 

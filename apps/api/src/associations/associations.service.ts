@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+} from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateAssociationDto } from './dto/create-association.dto';
@@ -52,5 +56,20 @@ export class AssociationsService {
 
       throw error;
     }
+  }
+
+  async setActive(id: string, isActive: boolean, currentUser: any) {
+    if (currentUser.associationId !== id) {
+      throw new ForbiddenException('Wrong association');
+    }
+
+    if (currentUser.role !== 'OWNER') {
+      throw new ForbiddenException('Only OWNER can change association status');
+    }
+
+    return this.prisma.association.update({
+      where: { id },
+      data: { isActive },
+    });
   }
 }

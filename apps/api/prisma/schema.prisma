@@ -21,6 +21,7 @@ model Association {
   name         String
   slug         String?
   description  String?
+  isActive Boolean @default(true)
   transactions Transaction[]
   memberships  Membership[]
   invites      Invite[]
