@@ -33,17 +33,44 @@ export class EventsService {
       throw new ForbiddenException('No active association selected');
     }
 
-    return this.prisma.event.findMany({
+    const events = await this.prisma.event.findMany({
       where: {
         associationId: currentUser.associationId,
       },
       orderBy: {
         startsAt: 'asc',
       },
+      include: {
+        registrations: {
+          select: {
+            userId: true,
+          },
+        },
+      },
     });
+
+    return events.map((event) => ({
+      id: event.id,
+      associationId: event.associationId,
+      title: event.title,
+      description: event.description,
+      location: event.location,
+      startsAt: event.startsAt,
+      endsAt: event.endsAt,
+      createdAt: event.createdAt,
+      updatedAt: event.updatedAt,
+      registrationsCount: event.registrations.length,
+      isRegistered: event.registrations.some(
+        (registration) => registration.userId === currentUser.id,
+      ),
+    }));
   }
 
   async register(currentUser: any, eventId: string) {
+    if (!currentUser.associationId) {
+      throw new ForbiddenException('No active association selected');
+    }
+
     const event = await this.prisma.event.findUnique({
       where: {
         id: eventId,
@@ -80,6 +107,10 @@ export class EventsService {
   }
 
   async findRegistrations(currentUser: any, eventId: string) {
+    if (!currentUser.associationId) {
+      throw new ForbiddenException('No active association selected');
+    }
+
     const event = await this.prisma.event.findUnique({
       where: {
         id: eventId,
@@ -110,15 +141,32 @@ export class EventsService {
   }
 
   async unregister(currentUser: any, eventId: string) {
-    const registration =
-      await this.prisma.eventRegistration.findUnique({
-        where: {
-          eventId_userId: {
-            eventId,
-            userId: currentUser.id,
-          },
+    if (!currentUser.associationId) {
+      throw new ForbiddenException('No active association selected');
+    }
+
+    const event = await this.prisma.event.findUnique({
+      where: {
+        id: eventId,
+      },
+    });
+
+    if (!event) {
+      throw new NotFoundException('Event not found');
+    }
+
+    if (event.associationId !== currentUser.associationId) {
+      throw new ForbiddenException('Wrong association');
+    }
+
+    const registration = await this.prisma.eventRegistration.findUnique({
+      where: {
+        eventId_userId: {
+          eventId,
+          userId: currentUser.id,
         },
-      });
+      },
+    });
 
     if (!registration) {
       throw new NotFoundException('Registration not found');

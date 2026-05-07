@@ -1,2 +1,0 @@
-DATABASE_URL="postgresql://postgres:postgres@localhost:5432/saas?schema=public"
-JWT_SECRET="dev-secret-change"
