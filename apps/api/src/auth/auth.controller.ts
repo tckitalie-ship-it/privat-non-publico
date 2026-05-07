@@ -1,39 +1,32 @@
 import { Body, Controller, Get, Post, Req, UseGuards } from '@nestjs/common';
-import { SwitchAssociationDto } from './dto/switch-association.dto';
-import { Request } from 'express';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
+import { SwitchAssociationDto } from './dto/switch-association.dto';
 import { JwtAuthGuard } from './jwt-auth.guard';
-
-type AuthenticatedRequest = Request & {
-  user: {
-    id: string;
-    email: string;
-  };
-};
 
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   @Post('login')
-  async login(@Body() loginDto: LoginDto) {
-    return this.authService.login(loginDto);
+  login(@Body() dto: LoginDto) {
+    return this.authService.login(dto);
   }
+
+  @Post('switch-association')
   @UseGuards(JwtAuthGuard)
-@Post('switch-association')
-async switchAssociation(
-  @Req() req: AuthenticatedRequest,
-  @Body() dto: SwitchAssociationDto,
-) {
-  return this.authService.switchAssociation(
-    req.user.id,
-    dto.associationId,
-  );
-}
-  @UseGuards(JwtAuthGuard)
+  switchAssociation(@Req() req, @Body() dto: SwitchAssociationDto) {
+    return this.authService.switchAssociation(req.user.id, dto.associationId);
+  }
+
   @Get('me')
-  async me(@Req() req: AuthenticatedRequest) {
-    return this.authService.me(req.user.id);
+  @UseGuards(JwtAuthGuard)
+  me(@Req() req) {
+    return {
+      id: req.user.id,
+      email: req.user.email,
+      associationId: req.user.associationId ?? null,
+      role: req.user.role ?? null,
+    };
   }
 }

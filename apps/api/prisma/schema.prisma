@@ -7,33 +7,47 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum Role {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
 model User {
   id                 String              @id @default(uuid())
   email              String              @unique
   passwordHash       String
   memberships        Membership[]
   eventRegistrations EventRegistration[]
+  sentInvitations    Invitation[]
   createdAt          DateTime            @default(now())
 }
 
 model Association {
-  id           String        @id @default(uuid())
-  name         String
-  slug         String?
-  description  String?
-  isActive Boolean @default(true)
+  id          String  @id @default(uuid())
+  name        String
+  slug        String?
+  description String?
+  isActive    Boolean @default(true)
+
+  stripeCustomerId             String?
+  stripeSubscriptionId         String?
+  subscriptionStatus           String?
+  subscriptionCurrentPeriodEnd DateTime?
+
   transactions Transaction[]
   memberships  Membership[]
-  invites      Invite[]
+  invitations  Invitation[]
   events       Event[]
-  createdAt    DateTime      @default(now())
+
+  createdAt DateTime @default(now())
 }
 
 model Membership {
   id            String @id @default(uuid())
   userId        String
   associationId String
-  role          String @default("member")
+  role          Role   @default(MEMBER)
 
   user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
   association Association @relation(fields: [associationId], references: [id], onDelete: Cascade)
@@ -43,19 +57,24 @@ model Membership {
   @@unique([userId, associationId])
 }
 
-model Invite {
-  id            String      @id @default(uuid())
+model Invitation {
+  id            String    @id @default(uuid())
   email         String
-  token         String      @unique
-  role          String
-  status        String      @default("PENDING")
+  token         String    @unique
+  role          Role      @default(MEMBER)
+  status        String    @default("PENDING")
   associationId String
-  association   Association @relation(fields: [associationId], references: [id], onDelete: Cascade)
-  createdAt     DateTime    @default(now())
+  invitedById   String?
+  createdAt     DateTime  @default(now())
   expiresAt     DateTime
+  acceptedAt    DateTime?
+
+  association Association @relation(fields: [associationId], references: [id], onDelete: Cascade)
+  invitedBy   User?       @relation(fields: [invitedById], references: [id])
 
   @@unique([email, associationId])
   @@index([associationId])
+  @@index([invitedById])
 }
 
 model Event {

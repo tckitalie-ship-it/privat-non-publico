@@ -1,20 +1,23 @@
 import { Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
-import { PrismaModule } from '../prisma/prisma.module';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { InvitationsController } from './invitations.controller';
 import { InvitationsService } from './invitations.service';
+import { PrismaService } from '../prisma/prisma.service';
 
 @Module({
   imports: [
-    PrismaModule,
-    JwtModule.register({
-      secret: process.env.JWT_SECRET || 'dev-secret',
-      signOptions: {
-        expiresIn: '7d',
-      },
+    ConfigModule,
+    JwtModule.registerAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => ({
+        secret: config.get<string>('JWT_SECRET') ?? 'dev-secret',
+        signOptions: { expiresIn: '7d' },
+      }),
     }),
   ],
   controllers: [InvitationsController],
-  providers: [InvitationsService],
+  providers: [InvitationsService, PrismaService],
 })
 export class InvitationsModule {}

@@ -1,9 +1,10 @@
-import { IsEmail, IsIn } from 'class-validator';
+import { IsEmail, IsEnum } from 'class-validator';
+import { Role } from '@prisma/client';
 
 export class CreateInvitationDto {
   @IsEmail()
   email: string;
 
-  @IsIn(['MEMBER', 'ADMIN'])
-  role: 'MEMBER' | 'ADMIN';
+  @IsEnum(Role, { message: 'Role must be OWNER, ADMIN or MEMBER' })
+  role: Role;
 }

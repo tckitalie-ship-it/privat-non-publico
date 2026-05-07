@@ -1,25 +1,31 @@
 import { Module } from '@nestjs/common';
-import { FinancesModule } from './finances/finances.module';
-import { PrismaModule } from './prisma/prisma.module';
-import { UsersModule } from './users/users.module';
+import { ConfigModule } from '@nestjs/config';
 import { AuthModule } from './auth/auth.module';
 import { AssociationsModule } from './associations/associations.module';
-import { MembershipsModule } from './memberships/memberships.module';
+import { BillingModule } from './billing/billing.module';
 import { DashboardModule } from './dashboard/dashboard.module';
-import { InvitationsModule } from './invitations/invitations.module';
 import { EventsModule } from './events/events.module';
+import { FinancesModule } from './finances/finances.module';
+import { InvitationsModule } from './invitations/invitations.module';
+import { MembershipsModule } from './memberships/memberships.module';
+import { UsersModule } from './users/users.module';
 
 @Module({
   imports: [
-    PrismaModule,
-    FinancesModule,
-    UsersModule,
+    ConfigModule.forRoot({
+  isGlobal: true,
+  envFilePath: '.env',
+}),
+
     AuthModule,
+    UsersModule,
     AssociationsModule,
     MembershipsModule,
     DashboardModule,
-    InvitationsModule,
     EventsModule,
+    InvitationsModule,
+    FinancesModule,
+    BillingModule,
   ],
 })
 export class AppModule {}
