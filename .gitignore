@@ -24,3 +24,6 @@ build/
 # Installer & archive
 *.zip
 *.exe
+.env.local
+env.local
+apps/web/env.local
