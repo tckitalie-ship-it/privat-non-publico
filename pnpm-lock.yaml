@@ -90,6 +90,9 @@ importers:
       '@nestjs/platform-express':
         specifier: ^11.0.1
         version: 11.1.18(@nestjs/common@11.1.18(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.18)
+      '@prisma/client':
+        specifier: 6.16.3
+        version: 6.16.3(prisma@6.16.3(typescript@5.9.3))(typescript@5.9.3)
       bcrypt:
         specifier: ^6.0.0
         version: 6.0.0
@@ -117,6 +120,9 @@ importers:
       pg:
         specifier: ^8.20.0
         version: 8.20.0
+      prisma:
+        specifier: 6.16.3
+        version: 6.16.3(typescript@5.9.3)
       reflect-metadata:
         specifier: ^0.2.2
         version: 0.2.2
@@ -5721,6 +5727,11 @@ snapshots:
 
   '@pkgr/core@0.2.9': {}
 
+  '@prisma/client@6.16.3(prisma@6.16.3(typescript@5.9.3))(typescript@5.9.3)':
+    optionalDependencies:
+      prisma: 6.16.3(typescript@5.9.3)
+      typescript: 5.9.3
+
   '@prisma/client@6.16.3(prisma@6.16.3(typescript@6.0.2))(typescript@6.0.2)':
     optionalDependencies:
       prisma: 6.16.3(typescript@6.0.2)
@@ -8761,6 +8772,15 @@ snapshots:
       '@jest/schemas': 30.0.5
       ansi-styles: 5.2.0
       react-is: 18.3.1
+
+  prisma@6.16.3(typescript@5.9.3):
+    dependencies:
+      '@prisma/config': 6.16.3
+      '@prisma/engines': 6.16.3
+    optionalDependencies:
+      typescript: 5.9.3
+    transitivePeerDependencies:
+      - magicast
 
   prisma@6.16.3(typescript@6.0.2):
     dependencies:
