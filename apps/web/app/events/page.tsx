@@ -15,12 +15,31 @@ type EventItem = {
   isRegistered: boolean;
 };
 
+type Registration = {
+  id: string;
+  createdAt: string;
+  user: {
+    id: string;
+    email: string;
+  };
+};
+
 export default function EventsPage() {
   const router = useRouter();
 
   const [events, setEvents] = useState<EventItem[]>([]);
+  const [registrationsByEvent, setRegistrationsByEvent] = useState<
+    Record<string, Registration[]>
+  >({});
+  const [openRegistrationsEventId, setOpenRegistrationsEventId] =
+    useState<string | null>(null);
+
   const [loading, setLoading] = useState(true);
-  const [submittingEventId, setSubmittingEventId] = useState<string | null>(null);
+  const [submittingEventId, setSubmittingEventId] = useState<string | null>(
+    null,
+  );
+  const [loadingRegistrationsEventId, setLoadingRegistrationsEventId] =
+    useState<string | null>(null);
 
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -64,7 +83,6 @@ export default function EventsPage() {
 
   async function handleCreateEvent(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-
     setMessage('');
 
     const token = getAccessToken();
@@ -144,6 +162,7 @@ export default function EventsPage() {
         ),
       );
 
+      delete registrationsByEvent[eventId];
       setMessage('Registrazione completata');
     } catch (err: any) {
       setMessage(err.message || 'Errore registrazione');
@@ -189,11 +208,61 @@ export default function EventsPage() {
         ),
       );
 
+      delete registrationsByEvent[eventId];
       setMessage('Disiscrizione completata');
     } catch (err: any) {
       setMessage(err.message || 'Errore disiscrizione');
     } finally {
       setSubmittingEventId(null);
+    }
+  }
+
+  async function toggleRegistrations(eventId: string) {
+    if (openRegistrationsEventId === eventId) {
+      setOpenRegistrationsEventId(null);
+      return;
+    }
+
+    setOpenRegistrationsEventId(eventId);
+
+    if (registrationsByEvent[eventId]) {
+      return;
+    }
+
+    const token = getAccessToken();
+
+    if (!token) {
+      router.push('/login');
+      return;
+    }
+
+    setLoadingRegistrationsEventId(eventId);
+    setMessage('');
+
+    try {
+      const res = await fetch(
+        `${API_URL}/api/events/${eventId}/registrations`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      );
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.message || 'Errore caricamento partecipanti');
+      }
+
+      setRegistrationsByEvent((current) => ({
+        ...current,
+        [eventId]: Array.isArray(data) ? data : [],
+      }));
+    } catch (err: any) {
+      setMessage(err.message || 'Errore caricamento partecipanti');
+    } finally {
+      setLoadingRegistrationsEventId(null);
     }
   }
 
@@ -309,9 +378,51 @@ export default function EventsPage() {
               <p>🗓 {new Date(event.startsAt).toLocaleString('it-IT')}</p>
             </div>
 
-            <div className="text-sm text-gray-500">
-              Partecipanti: {event.registrationsCount}
+            <div className="flex items-center justify-between gap-3">
+              <div className="text-sm text-gray-500">
+                Partecipanti: {event.registrationsCount}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => toggleRegistrations(event.id)}
+                className="border px-3 py-2 rounded text-sm"
+              >
+                {openRegistrationsEventId === event.id
+                  ? 'Nascondi partecipanti'
+                  : 'Mostra partecipanti'}
+              </button>
             </div>
+
+            {openRegistrationsEventId === event.id && (
+              <div className="border rounded-lg p-3 bg-gray-50 space-y-2">
+                <h4 className="font-medium text-sm">Partecipanti evento</h4>
+
+                {loadingRegistrationsEventId === event.id && (
+                  <p className="text-sm text-gray-500">Caricamento...</p>
+                )}
+
+                {!loadingRegistrationsEventId &&
+                  registrationsByEvent[event.id]?.length === 0 && (
+                    <p className="text-sm text-gray-500">
+                      Nessun partecipante.
+                    </p>
+                  )}
+
+                {registrationsByEvent[event.id]?.map((registration) => (
+                  <div
+                    key={registration.id}
+                    className="flex items-center justify-between border rounded bg-white px-3 py-2"
+                  >
+                    <span className="text-sm">{registration.user.email}</span>
+
+                    <span className="text-xs text-gray-500">
+                      {new Date(registration.createdAt).toLocaleString('it-IT')}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         ))}
       </div>
