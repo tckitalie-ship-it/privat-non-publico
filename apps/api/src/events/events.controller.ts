@@ -4,6 +4,7 @@ import {
   Delete,
   Get,
   Param,
+  Patch,
   Post,
   Req,
   UseGuards,
@@ -28,6 +29,22 @@ export class EventsController {
   @Get()
   findAll(@Req() req: any) {
     return this.eventsService.findAll(req.user);
+  }
+
+  @Patch(':id')
+  @Roles('OWNER', 'ADMIN')
+  update(
+    @Req() req: any,
+    @Param('id') eventId: string,
+    @Body() dto: CreateEventDto,
+  ) {
+    return this.eventsService.update(req.user, eventId, dto);
+  }
+
+  @Delete(':id')
+  @Roles('OWNER', 'ADMIN')
+  remove(@Req() req: any, @Param('id') eventId: string) {
+    return this.eventsService.remove(req.user, eventId);
   }
 
   @Post(':id/register')

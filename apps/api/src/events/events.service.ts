@@ -66,6 +66,69 @@ export class EventsService {
     }));
   }
 
+  async update(currentUser: any, eventId: string, dto: CreateEventDto) {
+    if (!currentUser.associationId) {
+      throw new ForbiddenException('No active association selected');
+    }
+
+    const event = await this.prisma.event.findUnique({
+      where: {
+        id: eventId,
+      },
+    });
+
+    if (!event) {
+      throw new NotFoundException('Event not found');
+    }
+
+    if (event.associationId !== currentUser.associationId) {
+      throw new ForbiddenException('Wrong association');
+    }
+
+    return this.prisma.event.update({
+      where: {
+        id: eventId,
+      },
+      data: {
+        title: dto.title,
+        description: dto.description,
+        location: dto.location,
+        startsAt: new Date(dto.startsAt),
+        endsAt: dto.endsAt ? new Date(dto.endsAt) : null,
+      },
+    });
+  }
+
+  async remove(currentUser: any, eventId: string) {
+    if (!currentUser.associationId) {
+      throw new ForbiddenException('No active association selected');
+    }
+
+    const event = await this.prisma.event.findUnique({
+      where: {
+        id: eventId,
+      },
+    });
+
+    if (!event) {
+      throw new NotFoundException('Event not found');
+    }
+
+    if (event.associationId !== currentUser.associationId) {
+      throw new ForbiddenException('Wrong association');
+    }
+
+    await this.prisma.event.delete({
+      where: {
+        id: eventId,
+      },
+    });
+
+    return {
+      success: true,
+    };
+  }
+
   async register(currentUser: any, eventId: string) {
     if (!currentUser.associationId) {
       throw new ForbiddenException('No active association selected');
