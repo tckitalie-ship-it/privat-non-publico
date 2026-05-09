@@ -1,13 +1,14 @@
 'use client';
 
+
+'use client';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   API_URL,
   clearAccessToken,
   getAccessToken,
-} from '../../lib/api';
-
+} from '@/lib/api';
 type DashboardData = {
   membership: {
     role: string;

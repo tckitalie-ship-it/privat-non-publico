@@ -2,7 +2,10 @@
 
 import { FormEvent, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { API_URL, getAccessToken } from '../../lib/api';
+import {
+  API_URL,
+  getAccessToken,
+} from '../../lib/api';
 
 type EventItem = {
   id: string;

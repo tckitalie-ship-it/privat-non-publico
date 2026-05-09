@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { API_URL, setToken } from '@/lib/api';
+import { API_URL, setToken } from '../lib/api';
 
 export default function InvitePage() {
   const router = useRouter();
