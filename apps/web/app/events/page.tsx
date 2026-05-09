@@ -2,10 +2,7 @@
 
 import { FormEvent, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import {
-  API_URL,
-  getAccessToken,
-} from '../../lib/api';
+import { API_URL, getAccessToken } from '@/lib/api';
 
 type EventItem = {
   id: string;
@@ -23,9 +20,7 @@ export default function EventsPage() {
 
   const [events, setEvents] = useState<EventItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [submittingEventId, setSubmittingEventId] = useState<string | null>(
-    null,
-  );
+  const [submittingEventId, setSubmittingEventId] = useState<string | null>(null);
 
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -157,6 +152,51 @@ export default function EventsPage() {
     }
   }
 
+  async function unregisterFromEvent(eventId: string) {
+    setMessage('');
+    setSubmittingEventId(eventId);
+
+    const token = getAccessToken();
+
+    if (!token) {
+      router.push('/login');
+      return;
+    }
+
+    try {
+      const res = await fetch(`${API_URL}/api/events/${eventId}/register`, {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.message || 'Errore disiscrizione');
+      }
+
+      setEvents((currentEvents) =>
+        currentEvents.map((event) =>
+          event.id === eventId
+            ? {
+                ...event,
+                isRegistered: false,
+                registrationsCount: Math.max(0, event.registrationsCount - 1),
+              }
+            : event,
+        ),
+      );
+
+      setMessage('Disiscrizione completata');
+    } catch (err: any) {
+      setMessage(err.message || 'Errore disiscrizione');
+    } finally {
+      setSubmittingEventId(null);
+    }
+  }
+
   return (
     <main className="max-w-5xl mx-auto p-6 space-y-6">
       <div className="flex items-center justify-between">
@@ -240,21 +280,27 @@ export default function EventsPage() {
                 )}
               </div>
 
-              <button
-                onClick={() => registerToEvent(event.id)}
-                disabled={event.isRegistered || submittingEventId === event.id}
-                className={
-                  event.isRegistered
-                    ? 'bg-gray-300 text-gray-700 px-4 py-2 rounded cursor-not-allowed'
-                    : 'bg-green-600 text-white px-4 py-2 rounded disabled:opacity-60'
-                }
-              >
-                {submittingEventId === event.id
-                  ? 'Registro...'
-                  : event.isRegistered
-                    ? 'Registrato'
+              {event.isRegistered ? (
+                <button
+                  onClick={() => unregisterFromEvent(event.id)}
+                  disabled={submittingEventId === event.id}
+                  className="bg-red-600 text-white px-4 py-2 rounded disabled:opacity-60"
+                >
+                  {submittingEventId === event.id
+                    ? 'Disiscrivo...'
+                    : 'Disiscriviti'}
+                </button>
+              ) : (
+                <button
+                  onClick={() => registerToEvent(event.id)}
+                  disabled={submittingEventId === event.id}
+                  className="bg-green-600 text-white px-4 py-2 rounded disabled:opacity-60"
+                >
+                  {submittingEventId === event.id
+                    ? 'Registro...'
                     : 'Registrati'}
-              </button>
+                </button>
+              )}
             </div>
 
             <div className="text-sm text-gray-600 space-y-1">
