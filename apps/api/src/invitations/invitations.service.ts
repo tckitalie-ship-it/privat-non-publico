@@ -72,7 +72,6 @@ export class InvitationsService {
           <a href="${inviteLink}">Accetta invito</a>
         `,
       });
-
       console.log('EMAIL RESPONSE:', response);
     } catch (error) {
       console.error('EMAIL ERROR:', error);

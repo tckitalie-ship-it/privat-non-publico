@@ -5,10 +5,12 @@ import {
   Header,
   Post,
   Req,
+  Res,
   UseGuards,
 } from '@nestjs/common';
-import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import type { Response } from 'express';
 import { AssociationActiveGuard } from '../auth/association-active.guard';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
 import { CreateTransactionDto } from './dto/create-transaction.dto';
@@ -45,12 +47,19 @@ export class FinancesController {
 
   @Get('export.xlsx')
   @Roles('OWNER', 'ADMIN')
-  @Header(
-    'Content-Type',
-    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-  )
-  @Header('Content-Disposition', 'attachment; filename="transactions.xlsx"')
-  exportXlsx(@Req() req: any) {
-    return this.financesService.exportXlsx(req.user);
+  async exportXlsx(@Req() req: any, @Res() res: Response) {
+    const buffer = await this.financesService.exportXlsx(req.user);
+
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    );
+
+    res.setHeader(
+      'Content-Disposition',
+      'attachment; filename="transactions.xlsx"',
+    );
+
+    return res.send(buffer);
   }
 }

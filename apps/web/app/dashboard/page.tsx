@@ -1,260 +1,242 @@
 'use client';
 
-
-'use client';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+
 import {
-  API_URL,
-  clearAccessToken,
-  getAccessToken,
-} from '@/lib/api';
-type DashboardData = {
-  membership: {
-    role: string;
-    association: {
-      name: string;
-      isActive: boolean;
-    };
-  };
-  kpis: {
-    membersCount: number;
-    eventsCount: number;
-    incomeCents: number;
-    expenseCents: number;
-    balanceCents: number;
-  };
+  Bar,
+  BarChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+} from 'recharts';
+
+import { API_URL, getAccessToken } from '@/lib/api';
+import { DashboardSidebar } from '@/components/dashboard-sidebar';
+
+type DashboardKpis = {
+  associations: number;
+  members: number;
+  events: number;
+  revenue: number;
 };
 
-type Member = {
-  id: string;
-  role: string;
-  user: {
-    email: string;
-  };
-};
+const chartData = [
+  { month: 'Gen', revenue: 400 },
+  { month: 'Feb', revenue: 900 },
+  { month: 'Mar', revenue: 600 },
+  { month: 'Apr', revenue: 1200 },
+  { month: 'Mag', revenue: 1800 },
+];
 
 export default function DashboardPage() {
   const router = useRouter();
 
-  const [data, setData] = useState<DashboardData | null>(null);
-  const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
 
-  function logout() {
-    clearAccessToken();
-    router.push('/login');
-  }
-
-  async function requestJson(url: string, token: string) {
-    const res = await fetch(url, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
-
-    const text = await res.text();
-    const body = text ? JSON.parse(text) : null;
-
-    if (!res.ok) {
-      throw new Error(body?.message || `Errore HTTP ${res.status}`);
-    }
-
-    return body;
-  }
-
-  async function load() {
-    setLoading(true);
-    setError('');
-
-    const token = getAccessToken();
-
-    if (!token) {
-      router.push('/login');
-      return;
-    }
-
-    try {
-      const kpis = await requestJson(
-        `${API_URL}/api/dashboard/kpis`,
-        token,
-      );
-
-      const membership = await requestJson(
-        `${API_URL}/api/memberships/me`,
-        token,
-      );
-
-      const memberships = await requestJson(
-        `${API_URL}/api/memberships`,
-        token,
-      );
-
-      setData({
-        kpis,
-        membership,
-      });
-
-      setMembers(Array.isArray(memberships) ? memberships : []);
-    } catch (err: any) {
-      setError(
-        err.message || 'Errore nel caricamento dashboard',
-      );
-    } finally {
-      setLoading(false);
-    }
-  }
+  const [kpis, setKpis] = useState<DashboardKpis>({
+    associations: 0,
+    members: 0,
+    events: 0,
+    revenue: 0,
+  });
 
   useEffect(() => {
-    load();
-  }, []);
+    async function loadDashboard() {
+      try {
+        const token = getAccessToken();
 
-  if (loading) {
-    return (
-      <main className="p-10 text-center text-gray-500">
-        Caricamento dashboard...
-      </main>
-    );
-  }
+        if (!token) {
+          router.push('/login');
+          return;
+        }
 
-  if (error) {
-    return (
-      <main className="p-10 text-center space-y-4">
-        <p className="text-red-600 font-medium">{error}</p>
+        const res = await fetch(
+          `${API_URL}/api/dashboard/kpis`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          },
+        );
 
-        <button
-          onClick={load}
-          className="bg-black text-white px-4 py-2 rounded"
-        >
-          Riprova
-        </button>
+        if (!res.ok) {
+          throw new Error();
+        }
 
-        <button
-          onClick={logout}
-          className="block mx-auto border px-4 py-2 rounded"
-        >
-          Torna al login
-        </button>
-      </main>
-    );
-  }
+        const data = await res.json();
+
+        setKpis({
+          associations: data.associations || 0,
+          members: data.members || 0,
+          events: data.events || 0,
+          revenue: data.revenue || 0,
+        });
+      } catch {
+        console.error('Errore dashboard');
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadDashboard();
+  }, [router]);
+
+ if (loading) {
+  return (
+    <main className="min-h-screen bg-[#0f1117] p-8 text-white">
+      <div className="space-y-8">
+        <div className="h-12 w-72 animate-pulse rounded-2xl bg-white/10" />
+
+        <section className="grid gap-5 md:grid-cols-4">
+          {[1, 2, 3, 4].map((item) => (
+            <div
+              key={item}
+              className="h-32 animate-pulse rounded-3xl bg-white/10"
+            />
+          ))}
+        </section>
+
+        <div className="h-96 animate-pulse rounded-3xl bg-white/10" />
+
+        <div className="h-40 animate-pulse rounded-3xl bg-white/10" />
+      </div>
+    </main>
+  );
+}
 
   return (
-    <main className="max-w-4xl mx-auto p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold">
-          Cruscotto
-        </h1>
+    <div className="flex min-h-screen bg-[#0f1117] text-white">
+      <DashboardSidebar />
 
-        <div className="flex gap-2">
-          <button
-            onClick={() => router.push('/events')}
-            className="border px-3 py-2 rounded text-sm"
-          >
-            Eventi
-          </button>
+      <main className="flex-1 p-8 space-y-8">
+        <div>
+          <h1 className="text-5xl font-bold">
+            Dashboard
+          </h1>
 
-          <button
-            onClick={logout}
-            className="border px-3 py-2 rounded text-sm"
-          >
-            Logout
-          </button>
-        </div>
-      </div>
-
-      <div className="bg-white shadow rounded-xl p-5">
-        <h2 className="text-xl font-semibold">
-          {data?.membership.association.name}
-        </h2>
-
-        <p className="text-gray-500 text-sm mt-1">
-          Ruolo:{' '}
-          <strong>{data?.membership.role}</strong>
-        </p>
-
-        <p className="text-gray-500 text-sm">
-          Stato:{' '}
-          {data?.membership.association.isActive
-            ? '🟢 Attiva'
-            : '🔴 Disattiva'}
-        </p>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-white shadow rounded-xl p-4 text-center">
-          <p className="text-gray-500 text-sm">
-            Membri
-          </p>
-
-          <p className="text-xl font-bold">
-            {data?.kpis.membersCount ?? 0}
+          <p className="text-gray-400 mt-2">
+            Panoramica associazione
           </p>
         </div>
 
-        <div className="bg-white shadow rounded-xl p-4 text-center">
-          <p className="text-gray-500 text-sm">
-            Eventi
-          </p>
+        <section className="grid gap-5 md:grid-cols-4 animate-fade-up">
+          <div className="bg-[#1a1f2e] rounded-3xl border border-white/5 p-6 shadow-xl">
+            <p className="text-sm text-gray-400">
+              Associazioni
+            </p>
 
-          <p className="text-xl font-bold">
-            {data?.kpis.eventsCount ?? 0}
-          </p>
-        </div>
+            <h2 className="text-4xl font-bold mt-3">
+              {kpis.associations}
+            </h2>
+          </div>
 
-        <div className="bg-white shadow rounded-xl p-4 text-center">
-          <p className="text-gray-500 text-sm">
-            Saldo
-          </p>
+          <div className="bg-[#1a1f2e] rounded-3xl border border-white/5 p-6 shadow-xl">
+            <p className="text-sm text-gray-400">
+              Membri
+            </p>
 
-          <p className="text-xl font-bold">
-            €
-            {(
-              (data?.kpis.balanceCents ?? 0) / 100
-            ).toFixed(2)}
-          </p>
-        </div>
-      </div>
+            <h2 className="text-4xl font-bold mt-3">
+              {kpis.members}
+            </h2>
+          </div>
 
-      <div className="bg-white shadow rounded-xl p-5 space-y-3">
-        <div className="flex items-center justify-between">
-          <h2 className="font-semibold">
-            Membri
-          </h2>
+          <div className="bg-[#1a1f2e] rounded-3xl border border-white/5 p-6 shadow-xl">
+            <p className="text-sm text-gray-400">
+              Eventi
+            </p>
 
-          <span className="text-sm text-gray-500">
-            {members.length} totali
-          </span>
-        </div>
+            <h2 className="text-4xl font-bold mt-3">
+              {kpis.events}
+            </h2>
+          </div>
 
-        {members.length === 0 && (
-          <p className="text-sm text-gray-500">
-            Nessun membro trovato.
-          </p>
-        )}
+          <div className="bg-[#1a1f2e] rounded-3xl border border-white/5 p-6 shadow-xl">
+            <p className="text-sm text-gray-400">
+              Entrate
+            </p>
 
-        {members.map((member) => (
-          <div
-            key={member.id}
-            className="flex justify-between items-center border rounded p-3"
-          >
+            <h2 className="text-4xl font-bold mt-3">
+              €{kpis.revenue.toFixed(2)}
+            </h2>
+          </div>
+        </section>
+
+        <section className="bg-[#1a1f2e] rounded-3xl border border-white/5 p-6 shadow-xl">
+          <div className="flex items-center justify-between mb-6">
             <div>
-              <p className="font-medium">
-                {member.user.email}
-              </p>
+              <h2 className="text-3xl font-bold">
+                Entrate mensili
+              </h2>
 
-              <p className="text-sm text-gray-500">
-                {member.role}
+              <p className="text-gray-400 mt-1">
+                Performance ultimi mesi
               </p>
             </div>
 
-            <span className="text-xs border px-2 py-1 rounded">
-              {member.role}
-            </span>
+            <button
+              onClick={() => router.push('/finance')}
+              className="bg-indigo-600 hover:bg-indigo-500 transition px-5 py-3 rounded-xl font-medium"
+            >
+              Vai alle finanze
+            </button>
           </div>
-        ))}
-      </div>
-    </main>
+
+          <div className="h-96">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={chartData}>
+                <XAxis
+                  dataKey="month"
+                  stroke="#9CA3AF"
+                />
+
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: '#111827',
+                    border: '1px solid #374151',
+                    borderRadius: '12px',
+                    color: '#fff',
+                  }}
+                  labelStyle={{
+                    color: '#9CA3AF',
+                  }}
+                />
+
+                <Bar
+                  dataKey="revenue"
+                  radius={[12, 12, 0, 0]}
+                  fill="#6366f1"
+                />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </section>
+
+        <section className="animate-fade-up bg-[#1a1f2e] rounded-3xl border border-white/5 p-6 shadow-xl">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-3xl font-bold">
+              Memberships
+            </h2>
+
+            <button
+              onClick={() => router.push('/events')}
+              className="border border-white/10 hover:bg-white/5 transition px-5 py-3 rounded-xl"
+            >
+              Eventi
+            </button>
+          </div>
+
+          <div className="rounded-2xl border border-white/5 p-5 bg-[#111827]">
+            <p className="font-semibold text-lg">
+              Owner
+            </p>
+
+            <p className="text-gray-400 mt-1">
+              Associazione principale
+            </p>
+          </div>
+        </section>
+      </main>
+    </div>
   );
 }

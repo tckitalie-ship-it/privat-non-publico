@@ -1,15 +1,10 @@
-import './globals.css';
 import type { Metadata } from 'next';
-import { Inter } from 'next/font/google';
+import './globals.css';
 import { Toaster } from 'sonner';
-
-const inter = Inter({
-  subsets: ['latin'],
-});
 
 export const metadata: Metadata = {
   title: 'Association SaaS',
-  description: 'Modern association platform',
+  description: 'Association management platform',
 };
 
 export default function RootLayout({
@@ -18,16 +13,13 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="it" className="dark">
-      <body
-        className={`${inter.className} bg-white text-black dark:bg-[#0f1117] dark:text-white transition-colors`}
-      >
+    <html lang="it">
+      <body>
         {children}
 
         <Toaster
           richColors
           position="top-right"
-          theme="dark"
         />
       </body>
     </html>

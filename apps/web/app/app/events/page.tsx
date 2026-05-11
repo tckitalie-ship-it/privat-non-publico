@@ -2,7 +2,7 @@
 
 import { FormEvent, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { API_URL, getAccessToken } from '../../lib/api';
+import { API_URL, setAccessToken } from '@/lib/api';
 
 type EventItem = {
   id: string;
@@ -29,7 +29,7 @@ export default function EventsPage() {
   const [message, setMessage] = useState('');
 
   async function loadEvents() {
-    const token = getAccessToken();
+    const token = setAccessToken(
 
     if (!token) {
       router.push('/login');
@@ -238,4 +238,4 @@ export default function EventsPage() {
       </div>
     </main>
   );
-}
+}a

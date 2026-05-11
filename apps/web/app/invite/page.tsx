@@ -1,61 +1,103 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
+import {
+  API_URL,
+  getAccessToken,
+  setAccessToken,
+} from '@/lib/api';
 
-export default function AcceptInvitePage() {
-  const searchParams = useSearchParams();
-  const token = searchParams.get('token');
+export default function InvitePage() {
+  const router = useRouter();
+  const params = useSearchParams();
 
-  const [message, setMessage] = useState('Accettazione invito...');
-  const [error, setError] = useState(false);
+  const token = params.get('token');
+
+  const [status, setStatus] = useState<
+    'loading' | 'success' | 'error'
+  >('loading');
+
+  const [message, setMessage] = useState('');
 
   useEffect(() => {
     async function acceptInvite() {
-      if (!token) {
-        setError(true);
-        setMessage('Token mancante');
-        return;
-      }
-
       try {
-        const response = await fetch('/api/invitations/accept', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
+        if (!token) {
+          throw new Error('Token invito mancante');
+        }
+
+        const accessToken = getAccessToken();
+
+        if (!accessToken) {
+          router.push('/login');
+          return;
+        }
+
+        const res = await fetch(
+          `${API_URL}/api/invitations/accept`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${accessToken}`,
+            },
+            body: JSON.stringify({
+              token,
+            }),
           },
-          body: JSON.stringify({ token }),
-        });
+        );
 
-        const data = await response.json();
+        const data = await res.json();
 
-        if (!response.ok) {
-          throw new Error(data.message || 'Errore');
+        if (!res.ok) {
+          throw new Error(
+            data.message || 'Errore accettazione invito',
+          );
         }
 
-        setMessage('Invito accettato con successo ✅');
-      } catch (err) {
-        setError(true);
+        setAccessToken(data.access_token);
 
-        if (err instanceof Error) {
-          setMessage(err.message);
-        } else {
-          setMessage('Errore sconosciuto');
-        }
+        setStatus('success');
+
+        setTimeout(() => {
+          router.push('/dashboard');
+        }, 1000);
+      } catch (err: any) {
+        setStatus('error');
+        setMessage(
+          err.message || 'Errore accettazione invito',
+        );
       }
     }
 
     acceptInvite();
-  }, [token]);
+  }, [router, token]);
 
   return (
-    <main className="min-h-screen flex items-center justify-center">
-      <div className="border rounded-xl p-8 shadow-md max-w-md w-full text-center">
-        <h1 className="text-2xl font-bold mb-4">
-          {error ? 'Errore' : 'Invito'}
-        </h1>
+    <main className="min-h-screen flex items-center justify-center p-6">
+      <div className="bg-white shadow rounded-xl p-6 w-full max-w-md text-center">
+        {status === 'loading' && (
+          <p>Accettazione invito...</p>
+        )}
 
-        <p>{message}</p>
+        {status === 'success' && (
+          <p className="text-green-600 font-medium">
+            Invito accettato ✅
+          </p>
+        )}
+
+        {status === 'error' && (
+          <div className="space-y-2">
+            <p className="text-red-600 font-medium">
+              Errore
+            </p>
+
+            <p className="text-sm text-gray-600">
+              {message}
+            </p>
+          </div>
+        )}
       </div>
     </main>
   );

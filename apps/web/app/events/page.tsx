@@ -1,52 +1,54 @@
 'use client';
 
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { toast } from 'sonner';
 import { API_URL, getAccessToken } from '@/lib/api';
 
 type EventItem = {
   id: string;
   title: string;
-  description: string | null;
-  location: string | null;
+  description: string;
+  location: string;
   startsAt: string;
-  endsAt?: string | null;
-  registrationsCount: number;
-  isRegistered: boolean;
+  registrations?: {
+    id: string;
+  }[];
 };
 
-type Registration = {
-  id: string;
-  createdAt: string;
-  user: {
-    id: string;
-    email: string;
-  };
-};
+function formatDate(value: string) {
+  return new Date(value).toLocaleDateString('it-IT', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  });
+}
+
+function formatTime(value: string) {
+  return new Date(value).toLocaleTimeString('it-IT', {
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
 
 export default function EventsPage() {
   const router = useRouter();
 
   const [events, setEvents] = useState<EventItem[]>([]);
-  const [registrationsByEvent, setRegistrationsByEvent] = useState<
-    Record<string, Registration[]>
-  >({});
-  const [openRegistrationsEventId, setOpenRegistrationsEventId] =
-    useState<string | null>(null);
-
   const [loading, setLoading] = useState(true);
-  const [submittingEventId, setSubmittingEventId] = useState<string | null>(
-    null,
-  );
-  const [loadingRegistrationsEventId, setLoadingRegistrationsEventId] =
-    useState<string | null>(null);
 
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [location, setLocation] = useState('');
   const [startsAt, setStartsAt] = useState('');
 
-  const [message, setMessage] = useState('');
+  const nextEvent = useMemo(() => {
+    return [...events].sort(
+      (a, b) =>
+        new Date(a.startsAt).getTime() -
+        new Date(b.startsAt).getTime(),
+    )[0];
+  }, [events]);
 
   async function loadEvents() {
     const token = getAccessToken();
@@ -71,7 +73,7 @@ export default function EventsPage() {
 
       setEvents(Array.isArray(data) ? data : []);
     } catch (err: any) {
-      setMessage(err.message || 'Errore caricamento eventi');
+      toast.error(err.message || 'Errore caricamento eventi');
     } finally {
       setLoading(false);
     }
@@ -83,7 +85,6 @@ export default function EventsPage() {
 
   async function handleCreateEvent(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    setMessage('');
 
     const token = getAccessToken();
 
@@ -117,18 +118,16 @@ export default function EventsPage() {
       setDescription('');
       setLocation('');
       setStartsAt('');
-      setMessage('Evento creato');
+
+      toast.success('Evento creato');
 
       await loadEvents();
     } catch (err: any) {
-      setMessage(err.message || 'Errore creazione evento');
+      toast.error(err.message || 'Errore creazione evento');
     }
   }
 
   async function registerToEvent(eventId: string) {
-    setMessage('');
-    setSubmittingEventId(eventId);
-
     const token = getAccessToken();
 
     if (!token) {
@@ -150,281 +149,178 @@ export default function EventsPage() {
         throw new Error(data.message || 'Errore registrazione');
       }
 
-      setEvents((currentEvents) =>
-        currentEvents.map((event) =>
-          event.id === eventId
-            ? {
-                ...event,
-                isRegistered: true,
-                registrationsCount: event.registrationsCount + 1,
-              }
-            : event,
-        ),
-      );
+      toast.success('Registrazione completata');
 
-      delete registrationsByEvent[eventId];
-      setMessage('Registrazione completata');
+      await loadEvents();
     } catch (err: any) {
-      setMessage(err.message || 'Errore registrazione');
-    } finally {
-      setSubmittingEventId(null);
-    }
-  }
-
-  async function unregisterFromEvent(eventId: string) {
-    setMessage('');
-    setSubmittingEventId(eventId);
-
-    const token = getAccessToken();
-
-    if (!token) {
-      router.push('/login');
-      return;
-    }
-
-    try {
-      const res = await fetch(`${API_URL}/api/events/${eventId}/register`, {
-        method: 'DELETE',
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.message || 'Errore disiscrizione');
-      }
-
-      setEvents((currentEvents) =>
-        currentEvents.map((event) =>
-          event.id === eventId
-            ? {
-                ...event,
-                isRegistered: false,
-                registrationsCount: Math.max(0, event.registrationsCount - 1),
-              }
-            : event,
-        ),
-      );
-
-      delete registrationsByEvent[eventId];
-      setMessage('Disiscrizione completata');
-    } catch (err: any) {
-      setMessage(err.message || 'Errore disiscrizione');
-    } finally {
-      setSubmittingEventId(null);
-    }
-  }
-
-  async function toggleRegistrations(eventId: string) {
-    if (openRegistrationsEventId === eventId) {
-      setOpenRegistrationsEventId(null);
-      return;
-    }
-
-    setOpenRegistrationsEventId(eventId);
-
-    if (registrationsByEvent[eventId]) {
-      return;
-    }
-
-    const token = getAccessToken();
-
-    if (!token) {
-      router.push('/login');
-      return;
-    }
-
-    setLoadingRegistrationsEventId(eventId);
-    setMessage('');
-
-    try {
-      const res = await fetch(
-        `${API_URL}/api/events/${eventId}/registrations`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        },
-      );
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.message || 'Errore caricamento partecipanti');
-      }
-
-      setRegistrationsByEvent((current) => ({
-        ...current,
-        [eventId]: Array.isArray(data) ? data : [],
-      }));
-    } catch (err: any) {
-      setMessage(err.message || 'Errore caricamento partecipanti');
-    } finally {
-      setLoadingRegistrationsEventId(null);
+      toast.error(err.message || 'Errore registrazione');
     }
   }
 
   return (
-    <main className="max-w-5xl mx-auto p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold">Eventi</h1>
+    <main className="min-h-screen bg-[#0f1117] p-8 text-white">
+      <div className="mx-auto max-w-7xl space-y-8">
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <h1 className="text-5xl font-bold">Eventi</h1>
+            <p className="mt-2 text-gray-400">
+              Crea, gestisci e monitora gli eventi della tua associazione
+            </p>
+          </div>
 
-        <button
-          onClick={() => router.push('/dashboard')}
-          className="border px-3 py-2 rounded"
-        >
-          Dashboard
-        </button>
-      </div>
-
-      <form
-        onSubmit={handleCreateEvent}
-        className="bg-white shadow rounded-xl p-5 space-y-4"
-      >
-        <h2 className="text-xl font-semibold">Crea evento</h2>
-
-        {message && (
-          <div className="bg-gray-100 p-3 rounded text-sm">{message}</div>
-        )}
-
-        <input
-          type="text"
-          placeholder="Titolo"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          className="w-full border rounded px-3 py-2"
-          required
-        />
-
-        <textarea
-          placeholder="Descrizione"
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          className="w-full border rounded px-3 py-2"
-        />
-
-        <input
-          type="text"
-          placeholder="Luogo"
-          value={location}
-          onChange={(e) => setLocation(e.target.value)}
-          className="w-full border rounded px-3 py-2"
-        />
-
-        <input
-          type="datetime-local"
-          value={startsAt}
-          onChange={(e) => setStartsAt(e.target.value)}
-          className="w-full border rounded px-3 py-2"
-          required
-        />
-
-        <button type="submit" className="bg-black text-white px-4 py-2 rounded">
-          Crea evento
-        </button>
-      </form>
-
-      <div className="space-y-4">
-        <h2 className="text-xl font-semibold">Lista eventi</h2>
-
-        {loading && <p className="text-gray-500">Caricamento...</p>}
-
-        {!loading && events.length === 0 && (
-          <p className="text-gray-500">Nessun evento.</p>
-        )}
-
-        {events.map((event) => (
-          <div
-            key={event.id}
-            className="bg-white shadow rounded-xl p-5 space-y-4 border"
+          <button
+            onClick={() => router.push('/dashboard')}
+            className="rounded-xl border border-white/10 px-5 py-3 transition hover:bg-white/5"
           >
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <h3 className="text-lg font-bold">{event.title}</h3>
+            Dashboard
+          </button>
+        </div>
 
-                {event.description && (
-                  <p className="text-gray-600 mt-2">{event.description}</p>
-                )}
-              </div>
+        <section className="grid gap-6 lg:grid-cols-3">
+          <div className="rounded-3xl border border-white/5 bg-[#1a1f2e] p-6 shadow-xl">
+            <p className="text-sm text-gray-400">Eventi totali</p>
+            <h2 className="mt-3 text-4xl font-bold">{events.length}</h2>
+          </div>
 
-              {event.isRegistered ? (
-                <button
-                  onClick={() => unregisterFromEvent(event.id)}
-                  disabled={submittingEventId === event.id}
-                  className="bg-red-600 text-white px-4 py-2 rounded disabled:opacity-60"
-                >
-                  {submittingEventId === event.id
-                    ? 'Disiscrivo...'
-                    : 'Disiscriviti'}
-                </button>
-              ) : (
-                <button
-                  onClick={() => registerToEvent(event.id)}
-                  disabled={submittingEventId === event.id}
-                  className="bg-green-600 text-white px-4 py-2 rounded disabled:opacity-60"
-                >
-                  {submittingEventId === event.id
-                    ? 'Registro...'
-                    : 'Registrati'}
-                </button>
+          <div className="rounded-3xl border border-white/5 bg-[#1a1f2e] p-6 shadow-xl">
+            <p className="text-sm text-gray-400">Partecipanti</p>
+            <h2 className="mt-3 text-4xl font-bold">
+              {events.reduce(
+                (acc, event) => acc + (event.registrations?.length ?? 0),
+                0,
               )}
-            </div>
+            </h2>
+          </div>
 
-            <div className="text-sm text-gray-600 space-y-1">
-              {event.location && <p>📍 {event.location}</p>}
-
-              <p>🗓 {new Date(event.startsAt).toLocaleString('it-IT')}</p>
-            </div>
-
-            <div className="flex items-center justify-between gap-3">
-              <div className="text-sm text-gray-500">
-                Partecipanti: {event.registrationsCount}
-              </div>
-
-              <button
-                type="button"
-                onClick={() => toggleRegistrations(event.id)}
-                className="border px-3 py-2 rounded text-sm"
-              >
-                {openRegistrationsEventId === event.id
-                  ? 'Nascondi partecipanti'
-                  : 'Mostra partecipanti'}
-              </button>
-            </div>
-
-            {openRegistrationsEventId === event.id && (
-              <div className="border rounded-lg p-3 bg-gray-50 space-y-2">
-                <h4 className="font-medium text-sm">Partecipanti evento</h4>
-
-                {loadingRegistrationsEventId === event.id && (
-                  <p className="text-sm text-gray-500">Caricamento...</p>
-                )}
-
-                {!loadingRegistrationsEventId &&
-                  registrationsByEvent[event.id]?.length === 0 && (
-                    <p className="text-sm text-gray-500">
-                      Nessun partecipante.
-                    </p>
-                  )}
-
-                {registrationsByEvent[event.id]?.map((registration) => (
-                  <div
-                    key={registration.id}
-                    className="flex items-center justify-between border rounded bg-white px-3 py-2"
-                  >
-                    <span className="text-sm">{registration.user.email}</span>
-
-                    <span className="text-xs text-gray-500">
-                      {new Date(registration.createdAt).toLocaleString('it-IT')}
-                    </span>
-                  </div>
-                ))}
-              </div>
+          <div className="rounded-3xl border border-white/5 bg-[#1a1f2e] p-6 shadow-xl">
+            <p className="text-sm text-gray-400">Prossimo evento</p>
+            <h2 className="mt-3 text-xl font-bold">
+              {nextEvent ? nextEvent.title : 'Nessuno'}
+            </h2>
+            {nextEvent && (
+              <p className="mt-2 text-sm text-gray-400">
+                {formatDate(nextEvent.startsAt)} · {formatTime(nextEvent.startsAt)}
+              </p>
             )}
           </div>
-        ))}
+        </section>
+
+        <section className="grid gap-6 lg:grid-cols-[420px_1fr]">
+          <form
+            onSubmit={handleCreateEvent}
+            className="space-y-4 rounded-3xl border border-white/5 bg-[#1a1f2e] p-6 shadow-xl"
+          >
+            <h2 className="text-2xl font-bold">Crea evento</h2>
+
+            <input
+              type="text"
+              placeholder="Titolo"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              className="w-full rounded-xl border border-white/10 bg-[#111827] px-4 py-3 text-white outline-none focus:border-indigo-500"
+              required
+            />
+
+            <textarea
+              placeholder="Descrizione"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              className="min-h-28 w-full rounded-xl border border-white/10 bg-[#111827] px-4 py-3 text-white outline-none focus:border-indigo-500"
+            />
+
+            <input
+              type="text"
+              placeholder="Luogo"
+              value={location}
+              onChange={(e) => setLocation(e.target.value)}
+              className="w-full rounded-xl border border-white/10 bg-[#111827] px-4 py-3 text-white outline-none focus:border-indigo-500"
+            />
+
+            <input
+              type="datetime-local"
+              value={startsAt}
+              onChange={(e) => setStartsAt(e.target.value)}
+              className="w-full rounded-xl border border-white/10 bg-[#111827] px-4 py-3 text-white outline-none focus:border-indigo-500"
+              required
+            />
+
+            <button
+              type="submit"
+              className="w-full rounded-xl bg-indigo-600 px-5 py-3 font-semibold transition hover:bg-indigo-500"
+            >
+              Crea evento
+            </button>
+          </form>
+
+          <div className="rounded-3xl border border-white/5 bg-[#1a1f2e] p-6 shadow-xl">
+            <div className="mb-6 flex items-center justify-between">
+              <div>
+                <h2 className="text-2xl font-bold">Calendario eventi</h2>
+                <p className="text-sm text-gray-400">
+                  Lista eventi programmati
+                </p>
+              </div>
+            </div>
+
+            {loading && <p className="text-gray-400">Caricamento...</p>}
+
+ {!loading && events.length === 0 && (
+  <div className="rounded-3xl border border-dashed border-white/10 bg-[#111827] p-12 text-center">
+    <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-indigo-600/20 text-4xl">
+      📅
+    </div>
+
+    <h3 className="mt-6 text-2xl font-bold">
+      Nessun evento creato
+    </h3>
+
+    <p className="mt-3 text-gray-400">
+      Inizia creando il tuo primo evento per la community.
+    </p>
+  </div>
+)}
+
+            <div className="space-y-4">
+              {events.map((event) => (
+                <div
+                  key={event.id}
+                  className="grid gap-4 rounded-2xl border border-white/5 bg-[#111827] p-5 md:grid-cols-[90px_1fr_auto]"
+                >
+                  <div className="rounded-2xl bg-indigo-600/20 p-4 text-center">
+                    <p className="text-2xl font-bold">
+                      {new Date(event.startsAt).getDate()}
+                    </p>
+                    <p className="text-xs uppercase text-indigo-300">
+                      {new Date(event.startsAt).toLocaleDateString('it-IT', {
+                        month: 'short',
+                      })}
+                    </p>
+                  </div>
+
+                  <div>
+                    <h3 className="text-xl font-bold">{event.title}</h3>
+                    <p className="mt-1 text-gray-400">{event.description}</p>
+
+                    <div className="mt-4 flex flex-wrap gap-3 text-sm text-gray-300">
+                      <span>📍 {event.location || 'Luogo non indicato'}</span>
+                      <span>🕒 {formatTime(event.startsAt)}</span>
+                      <span>
+                        👥 {event.registrations?.length ?? 0} partecipanti
+                      </span>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => registerToEvent(event.id)}
+                    className="h-fit rounded-xl bg-emerald-600 px-5 py-3 font-semibold transition hover:bg-emerald-500"
+                  >
+                    Registrati
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
       </div>
     </main>
   );
