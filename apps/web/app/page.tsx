@@ -7,86 +7,95 @@ import { API_URL, setAccessToken } from '@/lib/api';
 function InviteContent() {
   const router = useRouter();
   const params = useSearchParams();
+
   const token = params.get('token');
 
-  const [status, setStatus] = useState<'loading' | 'success' | 'error'>(
-    'loading',
-  );
+  const [status, setStatus] = useState<
+    'loading' | 'success' | 'error'
+  >('loading');
+
   const [message, setMessage] = useState('');
 
   useEffect(() => {
-    async function run() {
-      if (!token) {
-        setStatus('error');
-        setMessage('Token invito mancante');
-        return;
-      }
-
-      const accessToken = localStorage.getItem('access_token');
-
-      if (!accessToken) {
-        router.push(`/login?next=/invite?token=${token}`);
-        return;
-      }
-
+    async function acceptInvite() {
       try {
-        const res = await fetch(`${API_URL}/api/invitations/accept`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${accessToken}`,
+        if (!token) {
+          throw new Error('Token invito mancante');
+        }
+
+        const accessToken =
+          localStorage.getItem('access_token');
+
+        if (!accessToken) {
+          router.push('/login');
+          return;
+        }
+
+        const res = await fetch(
+          `${API_URL}/api/invitations/accept`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${accessToken}`,
+            },
+            body: JSON.stringify({
+              token,
+            }),
           },
-          body: JSON.stringify({ token }),
-        });
+        );
 
         const data = await res.json();
 
         if (!res.ok) {
-          throw new Error(data.message || 'Invito non valido o scaduto');
+          throw new Error(
+            data.message || 'Errore accettazione invito',
+          );
         }
 
-        if (!data.access_token) {
-          throw new Error('Token mancante nella risposta');
+        if (data.access_token) {
+          setAccessToken(data.access_token);
         }
 
-        setAccessToken(data.access_token);
         setStatus('success');
-        setMessage('Invito accettato. Reindirizzamento...');
 
         setTimeout(() => {
           router.push('/dashboard');
         }, 1000);
       } catch (err: any) {
         setStatus('error');
-        setMessage(err.message || 'Errore accettazione invito');
+        setMessage(
+          err.message || 'Errore accettazione invito',
+        );
       }
     }
 
-    run();
-  }, [token, router]);
+    acceptInvite();
+  }, [router, token]);
 
   return (
-    <main className="min-h-screen flex items-center justify-center bg-gray-50 p-6">
-      <div className="w-full max-w-md bg-white shadow rounded-xl p-6 space-y-4">
-        <h1 className="text-2xl font-bold">Accetta invito</h1>
-
+    <main className="min-h-screen flex items-center justify-center p-6">
+      <div className="bg-white shadow rounded-xl p-6 w-full max-w-md text-center">
         {status === 'loading' && (
-          <p className="text-gray-500">Accettazione invito...</p>
+          <p>Accettazione invito...</p>
         )}
 
-        {message && (
-          <div className="border bg-gray-50 text-sm rounded p-3">
-            {message}
-          </div>
+        {status === 'success' && (
+          <p className="text-green-600 font-medium">
+            Invito accettato ✅
+          </p>
         )}
 
         {status === 'error' && (
-          <button
-            onClick={() => router.push('/login')}
-            className="w-full border rounded py-2"
-          >
-            Vai al login
-          </button>
+          <div className="space-y-2">
+            <p className="text-red-600 font-medium">
+              Errore
+            </p>
+
+            <p className="text-sm text-gray-600">
+              {message}
+            </p>
+          </div>
         )}
       </div>
     </main>
