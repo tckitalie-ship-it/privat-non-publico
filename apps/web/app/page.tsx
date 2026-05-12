@@ -1,10 +1,10 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { API_URL, setAccessToken } from '@/lib/api';
 
-export default function InvitePage() {
+function InviteContent() {
   const router = useRouter();
   const params = useSearchParams();
   const token = params.get('token');
@@ -90,5 +90,13 @@ export default function InvitePage() {
         )}
       </div>
     </main>
+  );
+}
+
+export default function InvitePage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <InviteContent />
+    </Suspense>
   );
 }
