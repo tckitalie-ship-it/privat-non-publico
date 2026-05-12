@@ -1,9 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 
-export default function AcceptInvitePage() {
+function AcceptInviteContent() {
   const searchParams = useSearchParams();
   const token = searchParams.get('token');
 
@@ -75,5 +75,13 @@ export default function AcceptInvitePage() {
         <p>{message}</p>
       </div>
     </main>
+  );
+}
+
+export default function AcceptInvitePage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <AcceptInviteContent />
+    </Suspense>
   );
 }
