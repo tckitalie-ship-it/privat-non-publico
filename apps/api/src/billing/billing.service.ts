@@ -8,7 +8,7 @@ import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
 export class BillingService {
-  private readonly stripe: any;
+private readonly stripe: any;
 
   constructor(private readonly prisma: PrismaService) {
     if (!process.env.STRIPE_SECRET_KEY) {
@@ -28,9 +28,7 @@ export class BillingService {
     }
 
     const association = await this.prisma.association.findUnique({
-      where: {
-        id: user.associationId,
-      },
+      where: { id: user.associationId },
     });
 
     if (!association) {
@@ -59,15 +57,13 @@ export class BillingService {
       },
       success_url:
         process.env.STRIPE_SUCCESS_URL ||
-        'http://localhost:3000/dashboard?billing=success',
+        'http://localhost:3000/dashboard/billing?success=true',
       cancel_url:
         process.env.STRIPE_CANCEL_URL ||
-        'http://localhost:3000/dashboard?billing=cancel',
+        'http://localhost:3000/dashboard/billing?canceled=true',
     });
 
-    return {
-      url: session.url,
-    };
+    return { url: session.url };
   }
 
   async handleWebhook(req: any, signature: string) {
@@ -86,15 +82,13 @@ export class BillingService {
     );
 
     if (event.type === 'checkout.session.completed') {
-      const session = event.data.object as any;
+const session = event.data.object as any;
 
       const associationId = session.metadata?.associationId;
 
       if (associationId) {
         await this.prisma.association.update({
-          where: {
-            id: associationId,
-          },
+          where: { id: associationId },
           data: {
             stripeCustomerId:
               typeof session.customer === 'string'
@@ -114,32 +108,27 @@ export class BillingService {
       event.type === 'customer.subscription.updated' ||
       event.type === 'customer.subscription.deleted'
     ) {
-      const subscription = event.data.object as any;
+const subscription = event.data.object as any;
 
       const associationId = subscription.metadata?.associationId;
 
       if (associationId) {
         await this.prisma.association.update({
-          where: {
-            id: associationId,
-          },
+          where: { id: associationId },
           data: {
             stripeCustomerId:
               typeof subscription.customer === 'string'
                 ? subscription.customer
-                : subscription.customer?.id,
+                : subscription.customer.id,
             stripeSubscriptionId: subscription.id,
             subscriptionStatus: subscription.status,
-            subscriptionCurrentPeriodEnd: subscription.current_period_end
-              ? new Date(subscription.current_period_end * 1000)
-              : null,
           },
         });
       }
     }
 
     if (event.type === 'invoice.paid') {
-      const invoice = event.data.object as any;
+const invoice = event.data.object as any;
 
       const subscriptionId =
         typeof invoice.subscription === 'string'
@@ -148,18 +137,14 @@ export class BillingService {
 
       if (subscriptionId) {
         await this.prisma.association.updateMany({
-          where: {
-            stripeSubscriptionId: subscriptionId,
-          },
-          data: {
-            subscriptionStatus: 'active',
-          },
+          where: { stripeSubscriptionId: subscriptionId },
+          data: { subscriptionStatus: 'active' },
         });
       }
     }
 
     if (event.type === 'invoice.payment_failed') {
-      const invoice = event.data.object as any;
+const invoice = event.data.object as any;
 
       const subscriptionId =
         typeof invoice.subscription === 'string'
@@ -168,18 +153,12 @@ export class BillingService {
 
       if (subscriptionId) {
         await this.prisma.association.updateMany({
-          where: {
-            stripeSubscriptionId: subscriptionId,
-          },
-          data: {
-            subscriptionStatus: 'past_due',
-          },
+          where: { stripeSubscriptionId: subscriptionId },
+          data: { subscriptionStatus: 'past_due' },
         });
       }
     }
 
-    return {
-      received: true,
-    };
+    return { received: true };
   }
 }

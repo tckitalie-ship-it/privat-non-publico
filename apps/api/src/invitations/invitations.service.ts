@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  NotFoundException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { Role } from '@prisma/client';
@@ -12,12 +13,30 @@ import { CreateInvitationDto } from './dto/create-invitation.dto';
 
 @Injectable()
 export class InvitationsService {
-  private resend = new Resend(process.env.RESEND_API_KEY);
+  private resend = process.env.RESEND_API_KEY
+    ? new Resend(process.env.RESEND_API_KEY)
+    : null;
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
   ) {}
+
+  async findAll(user: any) {
+    if (!user.associationId) {
+      throw new BadRequestException('No active association');
+    }
+
+    return this.prisma.invitation.findMany({
+      where: {
+        associationId: user.associationId,
+        acceptedAt: null,
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+  }
 
   async create(user: any, dto: CreateInvitationDto) {
     if (!user.associationId) {
@@ -29,6 +48,19 @@ export class InvitationsService {
     }
 
     const email = dto.email.toLowerCase().trim();
+
+    const existingMember = await this.prisma.membership.findFirst({
+      where: {
+        associationId: user.associationId,
+        user: {
+          email,
+        },
+      },
+    });
+
+    if (existingMember) {
+      throw new ConflictException('User is already a member');
+    }
 
     const existing = await this.prisma.invitation.findUnique({
       where: {
@@ -62,6 +94,11 @@ export class InvitationsService {
     const inviteLink = `${process.env.APP_FRONTEND_URL}/invite?token=${token}`;
 
     try {
+      if (!this.resend) {
+        console.warn('RESEND_API_KEY missing, email skipped');
+        return invitation;
+      }
+
       const response = await this.resend.emails.send({
         from: process.env.INVITATION_FROM_EMAIL!,
         to: invitation.email,
@@ -72,12 +109,37 @@ export class InvitationsService {
           <a href="${inviteLink}">Accetta invito</a>
         `,
       });
+
       console.log('EMAIL RESPONSE:', response);
     } catch (error) {
       console.error('EMAIL ERROR:', error);
     }
 
     return invitation;
+  }
+
+  async remove(user: any, id: string) {
+    if (!user.associationId) {
+      throw new BadRequestException('No active association');
+    }
+
+    const invitation = await this.prisma.invitation.findFirst({
+      where: {
+        id,
+        associationId: user.associationId,
+        acceptedAt: null,
+      },
+    });
+
+    if (!invitation) {
+      throw new NotFoundException('Invitation not found');
+    }
+
+    await this.prisma.invitation.delete({
+      where: { id },
+    });
+
+    return { success: true };
   }
 
   async accept(user: any, token: string) {
