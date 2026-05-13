@@ -109,7 +109,7 @@ export default function DashboardPage() {
     <div className="flex min-h-screen bg-[#0f1117] text-white">
       <DashboardSidebar />
 
-      <main className="flex-1 p-8 space-y-8">
+      <main className="flex-1 p-8 space-y-8 lg:ml-72">
         <div>
           <h1 className="text-5xl font-bold">
             Dashboard

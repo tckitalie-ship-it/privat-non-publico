@@ -104,7 +104,7 @@ export default function EventsPage() {
           title,
           description,
           location,
-          startsAt,
+          startsAt: new Date(startsAt).toISOString(),
         }),
       });
 

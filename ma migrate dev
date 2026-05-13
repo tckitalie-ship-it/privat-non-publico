@@ -1,0 +1,48 @@
+[33mbdf4b22[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m)[m setup postgres and prisma
+[33mc0e145f[m[33m ([m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m Temporarily remove invite page for production build
+[33mc8fc158[m Temporarily remove invite page for production build
+[33m0060cd2[m Remove duplicated app folder
+[33m2a679cf[m Fix frontend suspense pages
+[33m79396f8[m Fix suspense invite page
+[33m198e9b1[m Fix api build for Railway
+[33mabfa137[m SaaS MVP polished UI and core features
+[33m79d1146[m feat: add invite acceptance flow
+[33me89abb5[m feat: add event edit and delete flow
+[33ma254191[m feat: add event participants list
+[33m36ec5e7[m feat: event registration and unregister flow
+[33mac01ba1[m feat: dashboard and events working locally
+[33m60ac503[m Fix API production start path
+[33ma0c739c[m Install prisma dependencies
+[33m58ec87d[m Generate Prisma client during API build
+[33m42d60ee[m Remove env.local from repository
+[33m12ef356[m Improve events frontend and dashboard
+[33mda613d7[m Add event registration state
+[33mb574eca[m working dashboard kpis memberships invitations billing
+[33ma00cb21[m[33m ([m[1;33mtag: [m[1;33mmvp-accesslock-v6[m[33m)[m feat: add association active access lock
+[33m8fbaf95[m[33m ([m[1;33mtag: [m[1;33mmvp-dashboard-v5[m[33m)[m feat: add dashboard KPI endpoint
+[33m2469bba[m[33m ([m[1;33mtag: [m[1;33mmvp-xlsx-v4[m[33m)[m feat: add finance XLSX export
+[33m8889c24[m[33m ([m[1;33mtag: [m[1;33mmvp-export-v3[m[33m)[m feat: add finance CSV export
+[33m2e2325b[m[33m ([m[1;33mtag: [m[1;33mmvp-finances-v2[m[33m, [m[1;33mtag: [m[1;33mmvp-finance-v1[m[33m)[m feat: finances module with transactions and KPI summary
+[33ma063033[m[33m ([m[1;33mtag: [m[1;33mmvp-core-v1[m[33m)[m feat: invitations flow with auto association switch and event registrations
+[33m90dfd30[m feat: add events module
+[33m3198b2e[m feat: add invitations module
+[33m6d738fd[m feat: add dashboard KPI endpoint
+[33me666121[m feat: add event update and delete
+[33mfae35b4[m feat: add events and registrations
+[33m1443b57[m chore: update workspace dependencies
+[33me38f99c[m feat: add invitation accept flow
+[33m8f7063e[m feat: aggiunto login dto e update config
+[33m5be614a[m fix prisma schema
+[33me1feed9[m checkpoint monorepo prima di sistemare auth
+[33m66d9799[m READEME .ND
+[33m6885adc[m Rename README .nd to README .
+[33m519c8cc[m README .nd
+[33m9ba0e5e[m Rename gitignore to .gitignore
+[33me4894c0[m Ad.
+[33m88bfd99[m README.
+[33mfd5e18d[m Fix README.md file name typo
+[33m5db171e[m Fix README correctly
+[33md256de4[m Add files via upload
+[33m87acf93[m Add files via upload
+[33ma9661b7[m dahs
+[33m716c9e4[m Initial commit
