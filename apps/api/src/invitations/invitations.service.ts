@@ -8,7 +8,10 @@ import { JwtService } from '@nestjs/jwt';
 import { Role } from '@prisma/client';
 import { randomBytes } from 'crypto';
 import { Resend } from 'resend';
+
 import { PrismaService } from '../prisma/prisma.service';
+import { NotificationsService } from '../notifications/notifications.service';
+
 import { CreateInvitationDto } from './dto/create-invitation.dto';
 
 @Injectable()
@@ -20,6 +23,7 @@ export class InvitationsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   async findAll(user: any) {
@@ -99,12 +103,20 @@ export class InvitationsService {
       },
     });
 
+    await this.notificationsService.create({
+      associationId: user.associationId,
+      userId: user.id,
+      title: 'Nuovo invito',
+      message: `${invitation.email} è stato invitato`,
+    });
+
     const frontendUrl =
       process.env.APP_FRONTEND_URL || 'http://localhost:3000';
 
     const inviteLink = `${frontendUrl}/invitations/accept?token=${token}`;
+
     console.log('INVITE TOKEN:', token);
-console.log('INVITE LINK:', inviteLink);
+    console.log('INVITE LINK:', inviteLink);
 
     try {
       if (!this.resend) {

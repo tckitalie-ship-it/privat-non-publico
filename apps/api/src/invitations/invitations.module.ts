@@ -1,23 +1,16 @@
 import { Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
-import { ConfigModule, ConfigService } from '@nestjs/config';
+
+import { PrismaModule } from '../prisma/prisma.module';
+import { NotificationsModule } from '../notifications/notifications.module';
+
 import { InvitationsController } from './invitations.controller';
 import { InvitationsService } from './invitations.service';
-import { PrismaService } from '../prisma/prisma.service';
 
 @Module({
-  imports: [
-    ConfigModule,
-    JwtModule.registerAsync({
-      imports: [ConfigModule],
-      inject: [ConfigService],
-      useFactory: (config: ConfigService) => ({
-        secret: config.get<string>('JWT_SECRET') ?? 'dev-secret',
-        signOptions: { expiresIn: '7d' },
-      }),
-    }),
-  ],
+  imports: [PrismaModule, JwtModule, NotificationsModule],
   controllers: [InvitationsController],
-  providers: [InvitationsService, PrismaService],
+  providers: [InvitationsService],
+  exports: [InvitationsService],
 })
 export class InvitationsModule {}

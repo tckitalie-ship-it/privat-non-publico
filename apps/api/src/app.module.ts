@@ -1,21 +1,26 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+
+import { PrismaModule } from './prisma/prisma.module';
+
 import { AuthModule } from './auth/auth.module';
+import { UsersModule } from './users/users.module';
 import { AssociationsModule } from './associations/associations.module';
-import { BillingModule } from './billing/billing.module';
+import { MembershipsModule } from './memberships/memberships.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { EventsModule } from './events/events.module';
-import { FinancesModule } from './finances/finances.module';
 import { InvitationsModule } from './invitations/invitations.module';
-import { MembershipsModule } from './memberships/memberships.module';
-import { UsersModule } from './users/users.module';
+import { FinancesModule } from './finances/finances.module';
+import { BillingModule } from './billing/billing.module';
+import { NotificationsModule } from './notifications/notifications.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
-  isGlobal: true,
-  envFilePath: '.env',
-}),
+      isGlobal: true,
+    }),
+
+    PrismaModule,
 
     AuthModule,
     UsersModule,
@@ -26,6 +31,7 @@ import { UsersModule } from './users/users.module';
     InvitationsModule,
     FinancesModule,
     BillingModule,
+    NotificationsModule,
   ],
 })
 export class AppModule {}

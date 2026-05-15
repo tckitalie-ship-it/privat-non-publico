@@ -1,25 +1,36 @@
 'use client';
 
-import { io } from 'socket.io-client';
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 
 import { API_URL, getAccessToken } from '@/lib/api';
+import { getSocket } from '@/lib/socket';
 import DashboardSidebar from '@/components/dashboard-sidebar';
+import NotificationBell from '@/components/notification-bell';
 
 type EventItem = {
   id: string;
   title: string;
-  description?: string;
-  location?: string;
+  description?: string | null;
+  location?: string | null;
   startsAt: string;
-  endsAt?: string;
+  endsAt?: string | null;
   registrationsCount: number;
   isRegistered: boolean;
 };
 
 const weekDays = ['Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab', 'Dom'];
+
+function toDatetimeLocalValue(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+
+  return `${year}-${month}-${day}T${hours}:${minutes}`;
+}
 
 export default function EventsPage() {
   const router = useRouter();
@@ -29,19 +40,23 @@ export default function EventsPage() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [draggingEventId, setDraggingEventId] = useState<string | null>(null);
 
+  const [modalOpen, setModalOpen] = useState(false);
+  const [creating, setCreating] = useState(false);
+
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [location, setLocation] = useState('');
   const [startsAt, setStartsAt] = useState('');
   const [endsAt, setEndsAt] = useState('');
-  const [creating, setCreating] = useState(false);
 
   const calendarDays = useMemo(() => {
     const year = currentDate.getFullYear();
     const month = currentDate.getMonth();
+
     const firstDay = new Date(year, month, 1);
     const lastDay = new Date(year, month + 1, 0);
     const startOffset = (firstDay.getDay() + 6) % 7;
+
     const days: Date[] = [];
 
     for (let i = startOffset; i > 0; i--) {
@@ -53,7 +68,8 @@ export default function EventsPage() {
     }
 
     while (days.length % 7 !== 0) {
-      days.push(new Date(year, month, days.length - startOffset + 1));
+      const nextDay = days.length - startOffset + 1;
+      days.push(new Date(year, month, nextDay));
     }
 
     return days;
@@ -84,6 +100,25 @@ export default function EventsPage() {
     );
   }
 
+  function openCreateModal(day?: Date) {
+    const base = day || new Date();
+    const start = new Date(base);
+
+    if (day) {
+      start.setHours(9, 0, 0, 0);
+    }
+
+    const end = new Date(start);
+    end.setHours(start.getHours() + 1);
+
+    setTitle('');
+    setDescription('');
+    setLocation('');
+    setStartsAt(toDatetimeLocalValue(start));
+    setEndsAt(toDatetimeLocalValue(end));
+    setModalOpen(true);
+  }
+
   async function loadEvents() {
     const token = getAccessToken();
 
@@ -110,74 +145,6 @@ export default function EventsPage() {
       toast.error(err.message || 'Errore caricamento eventi');
     } finally {
       setLoading(false);
-    }
-  }
-
-  async function handleDrop(day: Date) {
-    if (!draggingEventId) return;
-
-    const token = getAccessToken();
-
-    if (!token) {
-      router.push('/login');
-      return;
-    }
-
-    const event = events.find((item) => item.id === draggingEventId);
-
-    if (!event) {
-      setDraggingEventId(null);
-      return;
-    }
-
-    const newStartsAt = moveDateKeepingTime(event.startsAt, day);
-    const newEndsAt = event.endsAt
-      ? moveDateKeepingTime(event.endsAt, day)
-      : null;
-
-    const previousEvents = events;
-
-    setEvents((currentEvents) =>
-      currentEvents.map((item) =>
-        item.id === event.id
-          ? {
-              ...item,
-              startsAt: newStartsAt.toISOString(),
-              endsAt: newEndsAt ? newEndsAt.toISOString() : undefined,
-            }
-          : item,
-      ),
-    );
-
-    try {
-      const res = await fetch(`${API_URL}/api/events/${event.id}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          title: event.title,
-          description: event.description,
-          location: event.location,
-          startsAt: newStartsAt.toISOString(),
-          endsAt: newEndsAt ? newEndsAt.toISOString() : undefined,
-        }),
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.message || 'Errore spostamento evento');
-      }
-
-      toast.success('Evento spostato');
-      await loadEvents();
-    } catch (err: any) {
-      setEvents(previousEvents);
-      toast.error(err.message || 'Errore spostamento evento');
-    } finally {
-      setDraggingEventId(null);
     }
   }
 
@@ -216,12 +183,7 @@ export default function EventsPage() {
       }
 
       toast.success('Evento creato');
-
-      setTitle('');
-      setDescription('');
-      setLocation('');
-      setStartsAt('');
-      setEndsAt('');
+      setModalOpen(false);
 
       await loadEvents();
     } catch (err: any) {
@@ -231,11 +193,87 @@ export default function EventsPage() {
     }
   }
 
+  async function handleDrop(day: Date) {
+    if (!draggingEventId) {
+      return;
+    }
+
+    const token = getAccessToken();
+
+    if (!token) {
+      router.push('/login');
+      return;
+    }
+
+    const event = events.find((item) => item.id === draggingEventId);
+
+    if (!event) {
+      setDraggingEventId(null);
+      return;
+    }
+
+    const newStartsAt = moveDateKeepingTime(event.startsAt, day);
+    const newEndsAt = event.endsAt
+      ? moveDateKeepingTime(event.endsAt, day)
+      : null;
+
+    const previousEvents = events;
+
+    setEvents((currentEvents) =>
+      currentEvents.map((item) =>
+        item.id === event.id
+          ? {
+              ...item,
+              startsAt: newStartsAt.toISOString(),
+              endsAt: newEndsAt ? newEndsAt.toISOString() : null,
+            }
+          : item,
+      ),
+    );
+
+    try {
+      const res = await fetch(`${API_URL}/api/events/${event.id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          title: event.title,
+          description: event.description,
+          location: event.location,
+          startsAt: newStartsAt.toISOString(),
+          endsAt: newEndsAt ? newEndsAt.toISOString() : null,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.message || 'Errore spostamento evento');
+      }
+
+      toast.success('Evento spostato');
+      await loadEvents();
+    } catch (err: any) {
+      setEvents(previousEvents);
+      toast.error(err.message || 'Errore spostamento evento');
+    } finally {
+      setDraggingEventId(null);
+    }
+  }
+
   async function handleDelete(id: string) {
     const token = getAccessToken();
 
     if (!token) {
       router.push('/login');
+      return;
+    }
+
+    const confirmed = window.confirm('Vuoi eliminare questo evento?');
+
+    if (!confirmed) {
       return;
     }
 
@@ -292,7 +330,7 @@ export default function EventsPage() {
   useEffect(() => {
     loadEvents();
 
-    const socket = io(API_URL.replace('/api', ''));
+    const socket = getSocket();
 
     socket.on('events:changed', (payload?: { message?: string }) => {
       toast.success(payload?.message || 'Eventi aggiornati');
@@ -300,7 +338,7 @@ export default function EventsPage() {
     });
 
     return () => {
-      socket.disconnect();
+      socket.off('events:changed');
     };
   }, []);
 
@@ -310,20 +348,32 @@ export default function EventsPage() {
 
       <main className="flex-1 p-8 lg:ml-72">
         <div className="mx-auto max-w-7xl space-y-8">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
             <div>
               <h1 className="text-5xl font-bold">Eventi</h1>
+
               <p className="mt-2 text-gray-400">
-                Calendario eventi con drag & drop
+                Calendario eventi realtime con drag & drop
               </p>
             </div>
 
-            <button
-              onClick={() => router.push('/dashboard')}
-              className="rounded-xl border border-white/10 px-5 py-3 hover:bg-white/5"
-            >
-              Dashboard
-            </button>
+            <div className="flex flex-wrap items-center gap-3">
+              <NotificationBell />
+
+              <button
+                onClick={() => openCreateModal()}
+                className="rounded-xl bg-indigo-600 px-5 py-3 font-semibold transition hover:bg-indigo-500"
+              >
+                Nuovo evento
+              </button>
+
+              <button
+                onClick={() => router.push('/dashboard')}
+                className="rounded-xl border border-white/10 px-5 py-3 transition hover:bg-white/5"
+              >
+                Dashboard
+              </button>
+            </div>
           </div>
 
           <section className="grid gap-5 md:grid-cols-3">
@@ -354,7 +404,7 @@ export default function EventsPage() {
           </section>
 
           <section className="rounded-3xl border border-white/5 bg-[#1a1f2e] p-6">
-            <div className="mb-6 flex items-center justify-between">
+            <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
               <div>
                 <h2 className="text-3xl font-bold capitalize">
                   {currentDate.toLocaleDateString('it-IT', {
@@ -362,8 +412,9 @@ export default function EventsPage() {
                     year: 'numeric',
                   })}
                 </h2>
+
                 <p className="mt-1 text-gray-400">
-                  Trascina un evento su un altro giorno per spostarlo
+                  Clicca un giorno per creare. Trascina un evento per spostarlo.
                 </p>
               </div>
 
@@ -378,14 +429,14 @@ export default function EventsPage() {
                       ),
                     )
                   }
-                  className="rounded-xl border border-white/10 px-4 py-2 hover:bg-white/5"
+                  className="rounded-xl border border-white/10 px-4 py-2 transition hover:bg-white/5"
                 >
                   ←
                 </button>
 
                 <button
                   onClick={() => setCurrentDate(new Date())}
-                  className="rounded-xl border border-white/10 px-4 py-2 hover:bg-white/5"
+                  className="rounded-xl border border-white/10 px-4 py-2 transition hover:bg-white/5"
                 >
                   Oggi
                 </button>
@@ -400,7 +451,7 @@ export default function EventsPage() {
                       ),
                     )
                   }
-                  className="rounded-xl border border-white/10 px-4 py-2 hover:bg-white/5"
+                  className="rounded-xl border border-white/10 px-4 py-2 transition hover:bg-white/5"
                 >
                   →
                 </button>
@@ -426,17 +477,23 @@ export default function EventsPage() {
                 return (
                   <div
                     key={day.toISOString()}
+                    onClick={() => openCreateModal(day)}
                     onDragOver={(e) => e.preventDefault()}
-                    onDrop={() => handleDrop(day)}
-                    className={`min-h-32 border-b border-r border-white/5 p-3 transition ${
+                    onDrop={(e) => {
+                      e.stopPropagation();
+                      handleDrop(day);
+                    }}
+                    className={`min-h-36 cursor-pointer border-b border-r border-white/5 p-3 transition ${
                       isCurrentMonth
                         ? 'bg-[#151a27]'
                         : 'bg-[#111827]/50 text-gray-600'
-                    } ${draggingEventId ? 'hover:bg-indigo-600/10' : ''}`}
+                    } ${draggingEventId ? 'hover:bg-indigo-600/10' : 'hover:bg-white/5'}`}
                   >
                     <div
                       className={`mb-2 flex h-8 w-8 items-center justify-center rounded-full text-sm font-semibold ${
-                        isToday ? 'bg-indigo-600 text-white' : 'text-gray-300'
+                        isToday
+                          ? 'bg-indigo-600 text-white'
+                          : 'text-gray-300'
                       }`}
                     >
                       {day.getDate()}
@@ -447,14 +504,33 @@ export default function EventsPage() {
                         <div
                           key={event.id}
                           draggable
-                          onDragStart={() => setDraggingEventId(event.id)}
-                          onDragEnd={() => setDraggingEventId(null)}
-                          className={`cursor-move truncate rounded-lg bg-indigo-600/20 px-2 py-1 text-xs text-indigo-200 transition hover:bg-indigo-600/40 ${
+                          onClick={(e) => e.stopPropagation()}
+                          onDragStart={(e) => {
+                            e.stopPropagation();
+                            setDraggingEventId(event.id);
+                          }}
+                          onDragEnd={(e) => {
+                            e.stopPropagation();
+                            setDraggingEventId(null);
+                          }}
+                          className={`cursor-move rounded-lg bg-indigo-600/20 px-2 py-2 text-xs text-indigo-100 transition hover:bg-indigo-600/40 ${
                             draggingEventId === event.id ? 'opacity-50' : ''
                           }`}
                           title="Trascina per spostare"
                         >
-                          {event.title}
+                          <p className="truncate font-semibold">
+                            {event.title}
+                          </p>
+
+                          <p className="mt-1 text-[10px] text-indigo-200/80">
+                            {new Date(event.startsAt).toLocaleTimeString(
+                              'it-IT',
+                              {
+                                hour: '2-digit',
+                                minute: '2-digit',
+                              },
+                            )}
+                          </p>
                         </div>
                       ))}
 
@@ -468,61 +544,6 @@ export default function EventsPage() {
                 );
               })}
             </div>
-          </section>
-
-          <section className="rounded-3xl border border-white/5 bg-[#1a1f2e] p-6">
-            <h2 className="mb-6 text-2xl font-bold">Crea evento</h2>
-
-            <form onSubmit={handleCreateEvent} className="grid gap-4">
-              <input
-                type="text"
-                placeholder="Titolo evento"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                className="rounded-xl border border-white/10 bg-[#111827] px-4 py-3 outline-none"
-                required
-              />
-
-              <textarea
-                placeholder="Descrizione"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                className="rounded-xl border border-white/10 bg-[#111827] px-4 py-3 outline-none"
-              />
-
-              <input
-                type="text"
-                placeholder="Location"
-                value={location}
-                onChange={(e) => setLocation(e.target.value)}
-                className="rounded-xl border border-white/10 bg-[#111827] px-4 py-3 outline-none"
-              />
-
-              <div className="grid gap-4 md:grid-cols-2">
-                <input
-                  type="datetime-local"
-                  value={startsAt}
-                  onChange={(e) => setStartsAt(e.target.value)}
-                  className="rounded-xl border border-white/10 bg-[#111827] px-4 py-3 outline-none"
-                  required
-                />
-
-                <input
-                  type="datetime-local"
-                  value={endsAt}
-                  onChange={(e) => setEndsAt(e.target.value)}
-                  className="rounded-xl border border-white/10 bg-[#111827] px-4 py-3 outline-none"
-                />
-              </div>
-
-              <button
-                type="submit"
-                disabled={creating}
-                className="rounded-xl bg-indigo-600 px-5 py-3 font-semibold transition hover:bg-indigo-500 disabled:opacity-60"
-              >
-                {creating ? 'Creazione...' : 'Crea evento'}
-              </button>
-            </form>
           </section>
 
           <section className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
@@ -541,6 +562,7 @@ export default function EventsPage() {
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <h2 className="text-2xl font-bold">{event.title}</h2>
+
                       <p className="mt-2 text-gray-400">
                         {event.description || 'Nessuna descrizione'}
                       </p>
@@ -548,7 +570,7 @@ export default function EventsPage() {
 
                     <button
                       onClick={() => handleDelete(event.id)}
-                      className="rounded-xl border border-red-500/30 px-3 py-2 text-sm text-red-300 hover:bg-red-500/10"
+                      className="rounded-xl border border-red-500/30 px-3 py-2 text-sm text-red-300 transition hover:bg-red-500/10"
                     >
                       Elimina
                     </button>
@@ -556,7 +578,9 @@ export default function EventsPage() {
 
                   <div className="mt-6 space-y-2 text-sm text-gray-300">
                     <p>📍 {event.location || 'Location non definita'}</p>
-                    <p>📅 {new Date(event.startsAt).toLocaleString('it-IT')}</p>
+                    <p>
+                      📅 {new Date(event.startsAt).toLocaleString('it-IT')}
+                    </p>
                     <p>👥 {event.registrationsCount} registrazioni</p>
                   </div>
 
@@ -572,6 +596,90 @@ export default function EventsPage() {
           </section>
         </div>
       </main>
+
+      {modalOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-6">
+          <div className="w-full max-w-2xl rounded-3xl border border-white/10 bg-[#111827] p-6 shadow-2xl">
+            <div className="mb-6 flex items-start justify-between gap-4">
+              <div>
+                <h2 className="text-3xl font-bold">Crea evento</h2>
+
+                <p className="mt-1 text-gray-400">
+                  Aggiungi un nuovo evento al calendario.
+                </p>
+              </div>
+
+              <button
+                onClick={() => setModalOpen(false)}
+                className="rounded-xl border border-white/10 px-4 py-2 transition hover:bg-white/5"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateEvent} className="grid gap-4">
+              <input
+                type="text"
+                placeholder="Titolo evento"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                className="rounded-xl border border-white/10 bg-[#0f172a] px-4 py-3 text-white outline-none focus:border-indigo-500"
+                required
+              />
+
+              <textarea
+                placeholder="Descrizione"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                className="min-h-28 rounded-xl border border-white/10 bg-[#0f172a] px-4 py-3 text-white outline-none focus:border-indigo-500"
+              />
+
+              <input
+                type="text"
+                placeholder="Location"
+                value={location}
+                onChange={(e) => setLocation(e.target.value)}
+                className="rounded-xl border border-white/10 bg-[#0f172a] px-4 py-3 text-white outline-none focus:border-indigo-500"
+              />
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <input
+                  type="datetime-local"
+                  value={startsAt}
+                  onChange={(e) => setStartsAt(e.target.value)}
+                  className="rounded-xl border border-white/10 bg-[#0f172a] px-4 py-3 text-white outline-none focus:border-indigo-500"
+                  required
+                />
+
+                <input
+                  type="datetime-local"
+                  value={endsAt}
+                  onChange={(e) => setEndsAt(e.target.value)}
+                  className="rounded-xl border border-white/10 bg-[#0f172a] px-4 py-3 text-white outline-none focus:border-indigo-500"
+                />
+              </div>
+
+              <div className="flex justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setModalOpen(false)}
+                  className="rounded-xl border border-white/10 px-5 py-3 transition hover:bg-white/5"
+                >
+                  Annulla
+                </button>
+
+                <button
+                  type="submit"
+                  disabled={creating}
+                  className="rounded-xl bg-indigo-600 px-5 py-3 font-semibold transition hover:bg-indigo-500 disabled:opacity-60"
+                >
+                  {creating ? 'Creazione...' : 'Crea evento'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

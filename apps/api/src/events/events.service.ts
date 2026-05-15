@@ -4,7 +4,10 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+
 import { PrismaService } from '../prisma/prisma.service';
+import { NotificationsService } from '../notifications/notifications.service';
+
 import { CreateEventDto } from './dto/create-event.dto';
 import { EventsGateway } from './events.gateway';
 
@@ -13,6 +16,7 @@ export class EventsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly eventsGateway: EventsGateway,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   async create(currentUser: any, dto: CreateEventDto) {
@@ -29,6 +33,13 @@ export class EventsService {
         startsAt: new Date(dto.startsAt),
         endsAt: dto.endsAt ? new Date(dto.endsAt) : null,
       },
+    });
+
+    await this.notificationsService.create({
+      title: 'Nuovo evento',
+      message: `${event.title} è stato creato`,
+      associationId: currentUser.associationId,
+      userId: null,
     });
 
     this.eventsGateway.emitEventsChanged('Nuovo evento creato');

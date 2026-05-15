@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-
 import {
   Bar,
   BarChart,
@@ -13,6 +12,7 @@ import {
 
 import { API_URL, getAccessToken } from '@/lib/api';
 import DashboardSidebar from '@/components/dashboard-sidebar';
+import NotificationBell from '@/components/notification-bell';
 
 type DashboardKpis = {
   associations: number;
@@ -63,12 +63,12 @@ export default function DashboardPage() {
 
         const data = await res.json();
 
-setKpis({
-  associations: data.associationsCount || 0,
-  members: data.membersCount || 0,
-  events: data.eventsCount || 0,
-  revenue: (data.incomeCents || 0) / 100,
-});
+        setKpis({
+          associations: data.associationsCount || 0,
+          members: data.membersCount || 0,
+          events: data.eventsCount || 0,
+          revenue: (data.incomeCents || 0) / 100,
+        });
       } catch {
         console.error('Errore dashboard');
       } finally {
@@ -105,17 +105,17 @@ setKpis({
     <div className="flex min-h-screen bg-[#0f1117] text-white">
       <DashboardSidebar />
 
-      <main className="flex-1 p-8 space-y-8 lg:ml-72">
-        <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
+      <main className="flex-1 space-y-8 p-8 lg:ml-72">
+        <div className="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
           <div>
             <h1 className="text-5xl font-bold">Dashboard</h1>
 
-            <p className="text-gray-400 mt-2">
-              Panoramica associazione
-            </p>
+            <p className="mt-2 text-gray-400">Panoramica associazione</p>
           </div>
 
-          <div className="flex flex-wrap gap-3">
+          <div className="flex flex-wrap items-center gap-3">
+            <NotificationBell />
+
             <button
               onClick={() => router.push('/associations/new')}
               className="rounded-xl bg-indigo-600 px-5 py-3 font-medium transition hover:bg-indigo-500"
@@ -142,52 +142,50 @@ setKpis({
         <section className="grid gap-5 md:grid-cols-4 animate-fade-up">
           <button
             onClick={() => router.push('/associations')}
-            className="text-left bg-[#1a1f2e] rounded-3xl border border-white/5 p-6 shadow-xl transition hover:-translate-y-1 hover:border-indigo-500/50"
+            className="rounded-3xl border border-white/5 bg-[#1a1f2e] p-6 text-left shadow-xl transition hover:-translate-y-1 hover:border-indigo-500/50"
           >
             <p className="text-sm text-gray-400">Associazioni</p>
-            <h2 className="text-4xl font-bold mt-3">{kpis.associations}</h2>
+            <h2 className="mt-3 text-4xl font-bold">{kpis.associations}</h2>
           </button>
 
           <button
             onClick={() => router.push('/members')}
-            className="text-left bg-[#1a1f2e] rounded-3xl border border-white/5 p-6 shadow-xl transition hover:-translate-y-1 hover:border-indigo-500/50"
+            className="rounded-3xl border border-white/5 bg-[#1a1f2e] p-6 text-left shadow-xl transition hover:-translate-y-1 hover:border-indigo-500/50"
           >
             <p className="text-sm text-gray-400">Membri</p>
-            <h2 className="text-4xl font-bold mt-3">{kpis.members}</h2>
+            <h2 className="mt-3 text-4xl font-bold">{kpis.members}</h2>
           </button>
 
           <button
             onClick={() => router.push('/events')}
-            className="text-left bg-[#1a1f2e] rounded-3xl border border-white/5 p-6 shadow-xl transition hover:-translate-y-1 hover:border-indigo-500/50"
+            className="rounded-3xl border border-white/5 bg-[#1a1f2e] p-6 text-left shadow-xl transition hover:-translate-y-1 hover:border-indigo-500/50"
           >
             <p className="text-sm text-gray-400">Eventi</p>
-            <h2 className="text-4xl font-bold mt-3">{kpis.events}</h2>
+            <h2 className="mt-3 text-4xl font-bold">{kpis.events}</h2>
           </button>
 
           <button
             onClick={() => router.push('/finance')}
-            className="text-left bg-[#1a1f2e] rounded-3xl border border-white/5 p-6 shadow-xl transition hover:-translate-y-1 hover:border-indigo-500/50"
+            className="rounded-3xl border border-white/5 bg-[#1a1f2e] p-6 text-left shadow-xl transition hover:-translate-y-1 hover:border-indigo-500/50"
           >
             <p className="text-sm text-gray-400">Entrate</p>
-            <h2 className="text-4xl font-bold mt-3">
+            <h2 className="mt-3 text-4xl font-bold">
               €{kpis.revenue.toFixed(2)}
             </h2>
           </button>
         </section>
 
-        <section className="bg-[#1a1f2e] rounded-3xl border border-white/5 p-6 shadow-xl">
-          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between mb-6">
+        <section className="rounded-3xl border border-white/5 bg-[#1a1f2e] p-6 shadow-xl">
+          <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div>
               <h2 className="text-3xl font-bold">Entrate mensili</h2>
 
-              <p className="text-gray-400 mt-1">
-                Performance ultimi mesi
-              </p>
+              <p className="mt-1 text-gray-400">Performance ultimi mesi</p>
             </div>
 
             <button
               onClick={() => router.push('/finance')}
-              className="bg-indigo-600 hover:bg-indigo-500 transition px-5 py-3 rounded-xl font-medium"
+              className="rounded-xl bg-indigo-600 px-5 py-3 font-medium transition hover:bg-indigo-500"
             >
               Vai alle finanze
             </button>
@@ -220,8 +218,8 @@ setKpis({
           </div>
         </section>
 
-        <section className="animate-fade-up bg-[#1a1f2e] rounded-3xl border border-white/5 p-6 shadow-xl">
-          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between mb-6">
+        <section className="animate-fade-up rounded-3xl border border-white/5 bg-[#1a1f2e] p-6 shadow-xl">
+          <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <h2 className="text-3xl font-bold">Azioni rapide</h2>
 
             <div className="flex flex-wrap gap-3">
@@ -248,12 +246,10 @@ setKpis({
             </div>
           </div>
 
-          <div className="rounded-2xl border border-white/5 p-5 bg-[#111827]">
-            <p className="font-semibold text-lg">Owner</p>
+          <div className="rounded-2xl border border-white/5 bg-[#111827] p-5">
+            <p className="text-lg font-semibold">Owner</p>
 
-            <p className="text-gray-400 mt-1">
-              Associazione principale
-            </p>
+            <p className="mt-1 text-gray-400">Associazione principale</p>
           </div>
         </section>
       </main>
