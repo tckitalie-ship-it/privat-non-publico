@@ -1,32 +1,56 @@
-import { Body, Controller, Get, Post, Req, UseGuards } from '@nestjs/common';
-import { AuthService } from './auth.service';
-import { LoginDto } from './dto/login.dto';
-import { SwitchAssociationDto } from './dto/switch-association.dto';
+import {
+  Body,
+  Controller,
+  Get,
+  Patch,
+  Post,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
+
 import { JwtAuthGuard } from './jwt-auth.guard';
+import { AuthService } from './auth.service';
+import { ChangePasswordDto } from './dto/change-password.dto';
 
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   @Post('login')
-  login(@Body() dto: LoginDto) {
-    return this.authService.login(dto);
-  }
-
-  @Post('switch-association')
-  @UseGuards(JwtAuthGuard)
-  switchAssociation(@Req() req, @Body() dto: SwitchAssociationDto) {
-    return this.authService.switchAssociation(req.user.id, dto.associationId);
+  login(
+    @Body()
+    body: {
+      email: string;
+      password: string;
+    },
+  ) {
+    return this.authService.login(body.email, body.password);
   }
 
   @Get('me')
   @UseGuards(JwtAuthGuard)
-  me(@Req() req) {
-    return {
-      id: req.user.id,
-      email: req.user.email,
-      associationId: req.user.associationId ?? null,
-      role: req.user.role ?? null,
-    };
+  me(@Req() req: any) {
+    return this.authService.me(req.user);
+  }
+
+  @Post('switch-association')
+  @UseGuards(JwtAuthGuard)
+  switchAssociation(
+    @Req() req: any,
+    @Body() body: { associationId: string },
+  ) {
+    return this.authService.switchAssociation(
+      req.user,
+      body.associationId,
+    );
+  }
+
+  @Patch('change-password')
+  @UseGuards(JwtAuthGuard)
+  changePassword(
+    @Req() req: any,
+    @Body() dto: ChangePasswordDto,
+  ) {
+    return this.authService.changePassword(req.user, dto);
   }
 }

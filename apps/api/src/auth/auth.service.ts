@@ -1,99 +1,104 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
-import * as bcrypt from 'bcrypt';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { PrismaService } from '../prisma/prisma.service';
-import { UsersService } from '../users/users.service';
-import { LoginDto } from './dto/login.dto';
+import * as bcrypt from 'bcryptjs';
 
-type JwtPayload = {
-  sub: string;
-  email: string;
-  associationId: string | null;
-  role: string | null;
-};
+import { PrismaService } from '../prisma/prisma.service';
+import { ChangePasswordDto } from './dto/change-password.dto';
 
 @Injectable()
 export class AuthService {
   constructor(
-    private readonly usersService: UsersService,
-    private readonly jwtService: JwtService,
     private readonly prisma: PrismaService,
+    private readonly jwtService: JwtService,
   ) {}
 
-  async validateUser(email: string, password: string) {
-    const normalizedEmail = email.trim().toLowerCase();
-
+  async login(email: string, password: string) {
     const user = await this.prisma.user.findUnique({
-      where: { email: normalizedEmail },
-      include: {
-        memberships: {
-          include: {
-            association: true,
-          },
-        },
-      },
+      where: { email },
     });
 
     if (!user) {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    const passwordOk = await bcrypt.compare(password, user.passwordHash);
+    const isPasswordValid = await bcrypt.compare(
+      password,
+      user.passwordHash,
+    );
 
-    if (!passwordOk) {
+    if (!isPasswordValid) {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    const activeMembership = user.memberships[0] ?? null;
+    const memberships = await this.prisma.membership.findMany({
+      where: {
+        userId: user.id,
+      },
+      include: {
+        association: true,
+      },
+    });
+
+    const activeMembership = memberships[0];
+
+    const payload = {
+      sub: user.id,
+      email: user.email,
+      associationId: activeMembership?.associationId,
+      role: activeMembership?.role,
+    };
 
     return {
-      id: user.id,
-      email: user.email,
-      activeMembership: activeMembership
+      access_token: await this.jwtService.signAsync(payload),
+      user: {
+        id: user.id,
+        email: user.email,
+      },
+      association: activeMembership?.association
         ? {
-            associationId: activeMembership.associationId,
+            id: activeMembership.association.id,
+            name: activeMembership.association.name,
             role: activeMembership.role,
           }
         : null,
     };
   }
 
-  async signToken(user: {
-    id: string;
-    email: string;
-    activeMembership?: {
-      associationId: string;
-      role: string;
-    } | null;
-  }) {
-    const payload: JwtPayload = {
-      sub: user.id,
-      email: user.email,
-      associationId: user.activeMembership?.associationId ?? null,
-      role: user.activeMembership?.role ?? null,
-    };
+  async me(currentUser: any) {
+    const user = await this.prisma.user.findUnique({
+      where: {
+        id: currentUser.id,
+      },
+      select: {
+        id: true,
+        email: true,
+        createdAt: true,
+      },
+    });
 
-    return this.jwtService.signAsync(payload);
-  }
-
-  async login(loginDto: LoginDto) {
-    const user = await this.validateUser(loginDto.email, loginDto.password);
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
 
     return {
-      access_token: await this.signToken(user),
-      user,
+      ...user,
+      associationId: currentUser.associationId,
+      role: currentUser.role,
     };
   }
 
-  async me(userId: string) {
-    return this.usersService.findById(userId);
-  }
-
-  async switchAssociation(userId: string, associationId: string) {
-    const membership = await this.prisma.membership.findFirst({
+  async switchAssociation(currentUser: any, associationId: string) {
+    const membership = await this.prisma.membership.findUnique({
       where: {
-        userId,
-        associationId,
+        userId_associationId: {
+          userId: currentUser.id,
+          associationId,
+        },
       },
       include: {
         association: true,
@@ -101,35 +106,70 @@ export class AuthService {
     });
 
     if (!membership) {
-      throw new UnauthorizedException('User is not member of this association');
+      throw new ForbiddenException('Membership not found');
     }
 
-    const user = await this.prisma.user.findUnique({
-      where: {
-        id: userId,
-      },
-    });
-
-    if (!user) {
-      throw new UnauthorizedException();
+    if (!membership.association.isActive) {
+      throw new ForbiddenException('Association is inactive');
     }
 
-    const accessToken = await this.signToken({
-      id: user.id,
-      email: user.email,
-      activeMembership: {
-        associationId: membership.associationId,
-        role: membership.role,
-      },
-    });
+    const payload = {
+      sub: currentUser.id,
+      email: currentUser.email,
+      associationId: membership.associationId,
+      role: membership.role,
+    };
 
     return {
-      access_token: accessToken,
-      activeAssociation: {
+      access_token: await this.jwtService.signAsync(payload),
+      association: {
         id: membership.association.id,
         name: membership.association.name,
         role: membership.role,
       },
+    };
+  }
+
+  async changePassword(currentUser: any, dto: ChangePasswordDto) {
+    if (dto.currentPassword === dto.newPassword) {
+      throw new BadRequestException(
+        'La nuova password deve essere diversa da quella attuale',
+      );
+    }
+
+    const user = await this.prisma.user.findUnique({
+      where: {
+        id: currentUser.id,
+      },
+    });
+
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    const isCurrentPasswordValid = await bcrypt.compare(
+      dto.currentPassword,
+      user.passwordHash,
+    );
+
+    if (!isCurrentPasswordValid) {
+      throw new UnauthorizedException('Password attuale non corretta');
+    }
+
+    const passwordHash = await bcrypt.hash(dto.newPassword, 10);
+
+    await this.prisma.user.update({
+      where: {
+        id: user.id,
+      },
+      data: {
+        passwordHash,
+      },
+    });
+
+    return {
+      success: true,
+      message: 'Password aggiornata',
     };
   }
 }

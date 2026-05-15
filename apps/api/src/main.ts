@@ -1,41 +1,34 @@
-import 'dotenv/config';
-import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
+import { ValidationPipe } from '@nestjs/common';
+import { join } from 'path';
+import { NestExpressApplication } from '@nestjs/platform-express';
+
 import { AppModule } from './app.module';
-import * as bodyParser from 'body-parser';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, {
-    rawBody: true,
-  });
-  app.enableCors({
-  origin: true,
-  credentials: true,
-});
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
   app.setGlobalPrefix('api');
 
-  // 🔥 IMPORTANTE per Stripe webhook
-  app.use(
-    '/api/billing/webhook',
-    bodyParser.raw({ type: 'application/json' }),
-  );
+  app.enableCors({
+    origin: 'http://localhost:3000',
+    credentials: true,
+  });
+
+  app.useStaticAssets(join(process.cwd(), 'uploads'), {
+    prefix: '/uploads/',
+  });
 
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
-      forbidNonWhitelisted: true,
       transform: true,
     }),
   );
 
-  await app.listen(3001, '0.0.0.0');
+  await app.listen(3001, '127.0.0.1');
 
   console.log('API running on http://127.0.0.1:3001/api');
 }
 
 bootstrap();
-
-setInterval(() => {
-  // keep process alive on Windows
-}, 1000);

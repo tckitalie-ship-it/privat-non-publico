@@ -1,6 +1,15 @@
-import { ForbiddenException, Injectable } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateAssociationDto } from './dto/create-association.dto';
+
+type UpdateAssociationSettingsDto = {
+  name?: string;
+  description?: string | null;
+};
 
 @Injectable()
 export class AssociationsService {
@@ -38,6 +47,76 @@ export class AssociationsService {
           },
         },
       });
+    });
+  }
+
+  async me(currentUser: any) {
+    if (!currentUser.associationId) {
+      throw new ForbiddenException('No active association selected');
+    }
+
+    const association = await this.prisma.association.findUnique({
+      where: {
+        id: currentUser.associationId,
+      },
+      include: {
+        memberships: true,
+        invitations: true,
+      },
+    });
+
+    if (!association) {
+      throw new NotFoundException('Association not found');
+    }
+
+    return {
+      id: association.id,
+      name: association.name,
+      description: association.description,
+      logoUrl: association.logoUrl,
+      isActive: association.isActive,
+      createdAt: association.createdAt,
+      membersCount: association.memberships.length,
+      invitationsCount: association.invitations.length,
+    };
+  }
+
+  async updateMe(currentUser: any, dto: UpdateAssociationSettingsDto) {
+    if (!currentUser.associationId) {
+      throw new ForbiddenException('No active association selected');
+    }
+
+    if (!['OWNER', 'ADMIN'].includes(currentUser.role)) {
+      throw new ForbiddenException('Only OWNER or ADMIN can update settings');
+    }
+
+    return this.prisma.association.update({
+      where: {
+        id: currentUser.associationId,
+      },
+      data: {
+        name: dto.name,
+        description: dto.description === '' ? null : dto.description,
+      },
+    });
+  }
+
+  async updateLogo(currentUser: any, logoUrl: string) {
+    if (!currentUser.associationId) {
+      throw new ForbiddenException('No active association selected');
+    }
+
+    if (!['OWNER', 'ADMIN'].includes(currentUser.role)) {
+      throw new ForbiddenException('Only OWNER or ADMIN can update logo');
+    }
+
+    return this.prisma.association.update({
+      where: {
+        id: currentUser.associationId,
+      },
+      data: {
+        logoUrl,
+      },
     });
   }
 

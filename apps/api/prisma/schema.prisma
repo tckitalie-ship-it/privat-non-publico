@@ -28,6 +28,7 @@ model Association {
   name        String
   slug        String?
   description String?
+  logoUrl     String?
   isActive    Boolean @default(true)
 
   stripeCustomerId             String?

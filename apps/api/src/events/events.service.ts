@@ -6,17 +6,21 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateEventDto } from './dto/create-event.dto';
+import { EventsGateway } from './events.gateway';
 
 @Injectable()
 export class EventsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly eventsGateway: EventsGateway,
+  ) {}
 
   async create(currentUser: any, dto: CreateEventDto) {
     if (!currentUser.associationId) {
       throw new ForbiddenException('No active association selected');
     }
 
-    return this.prisma.event.create({
+    const event = await this.prisma.event.create({
       data: {
         associationId: currentUser.associationId,
         title: dto.title,
@@ -26,6 +30,10 @@ export class EventsService {
         endsAt: dto.endsAt ? new Date(dto.endsAt) : null,
       },
     });
+
+    this.eventsGateway.emitEventsChanged('Nuovo evento creato');
+
+    return event;
   }
 
   async findAll(currentUser: any) {
@@ -85,7 +93,7 @@ export class EventsService {
       throw new ForbiddenException('Wrong association');
     }
 
-    return this.prisma.event.update({
+    const updatedEvent = await this.prisma.event.update({
       where: {
         id: eventId,
       },
@@ -97,6 +105,10 @@ export class EventsService {
         endsAt: dto.endsAt ? new Date(dto.endsAt) : null,
       },
     });
+
+    this.eventsGateway.emitEventsChanged('Evento aggiornato');
+
+    return updatedEvent;
   }
 
   async remove(currentUser: any, eventId: string) {
@@ -123,6 +135,8 @@ export class EventsService {
         id: eventId,
       },
     });
+
+    this.eventsGateway.emitEventsChanged('Evento eliminato');
 
     return {
       success: true,
@@ -161,12 +175,16 @@ export class EventsService {
       throw new BadRequestException('Already registered');
     }
 
-    return this.prisma.eventRegistration.create({
+    const registration = await this.prisma.eventRegistration.create({
       data: {
         eventId,
         userId: currentUser.id,
       },
     });
+
+    this.eventsGateway.emitEventsChanged('Nuova registrazione evento');
+
+    return registration;
   }
 
   async findRegistrations(currentUser: any, eventId: string) {
@@ -243,6 +261,8 @@ export class EventsService {
         },
       },
     });
+
+    this.eventsGateway.emitEventsChanged('Registrazione annullata');
 
     return {
       success: true,

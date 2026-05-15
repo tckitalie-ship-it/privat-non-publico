@@ -2,138 +2,92 @@
 
 import { FormEvent, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import {
-  API_URL,
-  setAccessToken,
-} from '@/lib/api';
+import { toast } from 'sonner';
+
+import { API_URL, setAccessToken } from '@/lib/api';
 
 export default function LoginPage() {
   const router = useRouter();
 
-  const [email, setEmail] = useState('test@example.com');
-  const [password, setPassword] = useState('123456');
+  const [email, setEmail] = useState('demo@example.com');
+  const [password, setPassword] = useState('12345678');
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
 
-  async function handleLogin(
-    e: FormEvent<HTMLFormElement>,
-  ) {
+  async function handleLogin(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
 
-    setLoading(true);
-    setError('');
-
     try {
-      console.log('API_URL:', API_URL);
+      setLoading(true);
 
-      const res = await fetch(
-        `${API_URL}/api/auth/login`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            email,
-            password,
-          }),
+      const res = await fetch(`${API_URL}/api/auth/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
         },
-      );
+        body: JSON.stringify({
+          email,
+          password,
+        }),
+      });
 
       const data = await res.json();
 
       if (!res.ok) {
-        throw new Error(
-          data.message || 'Login fallito',
-        );
-      }
-
-      if (!data.access_token) {
-        throw new Error(
-          'Token mancante nella risposta login',
-        );
+        throw new Error(data.message || 'Login fallito');
       }
 
       setAccessToken(data.access_token);
+      toast.success('Login effettuato');
 
       router.push('/dashboard');
     } catch (err: any) {
-      console.error(err);
-
-      setError(
-        err.message || 'Login fallito',
-      );
+      toast.error(err.message || 'Errore login');
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <main className="min-h-screen flex items-center justify-center bg-gray-50 p-6">
-      <form
-        onSubmit={handleLogin}
-        className="w-full max-w-sm bg-white shadow rounded-xl p-6 space-y-4"
-      >
-        <div>
-          <h1 className="text-2xl font-bold">
-            Login
-          </h1>
+    <main className="flex min-h-screen items-center justify-center bg-[#0f1117] p-6 text-white">
+      <div className="w-full max-w-md rounded-3xl border border-white/10 bg-[#111827] p-8 shadow-2xl">
+        <h1 className="text-4xl font-bold">Accedi</h1>
 
-          <p className="text-sm text-gray-500 mt-1">
-            Accedi alla piattaforma
-          </p>
-        </div>
+        <p className="mt-2 text-gray-400">
+          Entra nella piattaforma associazioni
+        </p>
 
-        {error && (
-          <div className="border border-red-200 bg-red-50 text-red-700 text-sm rounded p-3">
-            {error}
+        <form onSubmit={handleLogin} className="mt-8 space-y-5">
+          <div>
+            <label className="text-sm text-gray-400">Email</label>
+
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="mt-2 w-full rounded-xl border border-white/10 bg-[#0f172a] px-4 py-3 outline-none focus:border-indigo-500"
+            />
           </div>
-        )}
 
-        <div className="space-y-1">
-          <label className="text-sm text-gray-600">
-            Email
-          </label>
+          <div>
+            <label className="text-sm text-gray-400">Password</label>
 
-          <input
-            type="email"
-            className="w-full border rounded px-3 py-2"
-            value={email}
-            onChange={(e) =>
-              setEmail(e.target.value)
-            }
-            autoComplete="email"
-            required
-          />
-        </div>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="mt-2 w-full rounded-xl border border-white/10 bg-[#0f172a] px-4 py-3 outline-none focus:border-indigo-500"
+            />
+          </div>
 
-        <div className="space-y-1">
-          <label className="text-sm text-gray-600">
-            Password
-          </label>
-
-          <input
-            type="password"
-            className="w-full border rounded px-3 py-2"
-            value={password}
-            onChange={(e) =>
-              setPassword(e.target.value)
-            }
-            autoComplete="current-password"
-            required
-          />
-        </div>
-
-        <button
-          type="submit"
-          disabled={loading}
-          className="w-full bg-black text-white rounded py-2 disabled:opacity-50"
-        >
-          {loading
-            ? 'Accesso...'
-            : 'Accedi'}
-        </button>
-      </form>
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full rounded-xl bg-indigo-600 px-5 py-3 font-semibold transition hover:bg-indigo-500 disabled:opacity-60"
+          >
+            {loading ? 'Accesso...' : 'Login'}
+          </button>
+        </form>
+      </div>
     </main>
   );
 }

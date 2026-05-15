@@ -62,7 +62,7 @@ export class InvitationsService {
       throw new ConflictException('User is already a member');
     }
 
-    const existing = await this.prisma.invitation.findUnique({
+    const existingInvitation = await this.prisma.invitation.findUnique({
       where: {
         email_associationId: {
           email,
@@ -71,8 +71,16 @@ export class InvitationsService {
       },
     });
 
-    if (existing && !existing.acceptedAt) {
+    if (existingInvitation && !existingInvitation.acceptedAt) {
       throw new ConflictException('Invitation already exists');
+    }
+
+    if (existingInvitation && existingInvitation.acceptedAt) {
+      await this.prisma.invitation.delete({
+        where: {
+          id: existingInvitation.id,
+        },
+      });
     }
 
     const token = randomBytes(32).toString('hex');
@@ -91,15 +99,21 @@ export class InvitationsService {
       },
     });
 
-    const inviteLink = `${process.env.APP_FRONTEND_URL}/invite?token=${token}`;
+    const frontendUrl =
+      process.env.APP_FRONTEND_URL || 'http://localhost:3000';
+
+    const inviteLink = `${frontendUrl}/invitations/accept?token=${token}`;
+    console.log('INVITE TOKEN:', token);
+console.log('INVITE LINK:', inviteLink);
 
     try {
       if (!this.resend) {
         console.warn('RESEND_API_KEY missing, email skipped');
+        console.log('INVITE LINK:', inviteLink);
         return invitation;
       }
 
-      const response = await this.resend.emails.send({
+      await this.resend.emails.send({
         from: process.env.INVITATION_FROM_EMAIL!,
         to: invitation.email,
         subject: 'Sei stato invitato',
@@ -109,8 +123,6 @@ export class InvitationsService {
           <a href="${inviteLink}">Accetta invito</a>
         `,
       });
-
-      console.log('EMAIL RESPONSE:', response);
     } catch (error) {
       console.error('EMAIL ERROR:', error);
     }
