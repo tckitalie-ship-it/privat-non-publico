@@ -2,15 +2,14 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-COPY package.json pnpm-lock.yaml* ./
-
 RUN npm install -g pnpm
-RUN pnpm install
 
 COPY . .
 
-RUN pnpm build
+RUN pnpm install
+
+RUN pnpm --filter api build
 
 EXPOSE 3001
 
-CMD ["pnpm", "start:prod"]
+CMD ["pnpm", "--filter", "api", "start:prod"]
