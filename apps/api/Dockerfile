@@ -8,10 +8,8 @@ COPY . .
 
 RUN pnpm install
 
-RUN pnpm prisma migrate deploy --schema=apps/api/prisma/schema.prisma
-
 RUN pnpm --filter api build
 
 EXPOSE 3001
 
-CMD ["pnpm", "--filter", "api", "start:prod"]
+CMD ["sh", "-c", "pnpm prisma migrate deploy --schema=apps/api/prisma/schema.prisma && pnpm --filter api start:prod"]
