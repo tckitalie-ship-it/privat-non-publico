@@ -8,7 +8,7 @@ COPY . .
 
 RUN pnpm install
 
-RUN pnpm prisma migrate deploy --schema=prisma/schema.prisma
+RUN pnpm prisma migrate deploy --schema=apps/api/prisma/schema.prisma
 
 RUN pnpm --filter api build
 
