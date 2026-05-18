@@ -128,7 +128,7 @@ export default function EventsPage() {
     }
 
     try {
-      const res = await fetch(`${API_URL}/api/events`, {
+      const res = await fetch(`${API_URL}/events`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -161,7 +161,7 @@ export default function EventsPage() {
     try {
       setCreating(true);
 
-      const res = await fetch(`${API_URL}/api/events`, {
+      const res = await fetch(`${API_URL}/events`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -232,7 +232,7 @@ export default function EventsPage() {
     );
 
     try {
-      const res = await fetch(`${API_URL}/api/events/${event.id}`, {
+      const res = await fetch(`${API_URL}/events/${event.id}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -278,7 +278,7 @@ export default function EventsPage() {
     }
 
     try {
-      const res = await fetch(`${API_URL}/api/events/${id}`, {
+      const res = await fetch(`${API_URL}/events/${id}`, {
         method: 'DELETE',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -307,7 +307,7 @@ export default function EventsPage() {
     }
 
     try {
-      const res = await fetch(`${API_URL}/api/events/${id}/register`, {
+      const res = await fetch(`${API_URL}/events/${id}/register`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,

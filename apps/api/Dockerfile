@@ -8,6 +8,8 @@ COPY . .
 
 RUN pnpm install
 
+RUN pnpm prisma migrate deploy
+
 RUN pnpm --filter api build
 
 EXPOSE 3001

@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-
 import { Bell } from 'lucide-react';
 
 import { API_URL, getAccessToken } from '@/lib/api';
@@ -19,29 +18,23 @@ export default function NotificationBell() {
   const dropdownRef = useRef<HTMLDivElement | null>(null);
 
   const [open, setOpen] = useState(false);
-
   const [notifications, setNotifications] = useState<Notification[]>([]);
 
   async function loadNotifications() {
     try {
       const token = getAccessToken();
 
-      if (!token) {
-        return;
-      }
+      if (!token) return;
 
-      const res = await fetch(`${API_URL}/api/notifications`, {
+      const res = await fetch(`${API_URL}/notifications`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
       });
 
-      if (!res.ok) {
-        return;
-      }
+      if (!res.ok) return;
 
       const data = await res.json();
-
       setNotifications(data);
     } catch (error) {
       console.error(error);
@@ -52,11 +45,9 @@ export default function NotificationBell() {
     try {
       const token = getAccessToken();
 
-      if (!token) {
-        return;
-      }
+      if (!token) return;
 
-      await fetch(`${API_URL}/api/notifications/${id}/read`, {
+      await fetch(`${API_URL}/notifications/${id}/read`, {
         method: 'PATCH',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -66,10 +57,7 @@ export default function NotificationBell() {
       setNotifications((prev) =>
         prev.map((notification) =>
           notification.id === id
-            ? {
-                ...notification,
-                read: true,
-              }
+            ? { ...notification, read: true }
             : notification,
         ),
       );
@@ -131,9 +119,7 @@ export default function NotificationBell() {
       {open && (
         <div className="absolute right-0 z-50 mt-3 w-96 overflow-hidden rounded-3xl border border-white/10 bg-[#111827] shadow-2xl">
           <div className="border-b border-white/5 p-5">
-            <h2 className="text-lg font-bold text-white">
-              Notifiche
-            </h2>
+            <h2 className="text-lg font-bold text-white">Notifiche</h2>
           </div>
 
           <div className="max-h-[500px] overflow-y-auto">

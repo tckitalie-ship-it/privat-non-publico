@@ -1,5 +1,6 @@
-export const API_URL =
-  process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3001';
+import Cookies from 'js-cookie';
+
+export const API_URL = 'http://localhost:3000';
 
 const ACCESS_TOKEN_KEY = 'access_token';
 
@@ -9,6 +10,11 @@ export function setAccessToken(token: string) {
   }
 
   localStorage.setItem(ACCESS_TOKEN_KEY, token);
+
+  Cookies.set(ACCESS_TOKEN_KEY, token, {
+    expires: 7,
+    sameSite: 'lax',
+  });
 }
 
 export function getAccessToken() {
@@ -16,7 +22,11 @@ export function getAccessToken() {
     return null;
   }
 
-  return localStorage.getItem(ACCESS_TOKEN_KEY);
+  return (
+    localStorage.getItem(ACCESS_TOKEN_KEY) ||
+    Cookies.get(ACCESS_TOKEN_KEY) ||
+    null
+  );
 }
 
 export function clearAccessToken() {
@@ -25,4 +35,5 @@ export function clearAccessToken() {
   }
 
   localStorage.removeItem(ACCESS_TOKEN_KEY);
+  Cookies.remove(ACCESS_TOKEN_KEY);
 }
