@@ -119,7 +119,7 @@ export default function AssociationsPage() {
     <div className="flex min-h-screen bg-[#0f1117] text-white">
       <DashboardSidebar />
 
-      <main className="flex-1 p-8 lg:ml-72">
+      <main className="flex-1 p-8 md:ml-72">
         <div className="mx-auto max-w-7xl space-y-8">
           <div>
             <Link
