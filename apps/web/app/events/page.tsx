@@ -23,6 +23,14 @@ import { API_URL, getAccessToken } from '@/lib/api';
 
 import DashboardSidebar from '@/components/dashboard-sidebar';
 
+type EventRegistration = {
+  id: string;
+  user?: {
+    id: string;
+    email: string;
+  };
+};
+
 type EventItem = {
   id: string;
   title: string;
@@ -30,7 +38,7 @@ type EventItem = {
   location?: string | null;
   startsAt?: string | null;
   endsAt?: string | null;
-  registrations?: unknown[];
+  registrations?: EventRegistration[];
 };
 
 function getAssociationIdFromToken(token: string | null) {
@@ -40,6 +48,18 @@ function getAssociationIdFromToken(token: string | null) {
     const payload = JSON.parse(atob(token.split('.')[1]));
 
     return payload.associationId || null;
+  } catch {
+    return null;
+  }
+}
+
+function getUserIdFromToken(token: string | null) {
+  if (!token) return null;
+
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+
+    return payload.sub || null;
   } catch {
     return null;
   }
@@ -206,6 +226,84 @@ export default function EventsPage() {
     }
   }
 
+  async function registerToEvent(eventId: string) {
+    try {
+      const token = getAccessToken();
+      const userId = getUserIdFromToken(token);
+
+      if (!userId) {
+        throw new Error('Utente non autenticato');
+      }
+
+      const res = await fetch(`${API_URL}/events/${eventId}/register`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token
+            ? {
+                Authorization: `Bearer ${token}`,
+              }
+            : {}),
+        },
+        body: JSON.stringify({
+          userId,
+        }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+
+        throw new Error(data?.message || 'Errore registrazione');
+      }
+
+      await loadEvents();
+
+      toast.success('Registrazione completata');
+    } catch (error: any) {
+      console.error(error);
+      toast.error(error.message || 'Errore registrazione');
+    }
+  }
+
+  async function unregisterFromEvent(eventId: string) {
+    try {
+      const token = getAccessToken();
+      const userId = getUserIdFromToken(token);
+
+      if (!userId) {
+        throw new Error('Utente non autenticato');
+      }
+
+      const res = await fetch(`${API_URL}/events/${eventId}/register`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token
+            ? {
+                Authorization: `Bearer ${token}`,
+              }
+            : {}),
+        },
+        body: JSON.stringify({
+          userId,
+        }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+
+        throw new Error(data?.message || 'Errore annullamento');
+      }
+
+      await loadEvents();
+
+      toast.success('Partecipazione annullata');
+    } catch (error: any) {
+      console.error(error);
+      toast.error(error.message || 'Errore annullamento');
+    }
+  }
+
   const filteredEvents = useMemo(() => {
     return events.filter((event) => {
       const matchesSearch =
@@ -230,6 +328,8 @@ export default function EventsPage() {
   const registrationsCount = events.reduce((total, event) => {
     return total + (event.registrations?.length || 0);
   }, 0);
+
+  const currentUserId = getUserIdFromToken(getAccessToken());
 
   return (
     <div className="flex min-h-screen bg-[#0f1117] text-white">
@@ -474,57 +574,111 @@ export default function EventsPage() {
               </div>
             ) : (
               <div className="mt-8 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-                {filteredEvents.map((event) => (
-                  <div
-                    key={event.id}
-                    className="rounded-3xl border border-white/10 bg-[#111827] p-6 shadow-xl transition hover:border-indigo-500/30"
-                  >
-                    <div className="flex items-start justify-between gap-4">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <CalendarDays className="h-5 w-5 text-indigo-300" />
+                {filteredEvents.map((event) => {
+                  const isRegistered = event.registrations?.some(
+                    (registration) => registration.user?.id === currentUserId,
+                  );
 
-                          <h3 className="text-xl font-semibold">
-                            {event.title}
-                          </h3>
+                  return (
+                    <div
+                      key={event.id}
+                      className="rounded-3xl border border-white/10 bg-[#111827] p-6 shadow-xl transition hover:border-indigo-500/30"
+                    >
+                      <div className="flex items-start justify-between gap-4">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <CalendarDays className="h-5 w-5 text-indigo-300" />
+
+                            <h3 className="text-xl font-semibold">
+                              {event.title}
+                            </h3>
+                          </div>
+
+                          <p className="mt-3 text-sm text-zinc-400">
+                            {event.description || 'Nessuna descrizione'}
+                          </p>
                         </div>
 
-                        <p className="mt-3 text-sm text-zinc-400">
-                          {event.description || 'Nessuna descrizione'}
+                        <button
+                          type="button"
+                          onClick={() => deleteEvent(event.id)}
+                          className="rounded-xl border border-red-500/20 p-2 text-red-300 transition hover:bg-red-500/10"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+
+                      <div className="mt-6 space-y-3">
+                        <div className="flex items-center gap-2 text-sm text-zinc-400">
+                          <MapPin className="h-4 w-4 text-cyan-300" />
+                          {event.location || 'Luogo non specificato'}
+                        </div>
+
+                        <div className="text-sm text-zinc-400">
+                          <span className="font-medium text-white">
+                            Inizio:
+                          </span>{' '}
+                          {event.startsAt
+                            ? new Date(event.startsAt).toLocaleString('it-IT')
+                            : 'Non specificato'}
+                        </div>
+
+                        <div className="text-sm text-zinc-400">
+                          <span className="font-medium text-white">
+                            Fine:
+                          </span>{' '}
+                          {event.endsAt
+                            ? new Date(event.endsAt).toLocaleString('it-IT')
+                            : 'Non specificato'}
+                        </div>
+                      </div>
+
+                      <div className="mt-6 rounded-2xl border border-white/5 bg-[#0b1220] p-4">
+                        <p className="mb-3 text-sm text-zinc-400">
+                          Partecipanti:{' '}
+                          <span className="font-semibold text-white">
+                            {event.registrations?.length || 0}
+                          </span>
                         </p>
-                      </div>
 
-                      <button
-                        type="button"
-                        onClick={() => deleteEvent(event.id)}
-                        className="rounded-xl border border-red-500/20 p-2 text-red-300 transition hover:bg-red-500/10"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
+                        <div className="space-y-2">
+                          {event.registrations?.length ? (
+                            event.registrations.map((registration) => (
+                              <div
+                                key={registration.id}
+                                className="rounded-xl bg-[#111827] px-3 py-2 text-sm text-zinc-300"
+                              >
+                                {registration.user?.email || 'Utente'}
+                              </div>
+                            ))
+                          ) : (
+                            <p className="text-sm text-zinc-500">
+                              Nessun partecipante
+                            </p>
+                          )}
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() =>
+                            isRegistered
+                              ? unregisterFromEvent(event.id)
+                              : registerToEvent(event.id)
+                          }
+                          className={`mt-5 w-full rounded-2xl px-4 py-3 text-sm font-semibold transition ${
+                            isRegistered
+                              ? 'border border-red-500/30 bg-red-500/10 text-red-300 hover:bg-red-500/20'
+                              : 'bg-indigo-600 text-white hover:bg-indigo-500'
+                          }`}
+                        >
+                          {isRegistered
+                            ? 'Annulla partecipazione'
+                            : 'Partecipa'}
+                        </button>
+                      </div>
                     </div>
-
-                    <div className="mt-6 space-y-3">
-                      <div className="flex items-center gap-2 text-sm text-zinc-400">
-                        <MapPin className="h-4 w-4 text-cyan-300" />
-                        {event.location || 'Luogo non specificato'}
-                      </div>
-
-                      <div className="text-sm text-zinc-400">
-                        <span className="font-medium text-white">Inizio:</span>{' '}
-                        {event.startsAt
-                          ? new Date(event.startsAt).toLocaleString('it-IT')
-                          : 'Non specificato'}
-                      </div>
-
-                      <div className="text-sm text-zinc-400">
-                        <span className="font-medium text-white">Fine:</span>{' '}
-                        {event.endsAt
-                          ? new Date(event.endsAt).toLocaleString('it-IT')
-                          : 'Non specificato'}
-                      </div>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </section>
