@@ -17,6 +17,10 @@ import {
   Trash2,
 } from 'lucide-react';
 
+import { toast } from 'sonner';
+
+import { API_URL, getAccessToken } from '@/lib/api';
+
 import DashboardSidebar from '@/components/dashboard-sidebar';
 
 type EventItem = {
@@ -26,14 +30,26 @@ type EventItem = {
   location?: string | null;
   startsAt?: string | null;
   endsAt?: string | null;
+  registrations?: unknown[];
 };
 
-const STORAGE_KEY = 'demo-events';
+function getAssociationIdFromToken(token: string | null) {
+  if (!token) return null;
+
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+
+    return payload.associationId || null;
+  } catch {
+    return null;
+  }
+}
 
 export default function EventsPage() {
   const [events, setEvents] = useState<EventItem[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [loadingEvents, setLoadingEvents] = useState(true);
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<'ALL' | 'UPCOMING'>('ALL');
 
@@ -44,20 +60,69 @@ export default function EventsPage() {
   const [endsAt, setEndsAt] = useState('');
 
   useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
-
-    if (saved) {
-      try {
-        setEvents(JSON.parse(saved));
-      } catch {
-        setEvents([]);
-      }
-    }
+    loadEvents();
   }, []);
 
-  function saveEvents(updated: EventItem[]) {
-    setEvents(updated);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+  async function loadEvents() {
+    try {
+      setLoadingEvents(true);
+
+      const token = getAccessToken();
+
+      const res = await fetch(`${API_URL}/events`, {
+        headers: token
+          ? {
+              Authorization: `Bearer ${token}`,
+            }
+          : undefined,
+      });
+
+      if (!res.ok) {
+        throw new Error('Errore caricamento eventi');
+      }
+
+      const data = await res.json();
+
+      setEvents(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error(error);
+      toast.error('Errore caricamento eventi');
+      setEvents([]);
+    } finally {
+      setLoadingEvents(false);
+    }
+  }
+
+  async function getAssociationId() {
+    const token = getAccessToken();
+
+    const tokenAssociationId = getAssociationIdFromToken(token);
+
+    if (tokenAssociationId) {
+      return tokenAssociationId;
+    }
+
+    if (!token) {
+      throw new Error('Token mancante');
+    }
+
+    const res = await fetch(`${API_URL}/associations/me`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (!res.ok) {
+      throw new Error('Associazione attiva non trovata');
+    }
+
+    const association = await res.json();
+
+    if (!association?.id) {
+      throw new Error('Associazione attiva non valida');
+    }
+
+    return association.id;
   }
 
   async function handleCreateEvent(e: FormEvent<HTMLFormElement>) {
@@ -66,16 +131,34 @@ export default function EventsPage() {
     try {
       setLoading(true);
 
-      const demoEvent: EventItem = {
-        id: crypto.randomUUID(),
-        title,
-        description,
-        location,
-        startsAt,
-        endsAt,
-      };
+      const token = getAccessToken();
+      const associationId = await getAssociationId();
 
-      saveEvents([demoEvent, ...events]);
+      const res = await fetch(`${API_URL}/events`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token
+            ? {
+                Authorization: `Bearer ${token}`,
+              }
+            : {}),
+        },
+        body: JSON.stringify({
+          associationId,
+          title,
+          description,
+          location,
+          startsAt,
+          endsAt: endsAt || undefined,
+        }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+
+        throw new Error(data?.message || 'Errore creazione evento');
+      }
 
       setTitle('');
       setDescription('');
@@ -83,14 +166,44 @@ export default function EventsPage() {
       setStartsAt('');
       setEndsAt('');
       setShowForm(false);
+
+      await loadEvents();
+
+      toast.success('Evento creato');
+    } catch (error: any) {
+      console.error(error);
+      toast.error(error.message || 'Errore creazione evento');
     } finally {
       setLoading(false);
     }
   }
 
-  function deleteEvent(id: string) {
-    const updated = events.filter((event) => event.id !== id);
-    saveEvents(updated);
+  async function deleteEvent(id: string) {
+    try {
+      const token = getAccessToken();
+
+      const res = await fetch(`${API_URL}/events/${id}`, {
+        method: 'DELETE',
+        headers: token
+          ? {
+              Authorization: `Bearer ${token}`,
+            }
+          : undefined,
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+
+        throw new Error(data?.message || 'Errore eliminazione evento');
+      }
+
+      await loadEvents();
+
+      toast.success('Evento eliminato');
+    } catch (error: any) {
+      console.error(error);
+      toast.error(error.message || 'Errore eliminazione evento');
+    }
   }
 
   const filteredEvents = useMemo(() => {
@@ -110,8 +223,13 @@ export default function EventsPage() {
 
   const upcomingEvents = events.filter((event) => {
     if (!event.startsAt) return false;
+
     return new Date(event.startsAt) >= new Date();
   });
+
+  const registrationsCount = events.reduce((total, event) => {
+    return total + (event.registrations?.length || 0);
+  }, 0);
 
   return (
     <div className="flex min-h-screen bg-[#0f1117] text-white">
@@ -216,17 +334,23 @@ export default function EventsPage() {
           <section className="mt-8 grid gap-5 md:grid-cols-3">
             <div className="rounded-[2rem] border border-white/10 bg-gradient-to-br from-indigo-500/20 to-[#1a1f2e] p-6 shadow-xl">
               <p className="text-sm text-indigo-300">Eventi totali</p>
-              <h2 className="mt-4 text-4xl font-bold">{events.length}</h2>
+              <h2 className="mt-4 text-4xl font-bold">
+                {loadingEvents ? '...' : events.length}
+              </h2>
             </div>
 
             <div className="rounded-[2rem] border border-white/10 bg-gradient-to-br from-emerald-500/20 to-[#1a1f2e] p-6 shadow-xl">
               <p className="text-sm text-emerald-300">Prossimi eventi</p>
-              <h2 className="mt-4 text-4xl font-bold">{upcomingEvents.length}</h2>
+              <h2 className="mt-4 text-4xl font-bold">
+                {loadingEvents ? '...' : upcomingEvents.length}
+              </h2>
             </div>
 
             <div className="rounded-[2rem] border border-white/10 bg-gradient-to-br from-cyan-500/20 to-[#1a1f2e] p-6 shadow-xl">
               <p className="text-sm text-cyan-300">Registrazioni</p>
-              <h2 className="mt-4 text-4xl font-bold">0</h2>
+              <h2 className="mt-4 text-4xl font-bold">
+                {loadingEvents ? '...' : registrationsCount}
+              </h2>
             </div>
           </section>
 
@@ -234,8 +358,9 @@ export default function EventsPage() {
             <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
               <div>
                 <h2 className="text-2xl font-semibold">Lista eventi</h2>
+
                 <p className="mt-1 text-sm text-zinc-400">
-                  Eventi demo persistenti
+                  Eventi caricati dal backend
                 </p>
               </div>
 
@@ -266,14 +391,16 @@ export default function EventsPage() {
 
             <div className="mt-8 overflow-hidden rounded-3xl border border-white/10 bg-[#111827]">
               <div className="grid grid-cols-7 border-b border-white/10 text-center text-sm font-semibold text-zinc-400">
-                {['Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab', 'Dom'].map((day) => (
-                  <div
-                    key={day}
-                    className="border-r border-white/5 p-4 last:border-r-0"
-                  >
-                    {day}
-                  </div>
-                ))}
+                {['Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab', 'Dom'].map(
+                  (day) => (
+                    <div
+                      key={day}
+                      className="border-r border-white/5 p-4 last:border-r-0"
+                    >
+                      {day}
+                    </div>
+                  ),
+                )}
               </div>
 
               <div className="grid grid-cols-7">
@@ -325,7 +452,9 @@ export default function EventsPage() {
               </div>
             </div>
 
-            {filteredEvents.length === 0 ? (
+            {loadingEvents ? (
+              <div className="mt-8 h-40 animate-pulse rounded-3xl bg-[#111827]" />
+            ) : filteredEvents.length === 0 ? (
               <div className="mt-8 rounded-3xl border border-dashed border-white/10 bg-black/20 p-12 text-center">
                 <h3 className="text-2xl font-semibold">
                   Nessun evento trovato
