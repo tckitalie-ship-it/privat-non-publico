@@ -38,19 +38,41 @@ export class AuthService {
     const memberships = await this.prisma.membership.findMany({
       where: {
         userId: user.id,
+        association: {
+          isActive: true,
+        },
       },
       include: {
         association: true,
+      },
+      orderBy: {
+        createdAt: 'asc',
       },
     });
 
     const activeMembership = memberships[0];
 
+    if (!activeMembership) {
+      const payload = {
+        sub: user.id,
+        email: user.email,
+      };
+
+      return {
+        access_token: await this.jwtService.signAsync(payload),
+        user: {
+          id: user.id,
+          email: user.email,
+        },
+        association: null,
+      };
+    }
+
     const payload = {
       sub: user.id,
       email: user.email,
-      associationId: activeMembership?.associationId,
-      role: activeMembership?.role,
+      associationId: activeMembership.associationId,
+      role: activeMembership.role,
     };
 
     return {
@@ -59,13 +81,11 @@ export class AuthService {
         id: user.id,
         email: user.email,
       },
-      association: activeMembership?.association
-        ? {
-            id: activeMembership.association.id,
-            name: activeMembership.association.name,
-            role: activeMembership.role,
-          }
-        : null,
+      association: {
+        id: activeMembership.association.id,
+        name: activeMembership.association.name,
+        role: activeMembership.role,
+      },
     };
   }
 

@@ -1,13 +1,11 @@
 import Cookies from 'js-cookie';
 
-export const API_URL = 'http://localhost:3000';
+export const API_URL = 'http://localhost:3001';
 
 const ACCESS_TOKEN_KEY = 'access_token';
 
 export function setAccessToken(token: string) {
-  if (typeof window === 'undefined') {
-    return;
-  }
+  if (typeof window === 'undefined') return;
 
   localStorage.setItem(ACCESS_TOKEN_KEY, token);
 
@@ -18,9 +16,7 @@ export function setAccessToken(token: string) {
 }
 
 export function getAccessToken() {
-  if (typeof window === 'undefined') {
-    return null;
-  }
+  if (typeof window === 'undefined') return null;
 
   return (
     localStorage.getItem(ACCESS_TOKEN_KEY) ||
@@ -30,9 +26,7 @@ export function getAccessToken() {
 }
 
 export function clearAccessToken() {
-  if (typeof window === 'undefined') {
-    return;
-  }
+  if (typeof window === 'undefined') return;
 
   localStorage.removeItem(ACCESS_TOKEN_KEY);
   Cookies.remove(ACCESS_TOKEN_KEY);

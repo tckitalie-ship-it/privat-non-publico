@@ -1,203 +1,193 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
-import ThemeToggle from '@/components/theme-toggle';
+import { usePathname } from 'next/navigation';
 
-import { API_URL, clearAccessToken, getAccessToken } from '@/lib/api';
-import { disconnectSocket } from '@/lib/socket';
+import {
+  LayoutDashboard,
+  CalendarDays,
+  Wallet,
+  Users,
+  Settings,
+  CreditCard,
+  Bot,
+  MessageCircle,
+  Folder,
+  Building2,
+  Search,
+  Menu,
+  X,
+} from 'lucide-react';
 
-type Association = {
-  id: string;
-  name: string;
-  logoUrl?: string | null;
-};
+const mainItems = [
+  { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+  { label: 'Search', href: '/search', icon: Search },
+  { label: 'Assistant', href: '/assistant', icon: Bot },
+  { label: 'Chat', href: '/chat', icon: MessageCircle },
+];
 
-const navItems = [
-  { label: 'Cruscotto', href: '/dashboard', icon: '🏠' },
-  { label: 'Eventi', href: '/events', icon: '🗓️' },
-  { label: 'Finanze', href: '/finance', icon: '💰' },
-  { label: 'Membri', href: '/members', icon: '👥' },
-  { label: 'Settings', href: '/settings', icon: '⚙️' },
+const managementItems = [
+  { label: 'Eventi', href: '/events', icon: CalendarDays },
+  { label: 'Membri', href: '/members', icon: Users },
+  { label: 'Files', href: '/files', icon: Folder },
+  { label: 'Associations', href: '/associations', icon: Building2 },
+];
+
+const businessItems = [
+  { label: 'Finanze', href: '/finance', icon: Wallet },
+  { label: 'Billing', href: '/billing', icon: CreditCard },
+  { label: 'Settings', href: '/settings', icon: Settings },
 ];
 
 export default function DashboardSidebar() {
   const pathname = usePathname();
-  const router = useRouter();
+  const [open, setOpen] = useState(false);
 
-  const [association, setAssociation] = useState<Association | null>(null);
-  const [mobileOpen, setMobileOpen] = useState(false);
-
-  useEffect(() => {
-    async function loadAssociation() {
-      const token = getAccessToken();
-
-      if (!token) return;
-
-      try {
-        const res = await fetch(`${API_URL}/associations/me`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
-
-        if (!res.ok) return;
-
-        const data = await res.json();
-        setAssociation(data);
-      } catch (error) {
-        console.error(error);
-      }
-    }
-
-    loadAssociation();
-  }, []);
-
-  function handleLogout() {
-    clearAccessToken();
-    disconnectSocket();
-    router.replace('/login');
-  }
-
-  const associationName = association?.name || 'Association';
-
-  const initials = associationName
-    .split(' ')
-    .map((word) => word[0])
-    .join('')
-    .slice(0, 2)
-    .toUpperCase();
-
-  function Brand() {
+  function Section({
+    title,
+    items,
+  }: {
+    title: string;
+    items: typeof mainItems;
+  }) {
     return (
-      <div className="flex items-center gap-4">
-        <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-2xl border border-white/10 bg-[#0f172a]">
-          {association?.logoUrl ? (
-            <img
-              src={association.logoUrl}
-              alt={associationName}
-              className="h-full w-full object-cover"
-            />
-          ) : (
-            <span className="text-lg font-bold text-white">{initials}</span>
-          )}
-        </div>
+      <div className="space-y-2">
+        <p className="px-3 text-xs font-semibold uppercase tracking-[0.2em] text-zinc-600">
+          {title}
+        </p>
 
-        <div>
-          <h2 className="line-clamp-1 text-lg font-bold">
-            {associationName}
-          </h2>
-          <p className="text-sm text-gray-400">SaaS Platform</p>
-        </div>
+        <nav className="space-y-1">
+          {items.map((item) => {
+            const active =
+              pathname === item.href ||
+              pathname.startsWith(`${item.href}/`);
+
+            const Icon = item.icon;
+
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                onClick={() => setOpen(false)}
+                className={`group flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-medium transition-all duration-200 ${
+                  active
+                    ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-950/40'
+                    : 'text-zinc-400 hover:bg-white/[0.05] hover:text-white'
+                }`}
+              >
+                <span
+                  className={`flex h-9 w-9 items-center justify-center rounded-xl transition ${
+                    active
+                      ? 'bg-white/15'
+                      : 'bg-white/[0.04] group-hover:bg-white/[0.08]'
+                  }`}
+                >
+                  <Icon size={18} />
+                </span>
+
+                <span>{item.label}</span>
+              </Link>
+            );
+          })}
+        </nav>
       </div>
     );
   }
 
   function NavLinks() {
     return (
-      <nav className="flex flex-col gap-2">
-        {navItems.map((item) => {
-          const isActive =
-            pathname === item.href || pathname.startsWith(`${item.href}/`);
+      <div className="space-y-7">
+        <Section title="Main" items={mainItems} />
+        <Section title="Gestione" items={managementItems} />
+        <Section title="Business" items={businessItems} />
+      </div>
+    );
+  }
 
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              onClick={() => setMobileOpen(false)}
-              className={`flex items-center gap-4 rounded-2xl px-4 py-4 text-base font-semibold transition ${
-                isActive
-                  ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20'
-                  : 'text-gray-300 hover:bg-white/5 hover:text-white'
-              }`}
-            >
-              <span className="text-xl">{item.icon}</span>
-              <span>{item.label}</span>
-            </Link>
-          );
-        })}
-      </nav>
+  function Brand() {
+    return (
+      <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-4">
+        <div className="flex items-center gap-3">
+          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-cyan-400 font-bold text-white">
+            AS
+          </div>
+
+          <div>
+            <h2 className="text-base font-bold text-white">
+              Association SaaS
+            </h2>
+
+            <p className="text-xs text-zinc-500">
+              Premium workspace
+            </p>
+          </div>
+        </div>
+      </div>
     );
   }
 
   return (
     <>
-      <header className="sticky top-0 z-50 flex items-center justify-between border-b border-white/10 bg-[#111827]/95 px-4 py-4 text-white backdrop-blur lg:hidden">
-        <Brand />
+      {/* MOBILE HEADER */}
+      <header className="sticky top-0 z-50 flex items-center justify-between border-b border-white/10 bg-[#090D14]/95 px-4 py-3 text-white backdrop-blur md:hidden">
+        <div>
+          <h2 className="text-sm font-bold">
+            Association SaaS
+          </h2>
+
+          <p className="text-xs text-zinc-500">
+            Dashboard
+          </p>
+        </div>
 
         <button
           type="button"
-          onClick={() => setMobileOpen((prev) => !prev)}
-          className="rounded-2xl border border-white/10 px-4 py-3 text-sm font-semibold transition hover:bg-white/5"
+          onClick={() => setOpen(true)}
+          className="rounded-xl border border-white/10 p-2 text-zinc-300 transition hover:bg-white/5"
         >
-          {mobileOpen ? 'Chiudi' : 'Menu'}
+          <Menu size={22} />
         </button>
       </header>
 
-      {mobileOpen && (
-        <div className="fixed inset-0 z-[60] bg-black/60 lg:hidden">
-          <div className="h-full w-80 max-w-[85vw] border-r border-white/10 bg-[#111827] p-5 text-white shadow-2xl">
-            <div className="mb-8 flex items-center justify-between">
+      {/* MOBILE SIDEBAR */}
+      {open ? (
+        <div className="fixed inset-0 z-[60] bg-black/70 backdrop-blur-sm md:hidden">
+          <aside className="h-full w-80 max-w-[85vw] overflow-y-auto border-r border-white/10 bg-[#090D14] p-4 text-white shadow-2xl">
+            <div className="mb-6 flex items-center justify-between gap-3">
               <Brand />
 
               <button
                 type="button"
-                onClick={() => setMobileOpen(false)}
-                className="rounded-xl border border-white/10 px-3 py-2 text-sm transition hover:bg-white/5"
+                onClick={() => setOpen(false)}
+                className="rounded-xl border border-white/10 p-2 text-zinc-300 transition hover:bg-white/5"
               >
-                ✕
+                <X size={20} />
               </button>
             </div>
 
             <NavLinks />
-            <div className="mt-4">
-  <ThemeToggle />
-</div>
-
-            <button
-              type="button"
-              onClick={handleLogout}
-              className="mt-6 w-full rounded-2xl border border-red-500/30 px-4 py-3 text-sm font-semibold text-red-300 transition hover:bg-red-500/10"
-            >
-              Logout
-            </button>
-          </div>
+          </aside>
         </div>
-      )}
+      ) : null}
 
-      <aside className="fixed left-0 top-0 z-40 hidden h-screen w-72 flex-col border-r border-white/10 bg-[#111827] px-5 py-6 text-white lg:flex">
-        <div className="mb-10">
-          <Brand />
-        </div>
+      {/* DESKTOP SIDEBAR */}
+      <aside className="fixed left-0 top-0 z-40 hidden h-screen w-72 flex-col border-r border-white/10 bg-[#090D14] px-4 py-5 text-white md:flex">
+        <Brand />
 
-        <div className="flex flex-1 flex-col">
+        <div className="mt-8 flex-1 overflow-y-auto pr-1">
           <NavLinks />
         </div>
 
-        <div className="mt-6 rounded-3xl bg-gradient-to-br from-blue-600 to-cyan-400 p-5 shadow-xl">
-          <p className="text-sm font-medium text-white/80">Piano attuale</p>
-          <h3 className="mt-2 text-2xl font-bold">Starter</h3>
-          <p className="mt-2 text-sm text-white/80">
-            Sblocca analytics avanzate, automazioni e utenti illimitati.
+        <div className="mt-6 rounded-3xl border border-emerald-500/20 bg-emerald-500/10 p-4">
+          <p className="text-sm font-semibold text-emerald-300">
+            Sistema stabile
           </p>
 
-          <button
-            type="button"
-            onClick={() => router.push('/billing')}
-            className="mt-5 w-full rounded-2xl bg-[#111827] px-4 py-3 text-sm font-semibold text-white transition hover:bg-black/40"
-          >
-            Upgrade Pro
-          </button>
+          <p className="mt-1 text-xs text-zinc-400">
+            Demo locale persistente
+          </p>
         </div>
-
-        <button
-          type="button"
-          onClick={handleLogout}
-          className="mt-4 rounded-2xl border border-white/10 px-4 py-3 text-sm font-semibold text-gray-300 transition hover:bg-white/5 hover:text-white"
-        >
-          Logout
-        </button>
       </aside>
     </>
   );

@@ -1,266 +1,309 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import {
-  Bar,
-  BarChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-} from 'recharts';
+import Link from 'next/link';
 
-import { API_URL, getAccessToken } from '@/lib/api';
 import {
-  AuthUser,
-  canManageBilling,
-  canManageEvents,
-  canManageMembers,
-  getCurrentUser,
-} from '@/lib/auth';
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
+
+import {
+  CalendarDays,
+  DollarSign,
+  FileText,
+  MessageCircle,
+  Bell,
+  Building2,
+  TrendingUp,
+  Users,
+} from 'lucide-react';
+
 import DashboardSidebar from '@/components/dashboard-sidebar';
-import NotificationBell from '@/components/notification-bell';
-import AuthGuard from '@/components/auth-guard';
-import LogoutButton from '@/components/logout-button';
-
-type DashboardKpis = {
-  associations: number;
-  members: number;
-  events: number;
-  revenue: number;
-};
-
-const chartData = [
-  { month: 'Gen', revenue: 400 },
-  { month: 'Feb', revenue: 900 },
-  { month: 'Mar', revenue: 600 },
-  { month: 'Apr', revenue: 1200 },
-  { month: 'Mag', revenue: 1800 },
-];
 
 export default function DashboardPage() {
-  const router = useRouter();
-
-  const [loading, setLoading] = useState(true);
-  const [user, setUser] = useState<AuthUser | null>(null);
-
-  const [kpis, setKpis] = useState<DashboardKpis>({
-    associations: 0,
-    members: 0,
-    events: 0,
-    revenue: 0,
-  });
+  const [localStats, setLocalStats] =
+    useState({
+      events: 0,
+      members: 0,
+      files: 0,
+      chats: 0,
+      associations: 0,
+      notifications: 0,
+    });
 
   useEffect(() => {
-    getCurrentUser().then(setUser);
+    const events = JSON.parse(
+      localStorage.getItem(
+        'demo-events',
+      ) || '[]',
+    );
+
+    const members = JSON.parse(
+      localStorage.getItem(
+        'demo-member-invitations',
+      ) || '[]',
+    );
+
+    const files = JSON.parse(
+      localStorage.getItem(
+        'demo-files',
+      ) || '[]',
+    );
+
+    const chats = JSON.parse(
+      localStorage.getItem(
+        'demo-chat-messages',
+      ) || '[]',
+    );
+
+    const associations =
+      JSON.parse(
+        localStorage.getItem(
+          'demo-associations',
+        ) || '[]',
+      );
+
+    const notifications =
+      JSON.parse(
+        localStorage.getItem(
+          'demo-notifications',
+        ) || '[]',
+      );
+
+    setLocalStats({
+      events: events.length,
+      members: members.length,
+      files: files.length,
+      chats: chats.length,
+      associations:
+        associations.length,
+      notifications:
+        notifications.length,
+    });
   }, []);
 
-  useEffect(() => {
-    async function loadDashboard() {
-      try {
-        const token = getAccessToken();
-
-        if (!token) {
-          router.push('/login');
-          return;
-        }
-
-        const res = await fetch(`${API_URL}/dashboard/kpis`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
-
-        if (!res.ok) {
-          throw new Error('Errore caricamento KPI');
-        }
-
-        const data = await res.json();
-
-        setKpis({
-          associations: data.associations || 0,
-          members: data.memberships || data.members || 0,
-          events: data.events || 0,
-          revenue: data.revenue || 0,
-        });
-      } catch (error) {
-        console.error('Errore dashboard', error);
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    loadDashboard();
-  }, [router]);
-
-  if (loading) {
-    return (
-      <main className="min-h-screen bg-[#0f1117] p-8 text-white">
-        <div className="space-y-8">
-          <div className="h-12 w-72 animate-pulse rounded-2xl bg-white/10" />
-
-          <section className="grid gap-5 md:grid-cols-4">
-            {[1, 2, 3, 4].map((item) => (
-              <div
-                key={item}
-                className="h-32 animate-pulse rounded-3xl bg-white/10"
-              />
-            ))}
-          </section>
-
-          <div className="h-96 animate-pulse rounded-3xl bg-white/10" />
-          <div className="h-40 animate-pulse rounded-3xl bg-white/10" />
-        </div>
-      </main>
-    );
-  }
+  const growth =
+    useMemo(() => {
+      return (
+        localStats.members * 12
+      );
+    }, [localStats.members]);
 
   return (
-    <AuthGuard>
-      <div className="flex min-h-screen bg-[#0f1117] text-white">
-        <DashboardSidebar />
+    <div className="flex min-h-screen bg-[#0f1117] text-white">
+      <DashboardSidebar />
 
-        <main className="flex-1 space-y-8 p-8 lg:ml-72">
-          <div className="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
+      <main className="flex-1 p-8 lg:ml-72">
+        <div className="mx-auto max-w-7xl">
+          <div className="mb-8 flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <h1 className="text-5xl font-bold">Dashboard</h1>
+              <p className="text-sm font-medium text-indigo-400">
+                Overview piattaforma
+              </p>
 
-              <p className="mt-2 text-gray-400">
-                Panoramica associazione
+              <h1 className="mt-2 text-5xl font-bold">
+                Dashboard
+              </h1>
+
+              <p className="mt-3 max-w-2xl text-gray-400">
+                Monitora attività,
+                membri, eventi,
+                notifiche e dati
+                della tua
+                associazione.
               </p>
             </div>
 
-            <div className="flex flex-wrap items-center gap-3">
-              <NotificationBell />
-              <LogoutButton />
-
-              {canManageMembers(user?.role) && (
-                <button
-                  onClick={() => router.push('/associations/new')}
-                  className="rounded-xl bg-indigo-600 px-5 py-3 font-medium transition hover:bg-indigo-500"
-                >
-                  Nuova associazione
-                </button>
-              )}
-
-              {canManageMembers(user?.role) && (
-                <button
-                  onClick={() => router.push('/members/invite')}
-                  className="rounded-xl border border-white/10 px-5 py-3 font-medium transition hover:bg-white/5"
-                >
-                  Invita membro
-                </button>
-              )}
-
-              {canManageEvents(user?.role) && (
-                <button
-                  onClick={() => router.push('/events/new')}
-                  className="rounded-xl border border-white/10 px-5 py-3 font-medium transition hover:bg-white/5"
-                >
-                  Nuovo evento
-                </button>
-              )}
-            </div>
+            <Link
+              href="/events"
+              className="inline-flex items-center justify-center rounded-2xl bg-indigo-600 px-6 py-4 font-semibold transition hover:bg-indigo-500"
+            >
+              Nuovo evento
+            </Link>
           </div>
 
-          <section className="grid gap-5 md:grid-cols-4 animate-fade-up">
-            <button
-              onClick={() => router.push('/associations')}
-              className="rounded-3xl border border-white/5 bg-[#1a1f2e] p-6 text-left shadow-xl transition hover:-translate-y-1 hover:border-indigo-500/50"
-            >
-              <p className="text-sm text-gray-400">Associazioni</p>
+          <section className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
+            <div className="rounded-3xl border border-white/5 bg-[#111827] p-6 shadow-xl transition hover:border-indigo-500/30">
+              <div className="flex items-center justify-between">
+                <CalendarDays className="text-indigo-300" />
 
-              <h2 className="mt-3 text-4xl font-bold">
-                {kpis.associations}
-              </h2>
-            </button>
-
-            <button
-              onClick={() => router.push('/members')}
-              className="rounded-3xl border border-white/5 bg-[#1a1f2e] p-6 text-left shadow-xl transition hover:-translate-y-1 hover:border-indigo-500/50"
-            >
-              <p className="text-sm text-gray-400">Membri</p>
-
-              <h2 className="mt-3 text-4xl font-bold">
-                {kpis.members}
-              </h2>
-            </button>
-
-            <button
-              onClick={() => router.push('/events')}
-              className="rounded-3xl border border-white/5 bg-[#1a1f2e] p-6 text-left shadow-xl transition hover:-translate-y-1 hover:border-indigo-500/50"
-            >
-              <p className="text-sm text-gray-400">Eventi</p>
-
-              <h2 className="mt-3 text-4xl font-bold">
-                {kpis.events}
-              </h2>
-            </button>
-
-            {canManageBilling(user?.role) && (
-              <button
-                onClick={() => router.push('/finance')}
-                className="rounded-3xl border border-white/5 bg-[#1a1f2e] p-6 text-left shadow-xl transition hover:-translate-y-1 hover:border-indigo-500/50"
-              >
-                <p className="text-sm text-gray-400">Entrate</p>
-
-                <h2 className="mt-3 text-4xl font-bold">
-                  €{kpis.revenue.toFixed(2)}
-                </h2>
-              </button>
-            )}
-          </section>
-
-          <section className="rounded-3xl border border-white/5 bg-[#1a1f2e] p-6 shadow-xl">
-            <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-              <div>
-                <h2 className="text-3xl font-bold">
-                  Entrate mensili
-                </h2>
-
-                <p className="mt-1 text-gray-400">
-                  Performance ultimi mesi
-                </p>
+                <span className="rounded-full border border-indigo-500/20 bg-indigo-500/10 px-3 py-1 text-xs text-indigo-300">
+                  Eventi
+                </span>
               </div>
 
-              {canManageBilling(user?.role) && (
-                <button
-                  onClick={() => router.push('/finance')}
-                  className="rounded-xl bg-indigo-600 px-5 py-3 font-medium transition hover:bg-indigo-500"
-                >
-                  Vai alle finanze
-                </button>
-              )}
+              <h3 className="mt-5 text-4xl font-bold">
+                {localStats.events}
+              </h3>
+
+              <p className="mt-2 text-sm text-gray-400">
+                Eventi creati nella piattaforma.
+              </p>
             </div>
 
-            <div className="h-96 min-h-[384px] min-w-0">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={chartData}>
-                  <XAxis dataKey="month" stroke="#9CA3AF" />
+            <div className="rounded-3xl border border-white/5 bg-[#111827] p-6 shadow-xl transition hover:border-emerald-500/30">
+              <div className="flex items-center justify-between">
+                <Users className="text-emerald-300" />
 
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: '#111827',
-                      border: '1px solid #374151',
-                      borderRadius: '12px',
-                      color: '#fff',
-                    }}
-                    labelStyle={{
-                      color: '#9CA3AF',
-                    }}
-                  />
+                <span className="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1 text-xs text-emerald-300">
+                  Membri
+                </span>
+              </div>
 
-                  <Bar
-                    dataKey="revenue"
-                    radius={[12, 12, 0, 0]}
-                    fill="#6366f1"
-                  />
-                </BarChart>
-              </ResponsiveContainer>
+              <h3 className="mt-5 text-4xl font-bold">
+                {localStats.members}
+              </h3>
+
+              <p className="mt-2 text-sm text-gray-400">
+                Membri invitati nell’associazione.
+              </p>
+            </div>
+
+            <div className="rounded-3xl border border-white/5 bg-[#111827] p-6 shadow-xl transition hover:border-cyan-500/30">
+              <div className="flex items-center justify-between">
+                <FileText className="text-cyan-300" />
+
+                <span className="rounded-full border border-cyan-500/20 bg-cyan-500/10 px-3 py-1 text-xs text-cyan-300">
+                  Files
+                </span>
+              </div>
+
+              <h3 className="mt-5 text-4xl font-bold">
+                {localStats.files}
+              </h3>
+
+              <p className="mt-2 text-sm text-gray-400">
+                Documenti caricati nella libreria.
+              </p>
+            </div>
+
+            <div className="rounded-3xl border border-white/5 bg-[#111827] p-6 shadow-xl transition hover:border-pink-500/30">
+              <div className="flex items-center justify-between">
+                <Bell className="text-pink-300" />
+
+                <span className="rounded-full border border-pink-500/20 bg-pink-500/10 px-3 py-1 text-xs text-pink-300">
+                  Alert
+                </span>
+              </div>
+
+              <h3 className="mt-5 text-4xl font-bold">
+                {
+                  localStats.notifications
+                }
+              </h3>
+
+              <p className="mt-2 text-sm text-gray-400">
+                Notifiche attive nel sistema.
+              </p>
             </div>
           </section>
-        </main>
-      </div>
-    </AuthGuard>
+
+          <section className="mt-8 grid gap-5 lg:grid-cols-2">
+            <div className="rounded-3xl border border-white/5 bg-[#111827] p-8 shadow-xl">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-amber-300">
+                    Attività chat
+                  </p>
+
+                  <h2 className="mt-3 text-4xl font-bold">
+                    {localStats.chats}
+                  </h2>
+                </div>
+
+                <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-amber-500/10">
+                  <MessageCircle className="h-8 w-8 text-amber-300" />
+                </div>
+              </div>
+
+              <p className="mt-4 text-gray-400">
+                Conversazioni salvate localmente.
+              </p>
+            </div>
+
+            <div className="rounded-3xl border border-white/5 bg-[#111827] p-8 shadow-xl">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-blue-300">
+                    Workspace
+                  </p>
+
+                  <h2 className="mt-3 text-4xl font-bold">
+                    {
+                      localStats.associations
+                    }
+                  </h2>
+                </div>
+
+                <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-blue-500/10">
+                  <Building2 className="h-8 w-8 text-blue-300" />
+                </div>
+              </div>
+
+              <p className="mt-4 text-gray-400">
+                Associazioni create nella piattaforma.
+              </p>
+            </div>
+          </section>
+
+          <section className="mt-8 grid gap-5 lg:grid-cols-3">
+            <div className="rounded-3xl border border-white/5 bg-gradient-to-br from-emerald-500/20 to-[#111827] p-8 shadow-xl">
+              <div className="flex items-center justify-between">
+                <TrendingUp className="text-emerald-300" />
+
+                <span className="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1 text-xs text-emerald-300">
+                  Crescita
+                </span>
+              </div>
+
+              <h2 className="mt-5 text-5xl font-bold">
+                +{growth}%
+              </h2>
+
+              <p className="mt-3 text-gray-300">
+                Crescita simulata basata sui membri.
+              </p>
+            </div>
+
+            <div className="rounded-3xl border border-white/5 bg-gradient-to-br from-indigo-500/20 to-[#111827] p-8 shadow-xl">
+              <div className="flex items-center justify-between">
+                <DollarSign className="text-indigo-300" />
+
+                <span className="rounded-full border border-indigo-500/20 bg-indigo-500/10 px-3 py-1 text-xs text-indigo-300">
+                  Revenue
+                </span>
+              </div>
+
+              <h2 className="mt-5 text-5xl font-bold">
+                €19K
+              </h2>
+
+              <p className="mt-3 text-gray-300">
+                Entrate demo mensili della piattaforma.
+              </p>
+            </div>
+
+            <div className="rounded-3xl border border-white/5 bg-gradient-to-br from-cyan-500/20 to-[#111827] p-8 shadow-xl">
+              <div className="flex items-center justify-between">
+                <Building2 className="text-cyan-300" />
+
+                <span className="rounded-full border border-cyan-500/20 bg-cyan-500/10 px-3 py-1 text-xs text-cyan-300">
+                  Stato
+                </span>
+              </div>
+
+              <h2 className="mt-5 text-5xl font-bold">
+                Online
+              </h2>
+
+              <p className="mt-3 text-gray-300">
+                Sistema operativo e stabile.
+              </p>
+            </div>
+          </section>
+        </div>
+      </main>
+    </div>
   );
 }

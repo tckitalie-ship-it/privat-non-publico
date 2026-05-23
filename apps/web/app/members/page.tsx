@@ -1,22 +1,34 @@
 'use client';
 
-import { FormEvent, useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { toast } from 'sonner';
+import Link from 'next/link';
+
+import {
+  FormEvent,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
+
+import {
+  Mail,
+  Plus,
+  Shield,
+  Crown,
+  Search,
+  Trash2,
+} from 'lucide-react';
 
 import { API_URL, getAccessToken } from '@/lib/api';
+
 import DashboardSidebar from '@/components/dashboard-sidebar';
 
 type Membership = {
   id: string;
   role: string;
-  user?: {
+  createdAt: string;
+  user: {
     id: string;
     email: string;
-  };
-  association?: {
-    id: string;
-    name: string;
   };
 };
 
@@ -24,342 +36,515 @@ type Invitation = {
   id: string;
   email: string;
   role: string;
-  status?: string;
   createdAt: string;
-  expiresAt: string;
 };
 
+function getInitials(email: string) {
+  const name = email.split('@')[0] || 'user';
+
+  return name
+    .split(/[._-]/)
+    .map((part) => part[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase();
+}
+
+function getRoleColor(role: string) {
+  if (role === 'OWNER') {
+    return 'border-amber-500/20 bg-amber-500/10 text-amber-300';
+  }
+
+  if (role === 'ADMIN') {
+    return 'border-indigo-500/20 bg-indigo-500/10 text-indigo-300';
+  }
+
+  return 'border-emerald-500/20 bg-emerald-500/10 text-emerald-300';
+}
+
 export default function MembersPage() {
-  const router = useRouter();
+  const [email, setEmail] = useState('');
+  const [role, setRole] = useState('MEMBER');
+  const [search, setSearch] = useState('');
+  const [roleFilter, setRoleFilter] = useState('ALL');
 
   const [members, setMembers] = useState<Membership[]>([]);
   const [invitations, setInvitations] = useState<Invitation[]>([]);
-  const [loading, setLoading] = useState(true);
 
-  const [inviteEmail, setInviteEmail] = useState('');
-  const [inviteRole, setInviteRole] = useState('MEMBER');
-  const [inviting, setInviting] = useState(false);
-  const [deletingInvitationId, setDeletingInvitationId] =
-    useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [loadingMembers, setLoadingMembers] = useState(true);
+  const [loadingInvitations, setLoadingInvitations] = useState(true);
 
-  async function loadMembers() {
-    const token = getAccessToken();
+  useEffect(() => {
+    fetchMembers();
+    fetchInvitations();
+  }, []);
 
-    if (!token) {
-      router.push('/login');
-      return;
-    }
-
+  async function fetchMembers() {
     try {
-      const res = await fetch(`${API_URL}/api/memberships`, {
+      setLoadingMembers(true);
+
+      const token = getAccessToken();
+
+      if (!token) {
+        setMembers([]);
+        return;
+      }
+
+      const res = await fetch(`${API_URL}/memberships`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
       });
 
-      const data = await res.json();
-
       if (!res.ok) {
-        throw new Error(data.message || 'Errore caricamento membri');
+        throw new Error('Errore caricamento membri');
       }
+
+      const data = await res.json();
 
       setMembers(Array.isArray(data) ? data : []);
-    } catch (err: any) {
-      toast.error(err.message || 'Errore caricamento membri');
+    } catch (error) {
+      console.error(error);
+      setMembers([]);
+    } finally {
+      setLoadingMembers(false);
     }
   }
 
-  async function loadInvitations() {
-    const token = getAccessToken();
-
-    if (!token) {
-      router.push('/login');
-      return;
-    }
-
+  async function fetchInvitations() {
     try {
-      const res = await fetch(`${API_URL}/api/invitations`, {
+      setLoadingInvitations(true);
+
+      const token = getAccessToken();
+
+      if (!token) {
+        setInvitations([]);
+        return;
+      }
+
+      const res = await fetch(`${API_URL}/invitations`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
       });
 
-      const data = await res.json();
-
       if (!res.ok) {
-        throw new Error(data.message || 'Errore caricamento inviti');
+        throw new Error('Errore caricamento inviti');
       }
 
+      const data = await res.json();
+
       setInvitations(Array.isArray(data) ? data : []);
-    } catch (err: any) {
-      toast.error(err.message || 'Errore caricamento inviti');
-    }
-  }
-
-  async function loadPage() {
-    setLoading(true);
-
-    try {
-      await Promise.all([loadMembers(), loadInvitations()]);
+    } catch (error) {
+      console.error(error);
+      setInvitations([]);
     } finally {
-      setLoading(false);
+      setLoadingInvitations(false);
     }
   }
 
   async function handleInvite(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
 
-    const token = getAccessToken();
-
-    if (!token) {
-      router.push('/login');
-      return;
-    }
+    if (!email.trim()) return;
 
     try {
-      setInviting(true);
+      setLoading(true);
 
-      const res = await fetch(`${API_URL}/api/invitations`, {
+      const token = getAccessToken();
+
+      if (!token) return;
+
+      const res = await fetch(`${API_URL}/invitations`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
-          email: inviteEmail,
-          role: inviteRole,
+          email: email.trim(),
+          role,
         }),
       });
 
-      const data = await res.json();
-
       if (!res.ok) {
-        throw new Error(data.message || 'Errore invio invito');
+        throw new Error('Errore invito membro');
       }
 
-      setInviteEmail('');
-      setInviteRole('MEMBER');
+      setEmail('');
+      setRole('MEMBER');
 
-      toast.success('Invito inviato');
-
-      await loadInvitations();
-    } catch (err: any) {
-      toast.error(err.message || 'Errore invio invito');
+      await fetchMembers();
+      await fetchInvitations();
+    } catch (error) {
+      console.error(error);
     } finally {
-      setInviting(false);
+      setLoading(false);
     }
   }
 
-  async function handleDeleteInvitation(id: string) {
-    const token = getAccessToken();
-
-    if (!token) {
-      router.push('/login');
-      return;
-    }
-
+  async function removeMember(id: string) {
     try {
-      setDeletingInvitationId(id);
+      const token = getAccessToken();
 
-      const res = await fetch(`${API_URL}/api/invitations/${id}`, {
+      if (!token) return;
+
+      const res = await fetch(`${API_URL}/memberships/${id}`, {
         method: 'DELETE',
         headers: {
           Authorization: `Bearer ${token}`,
         },
       });
 
-      const data = await res.json();
-
       if (!res.ok) {
-        throw new Error(data.message || 'Errore cancellazione invito');
+        throw new Error('Errore rimozione membro');
       }
 
-      toast.success('Invito cancellato');
-
-      await loadInvitations();
-    } catch (err: any) {
-      toast.error(err.message || 'Errore cancellazione invito');
-    } finally {
-      setDeletingInvitationId(null);
+      await fetchMembers();
+    } catch (error) {
+      console.error(error);
     }
   }
 
-  useEffect(() => {
-    loadPage();
-  }, []);
+  async function removeInvitation(id: string) {
+    try {
+      const token = getAccessToken();
+
+      if (!token) return;
+
+      const res = await fetch(`${API_URL}/invitations/${id}`, {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!res.ok) {
+        throw new Error('Errore rimozione invito');
+      }
+
+      await fetchInvitations();
+    } catch (error) {
+      console.error(error);
+    }
+  }
+
+  const filteredMembers = useMemo(() => {
+    return members.filter((member) => {
+      const matchesSearch = member.user.email
+        .toLowerCase()
+        .includes(search.toLowerCase());
+
+      const matchesRole =
+        roleFilter === 'ALL' || member.role === roleFilter;
+
+      return matchesSearch && matchesRole;
+    });
+  }, [members, search, roleFilter]);
 
   return (
     <div className="flex min-h-screen bg-[#0f1117] text-white">
       <DashboardSidebar />
 
       <main className="flex-1 p-8 lg:ml-72">
-        <div className="mx-auto max-w-6xl space-y-8">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-5xl font-bold">Membri</h1>
-
-              <p className="mt-2 text-gray-400">
-                Gestisci utenti, ruoli e inviti
-              </p>
-            </div>
-
-            <button
-              onClick={() => router.push('/dashboard')}
-              className="rounded-xl border border-white/10 px-5 py-3 transition hover:bg-white/5"
+        <div className="mx-auto max-w-7xl space-y-8">
+          <div>
+            <Link
+              href="/dashboard"
+              className="rounded-xl border border-white/10 px-4 py-2 text-sm transition hover:bg-white/5"
             >
-              Dashboard
-            </button>
+              ← Dashboard
+            </Link>
           </div>
 
-          <section className="grid gap-5 md:grid-cols-3">
-            <div className="rounded-3xl border border-white/5 bg-[#1a1f2e] p-6">
-              <p className="text-sm text-gray-400">Membri totali</p>
+          <section className="relative overflow-hidden rounded-[2rem] border border-white/10 bg-[#111827] p-8 shadow-2xl">
+            <div className="absolute right-0 top-0 h-40 w-40 rounded-full bg-indigo-500/10 blur-3xl" />
+            <div className="absolute bottom-0 left-0 h-40 w-40 rounded-full bg-cyan-500/10 blur-3xl" />
 
-              <h2 className="mt-3 text-4xl font-bold">{members.length}</h2>
+            <div className="relative">
+              <p className="mb-3 inline-flex rounded-full border border-indigo-500/20 bg-indigo-500/10 px-4 py-2 text-sm text-indigo-300">
+                Team management
+              </p>
+
+              <h1 className="text-5xl font-bold">Members</h1>
+
+              <p className="mt-3 max-w-2xl text-gray-400">
+                Gestisci membri reali, ruoli e inviti della piattaforma.
+              </p>
             </div>
+          </section>
 
-            <div className="rounded-3xl border border-white/5 bg-[#1a1f2e] p-6">
-              <p className="text-sm text-gray-400">Owner/Admin</p>
-
-              <h2 className="mt-3 text-4xl font-bold">
-                {members.filter((m) => m.role !== 'MEMBER').length}
+          <section className="grid gap-5 md:grid-cols-4">
+            <div className="rounded-[2rem] border border-white/10 bg-gradient-to-br from-indigo-500/20 to-[#1a1f2e] p-6 shadow-xl">
+              <p className="text-sm text-indigo-300">Membri totali</p>
+              <h2 className="mt-4 text-4xl font-bold">
+                {loadingMembers ? '...' : members.length}
               </h2>
             </div>
 
-            <div className="rounded-3xl border border-white/5 bg-[#1a1f2e] p-6">
-              <p className="text-sm text-gray-400">Inviti pendenti</p>
+            <div className="rounded-[2rem] border border-white/10 bg-gradient-to-br from-emerald-500/20 to-[#1a1f2e] p-6 shadow-xl">
+              <p className="text-sm text-emerald-300">Member</p>
+              <h2 className="mt-4 text-4xl font-bold">
+                {loadingMembers
+                  ? '...'
+                  : members.filter((member) => member.role === 'MEMBER')
+                      .length}
+              </h2>
+            </div>
 
-              <h2 className="mt-3 text-4xl font-bold">
-                {invitations.length}
+            <div className="rounded-[2rem] border border-white/10 bg-gradient-to-br from-amber-500/20 to-[#1a1f2e] p-6 shadow-xl">
+              <p className="text-sm text-amber-300">Admin / Owner</p>
+              <h2 className="mt-4 text-4xl font-bold">
+                {loadingMembers
+                  ? '...'
+                  : members.filter(
+                      (member) =>
+                        member.role === 'ADMIN' || member.role === 'OWNER',
+                    ).length}
+              </h2>
+            </div>
+
+            <div className="rounded-[2rem] border border-white/10 bg-gradient-to-br from-cyan-500/20 to-[#1a1f2e] p-6 shadow-xl">
+              <p className="text-sm text-cyan-300">Inviti pending</p>
+              <h2 className="mt-4 text-4xl font-bold">
+                {loadingInvitations ? '...' : invitations.length}
               </h2>
             </div>
           </section>
 
-          <section className="rounded-3xl border border-white/5 bg-[#1a1f2e] p-6">
-            <h2 className="mb-4 text-2xl font-bold">Invita membro</h2>
+          <section className="rounded-3xl border border-white/10 bg-[#1a1f2e] p-6 shadow-2xl">
+            <h2 className="text-2xl font-bold">Nuovo invito</h2>
 
-            <form
-              onSubmit={handleInvite}
-              className="grid gap-4 md:grid-cols-[1fr_180px_160px]"
-            >
-              <input
-                type="email"
-                placeholder="email@example.com"
-                value={inviteEmail}
-                onChange={(e) => setInviteEmail(e.target.value)}
-                className="rounded-xl border border-white/10 bg-[#111827] px-4 py-3 text-white outline-none focus:border-indigo-500"
-                required
-              />
+            <form onSubmit={handleInvite} className="mt-6 space-y-5">
+              <div className="grid gap-5 md:grid-cols-2">
+                <div>
+                  <label className="mb-2 block text-sm text-gray-400">
+                    Email membro
+                  </label>
 
-              <select
-                value={inviteRole}
-                onChange={(e) => setInviteRole(e.target.value)}
-                className="rounded-xl border border-white/10 bg-[#111827] px-4 py-3 text-white outline-none focus:border-indigo-500"
-              >
-                <option value="MEMBER">MEMBER</option>
-                <option value="ADMIN">ADMIN</option>
-              </select>
+                  <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-[#111827] px-4">
+                    <Mail className="h-5 w-5 text-indigo-300" />
+
+                    <input
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="membro@email.com"
+                      required
+                      className="w-full bg-transparent py-4 outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="mb-2 block text-sm text-gray-400">
+                    Ruolo
+                  </label>
+
+                  <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-[#111827] px-4">
+                    <Shield className="h-5 w-5 text-emerald-300" />
+
+                    <select
+                      value={role}
+                      onChange={(e) => setRole(e.target.value)}
+                      className="w-full bg-transparent py-4 outline-none"
+                    >
+                      <option value="MEMBER" className="bg-[#111827]">
+                        MEMBER
+                      </option>
+
+                      <option value="ADMIN" className="bg-[#111827]">
+                        ADMIN
+                      </option>
+                    </select>
+                  </div>
+                </div>
+              </div>
 
               <button
                 type="submit"
-                disabled={inviting}
-                className="rounded-xl bg-indigo-600 px-5 py-3 font-semibold transition hover:bg-indigo-500 disabled:opacity-60"
+                disabled={loading}
+                className="inline-flex min-h-12 items-center gap-2 rounded-2xl bg-indigo-600 px-5 py-3 font-semibold transition hover:bg-indigo-500 disabled:opacity-60"
               >
-                {inviting ? 'Invio...' : 'Invita'}
+                <Plus className="h-5 w-5" />
+                {loading ? 'Invio...' : 'Invia invito'}
               </button>
             </form>
           </section>
 
-          <section className="rounded-3xl border border-white/5 bg-[#1a1f2e] p-6">
-            <h2 className="mb-4 text-2xl font-bold">Membri attuali</h2>
+          <section className="rounded-3xl border border-white/10 bg-[#1a1f2e] p-6 shadow-2xl">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-2xl font-bold">Inviti pending</h2>
 
-            {loading && <p className="text-gray-400">Caricamento...</p>}
+                <p className="mt-2 text-sm text-gray-400">
+                  Inviti non ancora accettati
+                </p>
+              </div>
 
-            {!loading && members.length === 0 && (
-              <p className="text-gray-400">Nessun membro trovato.</p>
-            )}
+              <div className="rounded-2xl border border-indigo-500/20 bg-indigo-500/10 px-4 py-2 text-indigo-300">
+                {loadingInvitations ? '...' : invitations.length} pending
+              </div>
+            </div>
 
-            {!loading && members.length > 0 && (
-              <div className="overflow-hidden rounded-2xl border border-white/5">
-                <table className="w-full text-left">
-                  <thead className="bg-[#111827] text-sm text-gray-400">
-                    <tr>
-                      <th className="px-5 py-4">Email</th>
-                      <th className="px-5 py-4">Ruolo</th>
-                      <th className="px-5 py-4">Associazione</th>
-                    </tr>
-                  </thead>
+            {loadingInvitations ? (
+              <div className="mt-6 h-32 animate-pulse rounded-2xl bg-[#111827]" />
+            ) : invitations.length === 0 ? (
+              <div className="mt-6 rounded-2xl border border-dashed border-white/10 bg-[#111827] p-8 text-center text-gray-400">
+                Nessun invito pending
+              </div>
+            ) : (
+              <div className="mt-6 grid gap-4">
+                {invitations.map((invitation) => (
+                  <div
+                    key={invitation.id}
+                    className="rounded-2xl border border-white/10 bg-[#111827] p-5"
+                  >
+                    <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                      <div>
+                        <h3 className="font-semibold">
+                          {invitation.email}
+                        </h3>
 
-                  <tbody className="divide-y divide-white/5">
-                    {members.map((member) => (
-                      <tr key={member.id} className="hover:bg-white/5">
-                        <td className="px-5 py-4">
-                          {member.user?.email || '-'}
-                        </td>
-                        <td className="px-5 py-4">{member.role}</td>
-                        <td className="px-5 py-4">
-                          {member.association?.name || '-'}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                        <p className="mt-2 text-sm text-gray-400">
+                          Invitato il{' '}
+                          {new Date(invitation.createdAt).toLocaleString(
+                            'it-IT',
+                          )}
+                        </p>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-3">
+                        <span
+                          className={`rounded-full border px-3 py-1 text-sm font-medium ${getRoleColor(
+                            invitation.role,
+                          )}`}
+                        >
+                          {invitation.role}
+                        </span>
+
+                        <button
+                          type="button"
+                          onClick={() => removeInvitation(invitation.id)}
+                          className="inline-flex items-center gap-2 rounded-xl border border-red-500/20 px-4 py-2 text-sm text-red-300 transition hover:bg-red-500/10"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                          Annulla
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
           </section>
 
-          <section className="rounded-3xl border border-white/5 bg-[#1a1f2e] p-6">
-            <h2 className="mb-4 text-2xl font-bold">Inviti</h2>
+          <section className="rounded-3xl border border-white/10 bg-[#1a1f2e] p-6 shadow-2xl">
+            <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+              <div>
+                <h2 className="text-2xl font-bold">Membri reali</h2>
 
-            {loading && <p className="text-gray-400">Caricamento...</p>}
+                <p className="mt-2 text-sm text-gray-400">
+                  Lista membri caricata dal backend
+                </p>
+              </div>
 
-            {!loading && invitations.length === 0 && (
-              <p className="text-gray-400">Nessun invito pendente.</p>
-            )}
+              <div className="flex flex-col gap-3 md:flex-row">
+                <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-[#111827] px-4">
+                  <Search className="h-5 w-5 text-gray-500" />
 
-            {!loading && invitations.length > 0 && (
-              <div className="overflow-hidden rounded-2xl border border-white/5">
-                <table className="w-full text-left">
-                  <thead className="bg-[#111827] text-sm text-gray-400">
-                    <tr>
-                      <th className="px-5 py-4">Email</th>
-                      <th className="px-5 py-4">Ruolo</th>
-                      <th className="px-5 py-4">Stato</th>
-                      <th className="px-5 py-4">Scadenza</th>
-                      <th className="px-5 py-4 text-right">Azione</th>
-                    </tr>
-                  </thead>
+                  <input
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    placeholder="Cerca membro..."
+                    className="bg-transparent py-3 outline-none"
+                  />
+                </div>
 
-                  <tbody className="divide-y divide-white/5">
-                    {invitations.map((invitation) => (
-                      <tr key={invitation.id} className="hover:bg-white/5">
-                        <td className="px-5 py-4">{invitation.email}</td>
-                        <td className="px-5 py-4">{invitation.role}</td>
-                        <td className="px-5 py-4">
-                          {invitation.status || 'PENDING'}
-                        </td>
-                        <td className="px-5 py-4">
-                          {new Date(invitation.expiresAt).toLocaleDateString(
-                            'it-IT',
-                          )}
-                        </td>
-                        <td className="px-5 py-4 text-right">
+                <select
+                  value={roleFilter}
+                  onChange={(e) => setRoleFilter(e.target.value)}
+                  className="rounded-2xl border border-white/10 bg-[#111827] px-4 py-3 outline-none"
+                >
+                  <option value="ALL" className="bg-[#111827]">
+                    Tutti i ruoli
+                  </option>
+                  <option value="MEMBER" className="bg-[#111827]">
+                    MEMBER
+                  </option>
+                  <option value="ADMIN" className="bg-[#111827]">
+                    ADMIN
+                  </option>
+                  <option value="OWNER" className="bg-[#111827]">
+                    OWNER
+                  </option>
+                </select>
+              </div>
+            </div>
+
+            {loadingMembers ? (
+              <div className="mt-8 h-40 animate-pulse rounded-3xl bg-[#111827]" />
+            ) : filteredMembers.length === 0 ? (
+              <div className="mt-8 rounded-3xl border border-dashed border-white/10 bg-[#111827] p-12 text-center text-gray-400">
+                Nessun membro trovato
+              </div>
+            ) : (
+              <div className="mt-6 grid gap-4">
+                {filteredMembers.map((member) => (
+                  <div
+                    key={member.id}
+                    className="rounded-2xl border border-white/10 bg-[#111827] p-5 transition hover:border-indigo-500/40"
+                  >
+                    <div className="flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
+                      <div className="flex items-center gap-4">
+                        <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-cyan-400 text-lg font-bold text-white shadow-lg shadow-indigo-950/40">
+                          {getInitials(member.user.email)}
+                        </div>
+
+                        <div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <h3 className="font-semibold">
+                              {member.user.email}
+                            </h3>
+
+                            {member.role === 'OWNER' && (
+                              <Crown className="h-4 w-4 text-amber-300" />
+                            )}
+                          </div>
+
+                          <p className="mt-2 text-sm text-gray-400">
+                            Creato il{' '}
+                            {new Date(member.createdAt).toLocaleString(
+                              'it-IT',
+                            )}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-3">
+                        <span
+                          className={`rounded-full border px-3 py-1 text-sm font-medium ${getRoleColor(
+                            member.role,
+                          )}`}
+                        >
+                          {member.role}
+                        </span>
+
+                        {member.role !== 'OWNER' && (
                           <button
-                            onClick={() =>
-                              handleDeleteInvitation(invitation.id)
-                            }
-                            disabled={deletingInvitationId === invitation.id}
-                            className="rounded-xl border border-red-500/30 px-4 py-2 text-sm font-semibold text-red-300 hover:bg-red-500/10 disabled:opacity-60"
+                            type="button"
+                            onClick={() => removeMember(member.id)}
+                            className="inline-flex items-center gap-2 rounded-xl border border-red-500/20 px-4 py-2 text-sm text-red-300 transition hover:bg-red-500/10"
                           >
-                            {deletingInvitationId === invitation.id
-                              ? 'Cancello...'
-                              : 'Cancella'}
+                            <Trash2 className="h-4 w-4" />
+                            Rimuovi
                           </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
           </section>

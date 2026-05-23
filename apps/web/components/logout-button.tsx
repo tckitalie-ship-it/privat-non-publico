@@ -1,14 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-
-import {
-  clearAccessToken,
-} from '@/lib/api';
-
-import {
-  disconnectSocket,
-} from '@/lib/socket';
+import { clearAccessToken } from '@/lib/api';
 
 export default function LogoutButton() {
   const router = useRouter();
@@ -16,15 +9,17 @@ export default function LogoutButton() {
   function handleLogout() {
     clearAccessToken();
 
-    disconnectSocket();
+    document.cookie =
+      'access_token=; path=/; max-age=0';
 
     router.replace('/login');
   }
 
   return (
     <button
+      type="button"
       onClick={handleLogout}
-      className="rounded-xl border border-red-500/30 px-5 py-3 text-sm font-semibold text-red-300 transition hover:bg-red-500/10"
+      className="rounded-xl border border-white/10 px-4 py-2 text-sm text-white transition hover:bg-white/5"
     >
       Logout
     </button>

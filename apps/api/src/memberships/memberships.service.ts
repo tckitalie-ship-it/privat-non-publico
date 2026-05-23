@@ -3,18 +3,28 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+
 import { PrismaService } from '../prisma/prisma.service';
+
 import { Role } from '@prisma/client';
 
 @Injectable()
 export class MembershipsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+  ) {}
 
   async findAll(user: any) {
+    if (!user.associationId) {
+      return [];
+    }
+
     return this.prisma.membership.findMany({
       where: {
-        associationId: user.associationId,
+        associationId:
+          user.associationId,
       },
+
       include: {
         user: {
           select: {
@@ -22,6 +32,7 @@ export class MembershipsService {
             email: true,
           },
         },
+
         association: {
           select: {
             id: true,
@@ -33,51 +44,85 @@ export class MembershipsService {
   }
 
   async me(user: any) {
+    if (!user.associationId) {
+      return null;
+    }
+
     return this.prisma.membership.findFirst({
       where: {
         userId: user.id,
-        associationId: user.associationId,
+        associationId:
+          user.associationId,
       },
+
       include: {
         association: true,
       },
     });
   }
 
-  async updateRole(id: string, role: Role, user: any) {
-    const membership = await this.prisma.membership.findUnique({
-      where: { id },
-    });
+  async updateRole(
+    id: string,
+    role: Role,
+    user: any,
+  ) {
+    const membership =
+      await this.prisma.membership.findUnique(
+        {
+          where: { id },
+        },
+      );
 
     if (!membership) {
-      throw new NotFoundException('Membership not found');
+      throw new NotFoundException(
+        'Membership not found',
+      );
     }
 
-    if (membership.associationId !== user.associationId) {
+    if (
+      membership.associationId !==
+      user.associationId
+    ) {
       throw new ForbiddenException();
     }
 
-    return this.prisma.membership.update({
-      where: { id },
-      data: { role },
-    });
+    return this.prisma.membership.update(
+      {
+        where: { id },
+
+        data: { role },
+      },
+    );
   }
 
-  async remove(id: string, user: any) {
-    const membership = await this.prisma.membership.findUnique({
-      where: { id },
-    });
+  async remove(
+    id: string,
+    user: any,
+  ) {
+    const membership =
+      await this.prisma.membership.findUnique(
+        {
+          where: { id },
+        },
+      );
 
     if (!membership) {
-      throw new NotFoundException('Membership not found');
+      throw new NotFoundException(
+        'Membership not found',
+      );
     }
 
-    if (membership.associationId !== user.associationId) {
+    if (
+      membership.associationId !==
+      user.associationId
+    ) {
       throw new ForbiddenException();
     }
 
-    return this.prisma.membership.delete({
-      where: { id },
-    });
+    return this.prisma.membership.delete(
+      {
+        where: { id },
+      },
+    );
   }
 }

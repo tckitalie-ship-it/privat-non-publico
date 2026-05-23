@@ -5,7 +5,11 @@
   "scripts": {
     "api:dev": "cd apps/api && npm run start:dev",
     "api:build": "cd apps/api && npm run build",
-    "api:start": "cd apps/api && npm run start"
+    "api:start": "cd apps/api && npm run start",
+
+    "web:dev": "cd apps/web && npm run dev",
+    "web:build": "cd apps/web && npm run build",
+    "web:start": "cd apps/web && npm run start"
   },
   "dependencies": {
     "@nestjs/common": "^11.1.18",
