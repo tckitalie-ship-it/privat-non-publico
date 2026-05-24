@@ -4,6 +4,7 @@ import {
 } from '@nestjs/common';
 
 import { PrismaService } from '../../prisma/prisma.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 import { CreateEventDto } from './dto/create-event.dto';
 import { UpdateEventDto } from './dto/update-event.dto';
@@ -12,6 +13,7 @@ import { UpdateEventDto } from './dto/update-event.dto';
 export class EventsService {
   constructor(
     private readonly prisma: PrismaService,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   findAll() {
@@ -34,64 +36,49 @@ export class EventsService {
     });
   }
 
-  create(dto: CreateEventDto) {
-    return this.prisma.event.create({
+  async create(dto: CreateEventDto) {
+    const event = await this.prisma.event.create({
       data: {
-        associationId:
-          dto.associationId,
+        associationId: dto.associationId,
         title: dto.title,
-        description:
-          dto.description || null,
-        location:
-          dto.location || null,
-        startsAt: new Date(
-          dto.startsAt,
-        ),
-        endsAt: dto.endsAt
-          ? new Date(dto.endsAt)
-          : null,
+        description: dto.description || null,
+        location: dto.location || null,
+        startsAt: new Date(dto.startsAt),
+        endsAt: dto.endsAt ? new Date(dto.endsAt) : null,
       },
       include: {
         registrations: true,
       },
     });
+
+    await this.notificationsService.create({
+      associationId: dto.associationId,
+      title: 'Nuovo evento creato',
+      message: `È stato creato l’evento: ${event.title}`,
+      userId: null,
+    });
+
+    return event;
   }
 
-  async update(
-    id: string,
-    dto: UpdateEventDto,
-  ) {
-    const event =
-      await this.prisma.event.findUnique(
-        {
-          where: { id },
-        },
-      );
+  async update(id: string, dto: UpdateEventDto) {
+    const event = await this.prisma.event.findUnique({
+      where: { id },
+    });
 
     if (!event) {
-      throw new NotFoundException(
-        'Evento non trovato',
-      );
+      throw new NotFoundException('Evento non trovato');
     }
 
     return this.prisma.event.update({
       where: { id },
-
       data: {
         title: dto.title,
-        description:
-          dto.description,
+        description: dto.description,
         location: dto.location,
-
-        startsAt: dto.startsAt
-          ? new Date(dto.startsAt)
-          : undefined,
-
-        endsAt: dto.endsAt
-          ? new Date(dto.endsAt)
-          : undefined,
+        startsAt: dto.startsAt ? new Date(dto.startsAt) : undefined,
+        endsAt: dto.endsAt ? new Date(dto.endsAt) : undefined,
       },
-
       include: {
         registrations: true,
       },
@@ -99,17 +86,12 @@ export class EventsService {
   }
 
   async remove(id: string) {
-    const event =
-      await this.prisma.event.findUnique(
-        {
-          where: { id },
-        },
-      );
+    const event = await this.prisma.event.findUnique({
+      where: { id },
+    });
 
     if (!event) {
-      throw new NotFoundException(
-        'Evento non trovato',
-      );
+      throw new NotFoundException('Evento non trovato');
     }
 
     await this.prisma.event.delete({
@@ -121,68 +103,59 @@ export class EventsService {
     };
   }
 
-  async register(
-    eventId: string,
-    userId: string,
-  ) {
-    const event =
-      await this.prisma.event.findUnique(
-        {
-          where: {
-            id: eventId,
-          },
-        },
-      );
+  async register(eventId: string, userId: string) {
+    const event = await this.prisma.event.findUnique({
+      where: {
+        id: eventId,
+      },
+    });
 
     if (!event) {
-      throw new NotFoundException(
-        'Evento non trovato',
-      );
+      throw new NotFoundException('Evento non trovato');
     }
 
-    return this.prisma.eventRegistration.create(
-      {
-        data: {
+    const registration = await this.prisma.eventRegistration.create({
+      data: {
+        eventId,
+        userId,
+      },
+    });
+
+    await this.notificationsService.create({
+      associationId: event.associationId,
+      title: 'Nuova partecipazione evento',
+      message: `Un membro si è registrato all’evento: ${event.title}`,
+      userId: null,
+    });
+
+    return registration;
+  }
+
+  registrations(eventId: string) {
+    return this.prisma.eventRegistration.findMany({
+      where: {
+        eventId,
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+          },
+        },
+      },
+    });
+  }
+
+  async unregister(eventId: string, userId: string) {
+    await this.prisma.eventRegistration.delete({
+      where: {
+        eventId_userId: {
           eventId,
           userId,
         },
       },
-    );
-  }
-
-  registrations(eventId: string) {
-    return this.prisma.eventRegistration.findMany(
-      {
-        where: {
-          eventId,
-        },
-
-        include: {
-          user: {
-            select: {
-              id: true,
-              email: true,
-            },
-          },
-        },
-      },
-    );
-  }
-
-  async unregister(
-    eventId: string,
-    userId: string,
-  ) {
-    await this.prisma.eventRegistration.delete(
-      {
-        where: {
-          eventId_userId: {
-            eventId,
-            userId,
-          },
-        },
-      },
-    );
+    });
 
     return {
       success: true,
