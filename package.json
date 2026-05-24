@@ -6,7 +6,6 @@
     "api:dev": "cd apps/api && npm run start:dev",
     "api:build": "cd apps/api && npm run build",
     "api:start": "cd apps/api && npm run start",
-
     "web:dev": "cd apps/web && npm run dev",
     "web:build": "cd apps/web && npm run build",
     "web:start": "cd apps/web && npm run start"
@@ -26,6 +25,7 @@
     "passport-jwt": "^4.0.1",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2",
+    "socket.io-client": "^4.8.3",
     "stripe": "^22.1.0"
   },
   "devDependencies": {

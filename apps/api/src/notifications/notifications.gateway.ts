@@ -1,9 +1,11 @@
 import {
   MessageBody,
+  OnGatewayInit,
   SubscribeMessage,
   WebSocketGateway,
   WebSocketServer,
 } from '@nestjs/websockets';
+
 import { Server } from 'socket.io';
 
 @WebSocketGateway({
@@ -11,30 +13,35 @@ import { Server } from 'socket.io';
     origin: '*',
   },
 })
-export class NotificationsGateway {
-  private static serverInstance: Server | null = null;
-
+export class NotificationsGateway implements OnGatewayInit {
   @WebSocketServer()
-  set server(server: Server) {
+  server: Server;
+
+  private static serverInstance: Server;
+
+  afterInit(server: Server) {
     NotificationsGateway.serverInstance = server;
   }
 
   static emitNotification(payload: any) {
-    if (!NotificationsGateway.serverInstance) {
-      return;
-    }
-
-    NotificationsGateway.serverInstance.emit('notification:new', payload);
+    NotificationsGateway.serverInstance?.emit('notification:new', payload);
   }
 
   @SubscribeMessage('notification:test')
   handleTest(@MessageBody() data: any) {
-    NotificationsGateway.emitNotification({
+    const notification = {
       id: `test-${Date.now()}`,
-      title: 'Test notification',
+      title: data?.title || 'Test notification',
       message: data?.message || 'Realtime notification test',
       read: false,
       createdAt: new Date().toISOString(),
-    });
+    };
+
+    this.server.emit('notification:new', notification);
+
+    return {
+      success: true,
+      notification,
+    };
   }
 }
