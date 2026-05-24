@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsGateway } from './notifications.gateway';
 
@@ -21,17 +22,13 @@ export class NotificationsService {
       },
     });
 
-    console.log('NOTIFICATION CREATED:', notification);
-
     NotificationsGateway.emitNotification(notification);
 
     return notification;
   }
 
   async findAll(user: any) {
-    if (!user.associationId) {
-      return [];
-    }
+    if (!user.associationId) return [];
 
     return this.prisma.notification.findMany({
       where: {

@@ -1,4 +1,5 @@
 import {
+  ConnectedSocket,
   MessageBody,
   OnGatewayInit,
   SubscribeMessage,
@@ -6,38 +7,69 @@ import {
   WebSocketServer,
 } from '@nestjs/websockets';
 
-import { Server } from 'socket.io';
+import {
+  Server,
+  Socket,
+} from 'socket.io';
 
 @WebSocketGateway({
   cors: {
     origin: '*',
   },
 })
-export class NotificationsGateway implements OnGatewayInit {
+export class NotificationsGateway
+  implements OnGatewayInit
+{
   @WebSocketServer()
   server: Server;
 
   private static serverInstance: Server;
 
   afterInit(server: Server) {
-    NotificationsGateway.serverInstance = server;
+    NotificationsGateway.serverInstance =
+      server;
   }
 
-  static emitNotification(payload: any) {
-    NotificationsGateway.serverInstance?.emit('notification:new', payload);
+  static emitNotification(
+    payload: any,
+  ) {
+    NotificationsGateway.serverInstance?.emit(
+      'notification:new',
+      payload,
+    );
   }
 
-  @SubscribeMessage('notification:test')
-  handleTest(@MessageBody() data: any) {
+  @SubscribeMessage(
+    'notification:test',
+  )
+  handleTest(
+    @ConnectedSocket()
+    client: Socket,
+
+    @MessageBody()
+    data: any,
+  ) {
     const notification = {
       id: `test-${Date.now()}`,
-      title: data?.title || 'Test notification',
-      message: data?.message || 'Realtime notification test',
+
+      title:
+        data?.title ||
+        'Test notification',
+
+      message:
+        data?.message ||
+        'Realtime notification test',
+
       read: false,
-      createdAt: new Date().toISOString(),
+
+      createdAt:
+        new Date().toISOString(),
     };
 
-    this.server.emit('notification:new', notification);
+    client.emit(
+      'notification:new',
+      notification,
+    );
 
     return {
       success: true,

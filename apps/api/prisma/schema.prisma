@@ -14,17 +14,18 @@ enum Role {
 }
 
 model User {
-  id           String   @id @default(cuid())
-  email        String   @unique
+  id           String @id @default(cuid())
+  email        String @unique
   passwordHash String
 
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  updatedAt DateTime @default(now()) @updatedAt
 
   memberships        Membership[]
   invitationsSent    Invitation[] @relation("InvitationInvitedBy")
   notifications      Notification[]
   eventRegistrations EventRegistration[]
+  uploadedFiles      File[]
 }
 
 model Association {
@@ -40,13 +41,14 @@ model Association {
   subscriptionStatus   String?
 
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  updatedAt DateTime @default(now()) @updatedAt
 
   memberships   Membership[]
   invitations   Invitation[]
   events        Event[]
   transactions  Transaction[]
   notifications Notification[]
+  files         File[]
 }
 
 model Membership {
@@ -58,7 +60,7 @@ model Membership {
   role Role @default(MEMBER)
 
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  updatedAt DateTime @default(now()) @updatedAt
 
   user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
   association Association @relation(fields: [associationId], references: [id], onDelete: Cascade)
@@ -81,7 +83,7 @@ model Invitation {
   expiresAt  DateTime
 
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  updatedAt DateTime @default(now()) @updatedAt
 
   association Association @relation(fields: [associationId], references: [id], onDelete: Cascade)
   invitedBy   User        @relation("InvitationInvitedBy", fields: [invitedById], references: [id], onDelete: Cascade)
@@ -102,7 +104,7 @@ model Event {
   endsAt   DateTime?
 
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  updatedAt DateTime @default(now()) @updatedAt
 
   association   Association         @relation(fields: [associationId], references: [id], onDelete: Cascade)
   registrations EventRegistration[]
@@ -115,7 +117,7 @@ model EventRegistration {
   eventId String
 
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  updatedAt DateTime @default(now()) @updatedAt
 
   user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
   event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
@@ -134,7 +136,7 @@ model Notification {
   read    Boolean @default(false)
 
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  updatedAt DateTime @default(now()) @updatedAt
 
   user        User?        @relation(fields: [userId], references: [id], onDelete: Cascade)
   association Association? @relation(fields: [associationId], references: [id], onDelete: Cascade)
@@ -154,7 +156,26 @@ model Transaction {
   date        DateTime @default(now())
 
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  updatedAt DateTime @default(now()) @updatedAt
 
   association Association @relation(fields: [associationId], references: [id], onDelete: Cascade)
+}
+
+model File {
+  id String @id @default(cuid())
+
+  filename     String
+  originalName String
+  mimetype     String
+  size         Int
+  path         String
+
+  associationId String
+  uploadedById  String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  association Association @relation(fields: [associationId], references: [id], onDelete: Cascade)
+  uploadedBy  User        @relation(fields: [uploadedById], references: [id], onDelete: Cascade)
 }

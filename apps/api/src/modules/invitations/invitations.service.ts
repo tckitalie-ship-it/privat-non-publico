@@ -7,7 +7,7 @@ import {
 import { randomBytes } from 'crypto';
 
 import { PrismaService } from '../../prisma/prisma.service';
-import { NotificationsService } from '../notifications/notifications.service';
+import { NotificationsService } from '../../notifications/notifications.service';
 
 @Injectable()
 export class InvitationsService {
