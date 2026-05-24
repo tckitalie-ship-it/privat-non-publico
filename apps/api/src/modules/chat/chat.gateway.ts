@@ -1,132 +1,85 @@
 import {
-  ConnectedSocket,
   MessageBody,
-  OnGatewayConnection,
   SubscribeMessage,
   WebSocketGateway,
   WebSocketServer,
+  ConnectedSocket,
 } from '@nestjs/websockets';
 
-import { JwtService } from '@nestjs/jwt';
 import { Server, Socket } from 'socket.io';
+
+type JoinRoomPayload = {
+  associationId: string;
+  userEmail?: string;
+};
+
+type SendMessagePayload = {
+  associationId: string;
+  userEmail: string;
+  message: string;
+};
 
 @WebSocketGateway({
   cors: {
     origin: '*',
   },
 })
-export class ChatGateway implements OnGatewayConnection {
+export class ChatGateway {
   @WebSocketServer()
   server: Server;
 
-  constructor(
-    private readonly jwtService: JwtService,
-  ) {}
-
-  handleConnection(client: Socket) {
-    console.log(
-      `🔌 Chat client connected: ${client.id}`,
-    );
-  }
-
   @SubscribeMessage('chat:join')
-  async handleJoin(
+  handleJoin(
     @ConnectedSocket() client: Socket,
-    @MessageBody()
-    body: {
-      token: string;
-    },
+    @MessageBody() body: JoinRoomPayload,
   ) {
-    try {
-      const payload =
-        await this.jwtService.verifyAsync(
-          body.token,
-        );
-
-      const associationId =
-        payload.associationId;
-
-      if (!associationId) {
-        client.emit('chat:error', {
-          message:
-            'Associazione non trovata',
-        });
-
-        return;
-      }
-
-      client.data.user = payload;
-
-      client.join(
-        `association:${associationId}`,
-      );
-
-      client.emit('chat:joined', {
-        success: true,
-      });
-    } catch (error) {
-      client.emit('chat:error', {
-        message: 'Token non valido',
-      });
+    if (!body?.associationId) {
+      return {
+        success: false,
+        message: 'associationId mancante',
+      };
     }
+
+    const room = `association:${body.associationId}`;
+
+    client.join(room);
+
+    client.to(room).emit('chat:user_joined', {
+      associationId: body.associationId,
+      userEmail: body.userEmail || 'Utente',
+      joinedAt: new Date().toISOString(),
+    });
+
+    return {
+      success: true,
+      room,
+    };
   }
 
   @SubscribeMessage('chat:send')
-  async handleSendMessage(
-    @ConnectedSocket() client: Socket,
-    @MessageBody()
-    body: {
-      token: string;
-      message: string;
-    },
-  ) {
-    try {
-      const payload =
-        await this.jwtService.verifyAsync(
-          body.token,
-        );
-
-      const associationId =
-        payload.associationId;
-
-      if (!associationId) {
-        client.emit('chat:error', {
-          message:
-            'Associazione non trovata',
-        });
-
-        return;
-      }
-
-      if (
-        !body.message ||
-        !body.message.trim()
-      ) {
-        return;
-      }
-
-      const chatMessage = {
-        id: crypto.randomUUID(),
-        userEmail: payload.email,
-        message:
-          body.message.trim(),
-        createdAt:
-          new Date().toISOString(),
+  handleSend(@MessageBody() body: SendMessagePayload) {
+    if (!body?.associationId || !body?.message) {
+      return {
+        success: false,
+        message: 'Dati messaggio mancanti',
       };
-
-      this.server
-        .to(
-          `association:${associationId}`,
-        )
-        .emit(
-          'chat:message',
-          chatMessage,
-        );
-    } catch (error) {
-      client.emit('chat:error', {
-        message:
-          'Errore invio messaggio',
-      });
     }
+
+    const room = `association:${body.associationId}`;
+
+    const payload = {
+      id: `msg-${Date.now()}`,
+      associationId: body.associationId,
+      userEmail: body.userEmail || 'Utente',
+      message: body.message,
+      createdAt: new Date().toISOString(),
+    };
+
+    this.server.to(room).emit('chat:message', payload);
+
+    return {
+      success: true,
+      message: payload,
+    };
   }
 }
