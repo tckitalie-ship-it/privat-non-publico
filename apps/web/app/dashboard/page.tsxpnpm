@@ -1,0 +1,84 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+
+export default function Page() {
+  const [allowed, setAllowed] = useState(false);
+
+  useEffect(() => {
+    const token =
+      localStorage.getItem('access_token') ||
+      localStorage.getItem('token') ||
+      localStorage.getItem('jwt');
+
+    if (!token) {
+      window.location.href = '/';
+      return;
+    }
+
+    setAllowed(true);
+  }, []);
+
+  if (!allowed) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-[#090D14] text-white">
+        Verifica accesso...
+      </main>
+    );
+  }
+
+  const cards = [
+    { title: 'Membri', value: '1,248' },
+    { title: 'Eventi', value: '32' },
+    { title: 'Entrate', value: '€12.4k' },
+    { title: 'Associazioni', value: '8' },
+  ];
+
+  return (
+    <main className="min-h-screen bg-[#090D14] p-8 text-white">
+      <p className="text-sm text-zinc-500">Dashboard</p>
+
+      <h1 className="mt-2 text-5xl font-bold tracking-tight">
+        Overview
+      </h1>
+
+      <p className="mt-4 max-w-2xl text-zinc-400">
+        Gestisci membri, eventi, finanze e attività della tua associazione.
+      </p>
+
+      <section className="mt-10 grid gap-5 md:grid-cols-2 xl:grid-cols-4">
+        {cards.map((card) => (
+          <div
+            key={card.title}
+            className="rounded-3xl border border-white/10 bg-white/[0.03] p-6"
+          >
+            <p className="text-sm text-zinc-500">{card.title}</p>
+
+            <h2 className="mt-4 text-4xl font-bold tracking-tight">
+              {card.value}
+            </h2>
+          </div>
+        ))}
+      </section>
+
+      <section className="mt-8 rounded-3xl border border-white/10 bg-white/[0.03] p-6">
+        <h2 className="text-2xl font-semibold">Revenue</h2>
+        <p className="mt-1 text-sm text-zinc-500">Ultimi 6 mesi</p>
+
+        <div className="mt-10 flex h-72 items-end gap-4">
+          {[40, 65, 45, 80, 55, 90].map((value, index) => (
+            <div key={index} className="flex flex-1 flex-col justify-end">
+              <div
+                className="rounded-t-2xl bg-white"
+                style={{ height: `${value}%` }}
+              />
+              <span className="mt-3 text-center text-xs text-zinc-500">
+                {['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'][index]}
+              </span>
+            </div>
+          ))}
+        </div>
+      </section>
+    </main>
+  );
+}

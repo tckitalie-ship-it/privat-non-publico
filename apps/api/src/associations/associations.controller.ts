@@ -20,7 +20,7 @@ export class AssociationsController {
   @Post()
   @UseGuards(JwtAuthGuard)
   create(@Req() req: any, @Body() dto: CreateAssociationDto) {
-    return this.associationsService.create(req.user, dto);
+    return this.associationsService.create(req.user.id, dto);
   }
 
   @Patch(':id/active')

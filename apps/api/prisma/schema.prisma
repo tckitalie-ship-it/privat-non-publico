@@ -17,16 +17,23 @@ model User {
 }
 
 model Association {
-  id           String        @id @default(uuid())
-  name         String
-  slug         String?
-  description  String?
-  isActive Boolean @default(true)
+  id          String  @id @default(uuid())
+  name        String
+  slug        String?
+  description String?
+  isActive    Boolean @default(true)
+
+  stripeCustomerId                 String?
+  stripeSubscriptionId             String?
+  subscriptionStatus               String?
+  subscriptionCurrentPeriodEnd     DateTime?
+
   transactions Transaction[]
   memberships  Membership[]
   invites      Invite[]
   events       Event[]
-  createdAt    DateTime      @default(now())
+
+  createdAt DateTime @default(now())
 }
 
 model Membership {
