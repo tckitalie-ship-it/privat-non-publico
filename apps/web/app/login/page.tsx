@@ -1,9 +1,8 @@
 'use client';
 
-import { FormEvent, useState } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-
-import { API_URL, setAccessToken } from '@/lib/api';
+import { setAccessToken } from '@/lib/api';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -11,14 +10,16 @@ export default function LoginPage() {
   const [email, setEmail] = useState('test@example.com');
   const [password, setPassword] = useState('123456');
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
-  async function handleLogin(e: FormEvent<HTMLFormElement>) {
+  async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
 
-    try {
-      setLoading(true);
+    setLoading(true);
+    setError('');
 
-      const loginRes = await fetch(`${API_URL}/auth/login`, {
+    try {
+      const res = await fetch('http://localhost:3000/api/auth/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -29,100 +30,80 @@ export default function LoginPage() {
         }),
       });
 
-      const loginData = await loginRes.json();
-
-      if (!loginRes.ok) {
-        throw new Error(loginData.message || 'Login fallito');
+      if (!res.ok) {
+        throw new Error('Login fallito');
       }
 
-      setAccessToken(loginData.access_token);
+      const data = await res.json();
 
-      const associationId = loginData.association?.id;
-
-      if (associationId) {
-        const switchRes = await fetch(
-          `${API_URL}/auth/switch-association`,
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${loginData.access_token}`,
-            },
-            body: JSON.stringify({
-              associationId,
-            }),
-          },
-        );
-
-        const switchData = await switchRes.json();
-
-        if (switchRes.ok && switchData.access_token) {
-          setAccessToken(switchData.access_token);
-        }
+      if (!data.access_token) {
+        throw new Error('Token mancante');
       }
 
-      router.replace('/dashboard');
-    } catch (error) {
-      console.error(error);
-      alert('Login fallito');
+      setAccessToken(data.access_token);
+
+      router.push('/dashboard');
+    } catch (err) {
+      setError('Email o password non validi');
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[#0f1117] p-6 text-white">
-      <div className="w-full max-w-md rounded-3xl border border-white/10 bg-[#111827] p-8 shadow-2xl">
-        <h1 className="text-4xl font-bold">
-          Accedi
-        </h1>
+    <main className="min-h-screen flex items-center justify-center bg-slate-950 px-4">
+      <div className="w-full max-w-md rounded-2xl border border-slate-800 bg-white p-8 shadow-xl">
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold text-slate-900">
+            Association SaaS
+          </h1>
 
-        <p className="mt-2 text-gray-400">
-          Entra nella piattaforma associazioni
-        </p>
+          <p className="text-sm text-slate-500 mt-2">
+            Login reale collegato al backend NestJS.
+          </p>
+        </div>
 
-        <form
-          onSubmit={handleLogin}
-          className="mt-8 space-y-5"
-        >
+        <form onSubmit={handleLogin} className="space-y-4">
           <div>
-            <label className="text-sm text-gray-400">
+            <label className="mb-1 block text-sm font-medium text-slate-700">
               Email
             </label>
 
             <input
               type="email"
               value={email}
-              onChange={(e) =>
-                setEmail(e.target.value)
-              }
-              className="mt-2 w-full rounded-xl border border-white/10 bg-[#0f172a] px-4 py-3 outline-none focus:border-indigo-500"
-              required
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="test@example.com"
+              className="w-full rounded-xl border px-4 py-3 outline-none focus:ring-2 focus:ring-slate-900"
             />
           </div>
 
           <div>
-            <label className="text-sm text-gray-400">
+            <label className="mb-1 block text-sm font-medium text-slate-700">
               Password
             </label>
 
             <input
               type="password"
               value={password}
-              onChange={(e) =>
-                setPassword(e.target.value)
-              }
-              className="mt-2 w-full rounded-xl border border-white/10 bg-[#0f172a] px-4 py-3 outline-none focus:border-indigo-500"
-              required
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="123456"
+              className="w-full rounded-xl border px-4 py-3 outline-none focus:ring-2 focus:ring-slate-900"
             />
           </div>
+
+          {error && (
+            <div className="rounded-xl bg-red-50 p-3 text-sm text-red-600">
+              {error}
+            </div>
+          )}
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full rounded-xl bg-indigo-600 px-5 py-3 font-semibold transition hover:bg-indigo-500 disabled:opacity-60"
+            className="w-full rounded-xl bg-slate-950 px-4 py-3 font-semibold text-white disabled:opacity-60"
           >
-            {loading ? 'Accesso...' : 'Login'}
+            {loading ? 'Accesso...' : 'Entra'}
           </button>
         </form>
       </div>

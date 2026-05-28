@@ -1,99 +1,74 @@
-import {
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
+import crypto from 'crypto';
 
-import { PrismaService } from '../../prisma/prisma.service';
+type FileRecord = {
+  id: string;
+  filename: string;
+  originalName?: string;
+  mimeType?: string;
+  size?: number;
+  path?: string;
+  associationId?: string;
+  uploadedById?: string;
+  createdAt: Date;
+};
 
 @Injectable()
 export class FilesService {
-  constructor(
-    private readonly prisma: PrismaService,
-  ) {}
+  private files: FileRecord[] = [];
 
-  async upload(params: {
+  async create(data: {
     filename: string;
-    originalName: string;
-    mimetype: string;
-    size: number;
-    associationId: string;
-    uploadedById: string;
-    path: string;
+    originalName?: string;
+    mimeType?: string;
+    size?: number;
+    path?: string;
+    associationId?: string;
+    uploadedById?: string;
   }) {
-    return this.prisma.file.create({
-      data: {
-        filename: params.filename,
+    const file: FileRecord = {
+      id: crypto.randomUUID(),
+      filename: data.filename,
+      originalName: data.originalName,
+      mimeType: data.mimeType,
+      size: data.size,
+      path: data.path,
+      associationId: data.associationId,
+      uploadedById: data.uploadedById,
+      createdAt: new Date(),
+    };
 
-        originalName:
-          params.originalName,
+    this.files.push(file);
 
-        mimetype:
-          params.mimetype,
-
-        size: params.size,
-
-        associationId:
-          params.associationId,
-
-        uploadedById:
-          params.uploadedById,
-
-        path: params.path,
-      },
-    });
+    return file;
   }
 
-  async findAll(
-    associationId: string,
-  ) {
-    return this.prisma.file.findMany({
-      where: {
-        associationId,
-      },
+  async findAll(associationId?: string) {
+    if (!associationId) {
+      return this.files;
+    }
 
-      orderBy: {
-        createdAt: 'desc',
-      },
-    });
+    return this.files.filter((file) => file.associationId === associationId);
   }
 
   async findOne(id: string) {
-    const file =
-      await this.prisma.file.findUnique(
-        {
-          where: { id },
-        },
-      );
+    const file = this.files.find((item) => item.id === id);
 
     if (!file) {
-      throw new NotFoundException(
-        'File non trovato',
-      );
+      throw new NotFoundException('File non trovato');
     }
 
     return file;
   }
 
   async remove(id: string) {
-    const file =
-      await this.prisma.file.findUnique(
-        {
-          where: { id },
-        },
-      );
+    const file = await this.findOne(id);
 
-    if (!file) {
-      throw new NotFoundException(
-        'File non trovato',
-      );
-    }
-
-    await this.prisma.file.delete({
-      where: { id },
-    });
+    this.files = this.files.filter((item) => item.id !== id);
 
     return {
-      success: true,
+      deleted: true,
+      file,
     };
   }
 }

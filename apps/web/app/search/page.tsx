@@ -1,282 +1,322 @@
 'use client';
 
+import { useEffect, useMemo, useState } from 'react';
+
 import Link from 'next/link';
 
 import {
-  useEffect,
-  useMemo,
-  useState,
-} from 'react';
-
-import {
   Bell,
-  File,
-  MessageCircle,
-  Search,
   CalendarDays,
-  Building2,
+  DollarSign,
+  RefreshCw,
+  Search,
   Users,
 } from 'lucide-react';
 
 import DashboardSidebar from '@/components/dashboard-sidebar';
 
-type SearchItem = {
+const API_URL = 'http://localhost:3000/api';
+
+type EventItem = {
   id: string;
-
-  type:
-    | 'event'
-    | 'chat'
-    | 'file'
-    | 'notification'
-    | 'association'
-    | 'member';
-
   title: string;
-
-  description: string;
-
-  createdAt?: string;
+  description?: string | null;
+  location?: string | null;
 };
+
+type NotificationItem = {
+  id: string;
+  title: string;
+  message?: string | null;
+};
+
+type FinanceItem = {
+  id: string;
+  description: string;
+  amount: number;
+  type: string;
+};
+
+type MemberItem = {
+  id: string;
+  user?: {
+    id: string;
+    email: string;
+  };
+  role?: string;
+};
+
+function getAccessToken() {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  const token =
+    localStorage.getItem('access_token');
+
+  if (token) {
+    return token;
+  }
+
+  const cookies =
+    document.cookie.split(';');
+
+  for (const cookie of cookies) {
+    const [key, value] =
+      cookie.trim().split('=');
+
+    if (key === 'access_token') {
+      return decodeURIComponent(
+        value,
+      );
+    }
+  }
+
+  return null;
+}
 
 export default function SearchPage() {
   const [query, setQuery] =
     useState('');
 
-  const [items, setItems] =
-    useState<SearchItem[]>([]);
+  const [loading, setLoading] =
+    useState(true);
+
+  const [events, setEvents] =
+    useState<EventItem[]>([]);
+
+  const [
+    notifications,
+    setNotifications,
+  ] = useState<
+    NotificationItem[]
+  >([]);
+
+  const [finances, setFinances] =
+    useState<FinanceItem[]>(
+      [],
+    );
+
+  const [members, setMembers] =
+    useState<MemberItem[]>(
+      [],
+    );
+
+  const [error, setError] =
+    useState('');
+
+  async function loadAll() {
+    try {
+      setLoading(true);
+      setError('');
+
+      const token =
+        getAccessToken();
+
+      if (!token) {
+        throw new Error(
+          'Token mancante',
+        );
+      }
+
+      const headers = {
+        Authorization: `Bearer ${token}`,
+      };
+
+      const [
+        eventsRes,
+        notificationsRes,
+        financesRes,
+        membersRes,
+      ] = await Promise.all([
+        fetch(
+          `${API_URL}/events`,
+          {
+            headers,
+          },
+        ),
+        fetch(
+          `${API_URL}/notifications`,
+          {
+            headers,
+          },
+        ),
+        fetch(
+          `${API_URL}/finance`,
+          {
+            headers,
+          },
+        ),
+        fetch(
+          `${API_URL}/memberships`,
+          {
+            headers,
+          },
+        ),
+      ]);
+
+      const [
+        eventsData,
+        notificationsData,
+        financesData,
+        membersData,
+      ] = await Promise.all([
+        eventsRes
+          .json()
+          .catch(() => []),
+
+        notificationsRes
+          .json()
+          .catch(() => []),
+
+        financesRes
+          .json()
+          .catch(() => []),
+
+        membersRes
+          .json()
+          .catch(() => []),
+      ]);
+
+      setEvents(
+        Array.isArray(
+          eventsData,
+        )
+          ? eventsData
+          : [],
+      );
+
+      setNotifications(
+        Array.isArray(
+          notificationsData,
+        )
+          ? notificationsData
+          : [],
+      );
+
+      setFinances(
+        Array.isArray(
+          financesData,
+        )
+          ? financesData
+          : [],
+      );
+
+      setMembers(
+        Array.isArray(
+          membersData,
+        )
+          ? membersData
+          : [],
+      );
+    } catch (err: any) {
+      console.error(err);
+
+      setError(
+        err?.message ||
+          'Errore caricamento',
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
 
   useEffect(() => {
-    const events =
-      JSON.parse(
-        localStorage.getItem(
-          'demo-events',
-        ) || '[]',
-      ).map((event: any) => ({
-        id: event.id,
-
-        type: 'event',
-
-        title:
-          event.title ||
-          'Evento',
-
-        description:
-          event.description ||
-          'Nessuna descrizione',
-
-        createdAt:
-          event.startsAt,
-      }));
-
-    const files =
-      JSON.parse(
-        localStorage.getItem(
-          'demo-files',
-        ) || '[]',
-      ).map((file: any) => ({
-        id: file.id,
-
-        type: 'file',
-
-        title:
-          file.name ||
-          'File',
-
-        description:
-          file.type ||
-          'Documento',
-
-        createdAt:
-          file.createdAt,
-      }));
-
-    const chats =
-      JSON.parse(
-        localStorage.getItem(
-          'demo-chat-messages',
-        ) || '[]',
-      ).map((chat: any) => ({
-        id: chat.id,
-
-        type: 'chat',
-
-        title:
-          chat.userEmail ||
-          'Messaggio',
-
-        description:
-          chat.message ||
-          '',
-
-        createdAt:
-          chat.createdAt,
-      }));
-
-    const notifications =
-      JSON.parse(
-        localStorage.getItem(
-          'demo-notifications',
-        ) || '[]',
-      ).map(
-        (
-          notification: any,
-        ) => ({
-          id: notification.id,
-
-          type: 'notification',
-
-          title:
-            notification.title,
-
-          description:
-            notification.message,
-
-          createdAt:
-            notification.createdAt,
-        }),
-      );
-
-    const associations =
-      JSON.parse(
-        localStorage.getItem(
-          'demo-associations',
-        ) || '[]',
-      ).map(
-        (
-          association: any,
-        ) => ({
-          id: association.id,
-
-          type: 'association',
-
-          title:
-            association.name ||
-            'Associazione',
-
-          description:
-            association.description ||
-            'Workspace associazione',
-
-          createdAt:
-            association.createdAt,
-        }),
-      );
-
-    const members =
-      JSON.parse(
-        localStorage.getItem(
-          'demo-member-invitations',
-        ) || '[]',
-      ).map((member: any) => ({
-        id: member.id,
-
-        type: 'member',
-
-        title:
-          member.email ||
-          'Membro',
-
-        description:
-          `Ruolo: ${member.role}`,
-
-        createdAt:
-          member.createdAt,
-      }));
-
-    setItems([
-      ...events,
-      ...files,
-      ...chats,
-      ...notifications,
-      ...associations,
-      ...members,
-    ]);
+    loadAll();
   }, []);
 
-  const filtered =
+  const value =
+    query.toLowerCase();
+
+  const filteredEvents =
     useMemo(() => {
-      return items.filter(
-        (item) =>
-          item.title
-            .toLowerCase()
+      return events.filter(
+        (event) =>
+          event.title
+            ?.toLowerCase()
             .includes(
-              query.toLowerCase(),
+              value,
             ) ||
-          item.description
+          (
+            event.description ||
+            ''
+          )
             .toLowerCase()
             .includes(
-              query.toLowerCase(),
+              value,
+            ) ||
+          (
+            event.location ||
+            ''
+          )
+            .toLowerCase()
+            .includes(
+              value,
             ),
       );
-    }, [items, query]);
+    }, [events, value]);
 
-  function getIcon(
-    type: SearchItem['type'],
-  ) {
-    switch (type) {
-      case 'event':
-        return (
-          <CalendarDays className="h-5 w-5 text-emerald-300" />
-        );
+  const filteredNotifications =
+    useMemo(() => {
+      return notifications.filter(
+        (
+          notification,
+        ) =>
+          notification.title
+            ?.toLowerCase()
+            .includes(
+              value,
+            ) ||
+          (
+            notification.message ||
+            ''
+          )
+            .toLowerCase()
+            .includes(
+              value,
+            ),
+      );
+    }, [
+      notifications,
+      value,
+    ]);
 
-      case 'chat':
-        return (
-          <MessageCircle className="h-5 w-5 text-indigo-300" />
-        );
+  const filteredFinances =
+    useMemo(() => {
+      return finances.filter(
+        (finance) =>
+          finance.description
+            ?.toLowerCase()
+            .includes(
+              value,
+            ),
+      );
+    }, [finances, value]);
 
-      case 'file':
-        return (
-          <File className="h-5 w-5 text-amber-300" />
-        );
-
-      case 'notification':
-        return (
-          <Bell className="h-5 w-5 text-pink-300" />
-        );
-
-      case 'association':
-        return (
-          <Building2 className="h-5 w-5 text-cyan-300" />
-        );
-
-      case 'member':
-        return (
-          <Users className="h-5 w-5 text-purple-300" />
-        );
-    }
-  }
-
-  function getTypeColor(
-    type: SearchItem['type'],
-  ) {
-    switch (type) {
-      case 'event':
-        return 'border-emerald-500/20 bg-emerald-500/10 text-emerald-300';
-
-      case 'chat':
-        return 'border-indigo-500/20 bg-indigo-500/10 text-indigo-300';
-
-      case 'file':
-        return 'border-amber-500/20 bg-amber-500/10 text-amber-300';
-
-      case 'notification':
-        return 'border-pink-500/20 bg-pink-500/10 text-pink-300';
-
-      case 'association':
-        return 'border-cyan-500/20 bg-cyan-500/10 text-cyan-300';
-
-      case 'member':
-        return 'border-purple-500/20 bg-purple-500/10 text-purple-300';
-    }
-  }
+  const filteredMembers =
+    useMemo(() => {
+      return members.filter(
+        (member) =>
+          member.user?.email
+            ?.toLowerCase()
+            .includes(
+              value,
+            ) ||
+          member.role
+            ?.toLowerCase()
+            .includes(
+              value,
+            ),
+      );
+    }, [members, value]);
 
   return (
     <div className="flex min-h-screen bg-[#0f1117] text-white">
       <DashboardSidebar />
 
       <main className="flex-1 px-6 py-8 md:ml-72">
-        <div className="mx-auto max-w-7xl">
-          <div className="mb-6">
+        <div className="mx-auto max-w-7xl space-y-8">
+          <div>
             <Link
               href="/dashboard"
               className="rounded-xl border border-white/10 px-4 py-2 text-sm transition hover:bg-white/5"
@@ -285,32 +325,33 @@ export default function SearchPage() {
             </Link>
           </div>
 
-          <section className="relative overflow-hidden rounded-[2rem] border border-white/10 bg-[#111827] p-8 shadow-2xl">
-            <div className="absolute right-0 top-0 h-40 w-40 rounded-full bg-indigo-500/10 blur-3xl" />
-            <div className="absolute bottom-0 left-0 h-40 w-40 rounded-full bg-cyan-500/10 blur-3xl" />
+          <section className="rounded-[2rem] border border-white/10 bg-[#111827] p-8 shadow-2xl">
+            <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <h1 className="text-5xl font-bold">
+                  Search globale
+                </h1>
 
-            <div className="relative">
-              <p className="text-sm font-medium text-indigo-400">
-                Ricerca globale
-              </p>
+                <p className="mt-3 text-zinc-400">
+                  Cerca eventi,
+                  membri,
+                  finanze e
+                  notifiche realtime.
+                </p>
+              </div>
 
-              <h1 className="mt-2 text-5xl font-bold">
-                Search
-              </h1>
-
-              <p className="mt-3 max-w-2xl text-zinc-400">
-                Cerca tra eventi,
-                membri, chat,
-                notifiche,
-                associazioni e file
-                salvati localmente.
-              </p>
+              <button
+                type="button"
+                onClick={loadAll}
+                className="inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-5 py-3 text-sm font-semibold text-white hover:bg-white/10"
+              >
+                <RefreshCw className="h-5 w-5" />
+                Aggiorna
+              </button>
             </div>
-          </section>
 
-          <section className="mt-8 rounded-3xl border border-white/10 bg-[#111827] p-6 shadow-2xl">
-            <div className="relative">
-              <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-zinc-500" />
+            <div className="mt-8 flex items-center gap-3 rounded-3xl border border-cyan-500/20 bg-[#0b1220] px-5">
+              <Search className="h-6 w-6 text-cyan-300" />
 
               <input
                 value={query}
@@ -319,75 +360,210 @@ export default function SearchPage() {
                     e.target.value,
                   )
                 }
-                placeholder="Cerca membri, eventi, associazioni, file..."
-                className="w-full rounded-2xl border border-white/10 bg-[#0f172a] py-4 pl-12 pr-4 text-white outline-none transition focus:border-indigo-500"
+                placeholder="Cerca ovunque..."
+                className="w-full bg-transparent py-5 text-lg outline-none"
               />
             </div>
+          </section>
 
-            <div className="mt-8 grid gap-4">
-              {filtered.length ===
-              0 ? (
-                <div className="rounded-2xl border border-dashed border-white/10 bg-[#0f172a] p-12 text-center text-zinc-400">
-                  Nessun risultato trovato
+          {error && (
+            <div className="rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-sm font-semibold text-red-300">
+              {error}
+            </div>
+          )}
+
+          {loading ? (
+            <div className="rounded-3xl border border-white/10 bg-[#111827] p-10 text-center text-zinc-400">
+              Caricamento dati...
+            </div>
+          ) : (
+            <div className="grid gap-6">
+              <section className="rounded-3xl border border-cyan-500/10 bg-[#111827] p-6 shadow-xl">
+                <div className="mb-5 flex items-center gap-3">
+                  <CalendarDays className="h-6 w-6 text-cyan-300" />
+
+                  <h2 className="text-2xl font-bold">
+                    Eventi
+                  </h2>
                 </div>
-              ) : (
-                filtered.map(
-                  (item) => (
-                    <div
-                      key={
-                        item.id
-                      }
-                      className="rounded-2xl border border-white/10 bg-[#0f172a] p-5 transition hover:border-indigo-500/40"
-                    >
-                      <div className="flex items-start gap-4">
-                        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/5">
-                          {getIcon(
-                            item.type,
-                          )}
-                        </div>
 
-                        <div className="min-w-0 flex-1">
-                          <div className="flex flex-wrap items-center gap-3">
-                            <h2 className="text-lg font-semibold">
-                              {
-                                item.title
-                              }
-                            </h2>
-
-                            <span
-                              className={`rounded-full border px-3 py-1 text-xs uppercase ${getTypeColor(
-                                item.type,
-                              )}`}
-                            >
-                              {
-                                item.type
-                              }
-                            </span>
-                          </div>
-
-                          <p className="mt-2 text-sm leading-6 text-zinc-400">
+                <div className="space-y-3">
+                  {filteredEvents
+                    .length ===
+                  0 ? (
+                    <p className="text-zinc-500">
+                      Nessun evento.
+                    </p>
+                  ) : (
+                    filteredEvents.map(
+                      (
+                        event,
+                      ) => (
+                        <div
+                          key={
+                            event.id
+                          }
+                          className="rounded-2xl border border-white/10 bg-[#0b1220] p-4"
+                        >
+                          <p className="font-bold">
                             {
-                              item.description
+                              event.title
                             }
                           </p>
 
-                          {item.createdAt && (
-                            <p className="mt-3 text-xs text-zinc-500">
-                              {new Date(
-                                item.createdAt,
-                              ).toLocaleString(
-                                'it-IT',
+                          <p className="mt-1 text-sm text-zinc-400">
+                            {event.location ||
+                              '-'}
+                          </p>
+                        </div>
+                      ),
+                    )
+                  )}
+                </div>
+              </section>
+
+              <section className="rounded-3xl border border-emerald-500/10 bg-[#111827] p-6 shadow-xl">
+                <div className="mb-5 flex items-center gap-3">
+                  <DollarSign className="h-6 w-6 text-emerald-300" />
+
+                  <h2 className="text-2xl font-bold">
+                    Finanze
+                  </h2>
+                </div>
+
+                <div className="space-y-3">
+                  {filteredFinances
+                    .length ===
+                  0 ? (
+                    <p className="text-zinc-500">
+                      Nessun movimento.
+                    </p>
+                  ) : (
+                    filteredFinances.map(
+                      (
+                        finance,
+                      ) => (
+                        <div
+                          key={
+                            finance.id
+                          }
+                          className="rounded-2xl border border-white/10 bg-[#0b1220] p-4"
+                        >
+                          <div className="flex items-center justify-between">
+                            <p className="font-bold">
+                              {
+                                finance.description
+                              }
+                            </p>
+
+                            <p className="font-bold text-emerald-300">
+                              €
+                              {Number(
+                                finance.amount,
+                              ).toFixed(
+                                2,
                               )}
                             </p>
-                          )}
+                          </div>
                         </div>
-                      </div>
-                    </div>
-                  ),
-                )
-              )}
+                      ),
+                    )
+                  )}
+                </div>
+              </section>
+
+              <section className="rounded-3xl border border-violet-500/10 bg-[#111827] p-6 shadow-xl">
+                <div className="mb-5 flex items-center gap-3">
+                  <Bell className="h-6 w-6 text-violet-300" />
+
+                  <h2 className="text-2xl font-bold">
+                    Notifiche
+                  </h2>
+                </div>
+
+                <div className="space-y-3">
+                  {filteredNotifications
+                    .length ===
+                  0 ? (
+                    <p className="text-zinc-500">
+                      Nessuna notifica.
+                    </p>
+                  ) : (
+                    filteredNotifications.map(
+                      (
+                        notification,
+                      ) => (
+                        <div
+                          key={
+                            notification.id
+                          }
+                          className="rounded-2xl border border-white/10 bg-[#0b1220] p-4"
+                        >
+                          <p className="font-bold">
+                            {
+                              notification.title
+                            }
+                          </p>
+
+                          <p className="mt-1 text-sm text-zinc-400">
+                            {notification.message ||
+                              '-'}
+                          </p>
+                        </div>
+                      ),
+                    )
+                  )}
+                </div>
+              </section>
+
+              <section className="rounded-3xl border border-orange-500/10 bg-[#111827] p-6 shadow-xl">
+                <div className="mb-5 flex items-center gap-3">
+                  <Users className="h-6 w-6 text-orange-300" />
+
+                  <h2 className="text-2xl font-bold">
+                    Membri
+                  </h2>
+                </div>
+
+                <div className="space-y-3">
+                  {filteredMembers
+                    .length ===
+                  0 ? (
+                    <p className="text-zinc-500">
+                      Nessun membro.
+                    </p>
+                  ) : (
+                    filteredMembers.map(
+                      (
+                        member,
+                      ) => (
+                        <div
+                          key={
+                            member.id
+                          }
+                          className="rounded-2xl border border-white/10 bg-[#0b1220] p-4"
+                        >
+                          <div className="flex items-center justify-between">
+                            <p className="font-bold">
+                              {member
+                                .user
+                                ?.email ||
+                                '-'}
+                            </p>
+
+                            <p className="rounded-full bg-orange-500/10 px-3 py-1 text-xs font-bold text-orange-300">
+                              {member.role ||
+                                '-'}
+                            </p>
+                          </div>
+                        </div>
+                      ),
+                    )
+                  )}
+                </div>
+              </section>
             </div>
-          </section>
+          )}
         </div>
       </main>
     </div>

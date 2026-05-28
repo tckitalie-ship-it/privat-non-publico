@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { API_URL, getAccessToken } from '@/lib/api';
-import { DashboardSidebar } from '@/components/dashboard-sidebar';
+import { API_URL, getAccessToken } from '@/lib/api'
+import DashboardSidebar from '@/components/dashboard-sidebar';
 
 type DashboardKpis = {
   associations: number;

@@ -17,31 +17,20 @@ import { CreateEventDto } from './dto/create-event.dto';
 import { EventsService } from './events.service';
 
 @Controller('events')
+@UseGuards(JwtAuthGuard)
 export class EventsController {
   constructor(private readonly eventsService: EventsService) {}
 
   @Post()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('OWNER', 'ADMIN')
   create(@Req() req: any, @Body() dto: CreateEventDto) {
-    const user = req.user || {
-      id: 'test-user',
-      email: 'test@example.com',
-      associationId: 'cmocnwz0f00009ktt50kibswl',
-      role: 'OWNER',
-    };
-
-    return this.eventsService.create(user, dto);
+    return this.eventsService.create(req.user, dto);
   }
 
   @Get()
   findAll(@Req() req: any) {
-    const user = req.user || {
-      id: 'test-user',
-      email: 'test@example.com',
-      associationId: 'cmocnwz0f00009ktt50kibswl',
-      role: 'OWNER',
-    };
-
-    return this.eventsService.findAll(user);
+    return this.eventsService.findAll(req.user);
   }
 
   @Patch(':id')
@@ -63,7 +52,6 @@ export class EventsController {
   }
 
   @Post(':id/register')
-  @UseGuards(JwtAuthGuard)
   register(@Req() req: any, @Param('id') eventId: string) {
     return this.eventsService.register(req.user, eventId);
   }
@@ -76,7 +64,6 @@ export class EventsController {
   }
 
   @Delete(':id/register')
-  @UseGuards(JwtAuthGuard)
   unregister(@Req() req: any, @Param('id') eventId: string) {
     return this.eventsService.unregister(req.user, eventId);
   }

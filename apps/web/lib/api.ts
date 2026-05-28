@@ -1,6 +1,6 @@
 import Cookies from 'js-cookie';
 
-export const API_URL = 'http://localhost:3001';
+export const API_URL = 'http://localhost:3000/api';
 
 const ACCESS_TOKEN_KEY = 'access_token';
 

@@ -1,12 +1,18 @@
-import { IsIn, IsInt, IsOptional, IsString, Min } from 'class-validator';
+import { IsDateString, IsIn, IsNumber, IsOptional, IsString, Min } from 'class-validator';
 
 export class CreateTransactionDto {
   @IsIn(['INCOME', 'EXPENSE'])
   type: 'INCOME' | 'EXPENSE';
 
-  @IsInt()
+  @IsOptional()
+  @IsNumber()
   @Min(1)
-  amountCents: number;
+  amountCents?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0.01)
+  amount?: number;
 
   @IsOptional()
   @IsString()
@@ -17,6 +23,6 @@ export class CreateTransactionDto {
   description?: string;
 
   @IsOptional()
-  @IsString()
+  @IsDateString()
   date?: string;
 }

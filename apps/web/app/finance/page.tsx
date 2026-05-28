@@ -1,322 +1,367 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 
-import {
-  useMemo,
-  useState,
-} from 'react';
+type ImportType = 'members' | 'events' | 'finance';
 
-import { toast } from 'sonner';
+const API_URL = 'http://localhost:3000/api';
 
-import {
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  Bar as ReBar,
-  BarChart as RechartsBarChart,
-} from 'recharts';
+function getToken() {
+  if (typeof window === 'undefined') return '';
 
-import {
-  ArrowDownRight,
-  ArrowUpRight,
-  Download,
-  Wallet,
-} from 'lucide-react';
+  const localToken = localStorage.getItem('access_token');
 
-import DashboardSidebar from '@/components/dashboard-sidebar';
-
-type Transaction = {
-  id: string;
-
-  type:
-    | 'INCOME'
-    | 'EXPENSE';
-
-  amountCents: number;
-
-  date: string;
-
-  title: string;
-};
-
-export default function FinancePage() {
-  const [transactions] =
-    useState<Transaction[]>([
-      {
-        id: '1',
-
-        type: 'INCOME',
-
-        amountCents: 120000,
-
-        date:
-          new Date().toISOString(),
-
-        title:
-          'Quote associative',
-      },
-
-      {
-        id: '2',
-
-        type: 'EXPENSE',
-
-        amountCents: 35000,
-
-        date:
-          new Date().toISOString(),
-
-        title:
-          'Affitto sala eventi',
-      },
-
-      {
-        id: '3',
-
-        type: 'INCOME',
-
-        amountCents: 78000,
-
-        date:
-          new Date().toISOString(),
-
-        title:
-          'Sponsor evento',
-      },
-
-      {
-        id: '4',
-
-        type: 'EXPENSE',
-
-        amountCents: 18000,
-
-        date:
-          new Date().toISOString(),
-
-        title:
-          'Materiale marketing',
-      },
-    ]);
-
-  function formatMoney(
-    cents: number,
-  ) {
-    return `€${(
-      cents / 100
-    ).toFixed(2)}`;
+  if (localToken) {
+    return localToken;
   }
 
-  const incomeCents =
-    transactions
-      .filter(
-        (t) =>
-          t.type ===
-          'INCOME',
-      )
-      .reduce(
-        (sum, t) =>
-          sum +
-          t.amountCents,
-        0,
-      );
+  const cookies = document.cookie.split(';');
 
-  const expenseCents =
-    transactions
-      .filter(
-        (t) =>
-          t.type ===
-          'EXPENSE',
-      )
-      .reduce(
-        (sum, t) =>
-          sum +
-          t.amountCents,
-        0,
-      );
+  for (const cookie of cookies) {
+    const [key, value] = cookie.trim().split('=');
 
-  const balanceCents =
-    incomeCents -
-    expenseCents;
+    if (key === 'access_token') {
+      return decodeURIComponent(value);
+    }
+  }
 
-  const chartData =
-    useMemo(() => {
-      return [
-        {
-          month: 'Mag',
+  return '';
+}
 
-          entrate:
-            incomeCents / 100,
+function parseCsv(text: string) {
+  const lines = text
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
 
-          uscite:
-            expenseCents / 100,
-        },
-      ];
-    }, [
-      incomeCents,
-      expenseCents,
-    ]);
+  if (lines.length === 0) {
+    return [];
+  }
 
-  function downloadExport(
-    format:
-      | 'csv'
-      | 'xlsx',
-  ) {
-    toast.success(
-      `Export ${format.toUpperCase()} demo pronto`,
-    );
+  const headers = lines[0].split(',').map((header) => header.trim());
+
+  return lines.slice(1).map((line) => {
+    const values = line.split(',').map((value) => value.trim());
+    const row: Record<string, string> = {};
+
+    headers.forEach((header, index) => {
+      row[header] = values[index] ?? '';
+    });
+
+    return row;
+  });
+}
+
+export default function ImportPage() {
+  const [type, setType] = useState<ImportType>('finance');
+  const [rows, setRows] = useState<Record<string, any>[]>([]);
+  const [fileName, setFileName] = useState('');
+  const [status, setStatus] = useState('');
+  const [debug, setDebug] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  async function handleFile(file: File) {
+    setStatus('');
+    setDebug('');
+    setRows([]);
+    setFileName(file.name);
+
+    const ext = file.name.split('.').pop()?.toLowerCase();
+
+    if (ext === 'csv') {
+      const text = await file.text();
+      const parsed = parseCsv(text);
+      setRows(parsed);
+      setStatus(`File letto: ${parsed.length} righe.`);
+      return;
+    }
+
+    if (ext === 'xlsx' || ext === 'xls') {
+      const XLSX = await import('xlsx');
+      const buffer = await file.arrayBuffer();
+      const workbook = XLSX.read(buffer);
+      const sheet = workbook.Sheets[workbook.SheetNames[0]];
+      const data = XLSX.utils.sheet_to_json<Record<string, any>>(sheet);
+      setRows(data);
+      setStatus(`File Excel letto: ${data.length} righe.`);
+      return;
+    }
+
+    setStatus('Formato non supportato. Usa CSV o XLSX.');
+  }
+
+  function normalizeType(value: any) {
+    const raw = String(value || '').trim().toUpperCase();
+
+    if (raw === 'EXPENSE' || raw === 'USCITA' || raw === 'SPESA') {
+      return 'EXPENSE';
+    }
+
+    return 'INCOME';
+  }
+
+  function mapRow(row: Record<string, any>) {
+    if (type === 'members') {
+      return {
+        email: row.email || row.Email || row.EMAIL,
+        role: row.role || row.Ruolo || row.ROLE || 'MEMBER',
+      };
+    }
+
+    if (type === 'events') {
+      return {
+        title: row.title || row.titolo || row.Titolo || row.name || 'Evento',
+        location: row.location || row.luogo || row.Luogo || '',
+        description: row.description || row.descrizione || '',
+        startDate:
+          row.startDate ||
+          row.start ||
+          row.inizio ||
+          row['data inizio'] ||
+          new Date().toISOString(),
+        endDate:
+          row.endDate ||
+          row.end ||
+          row.fine ||
+          row['data fine'] ||
+          new Date().toISOString(),
+      };
+    }
+
+    const rawAmount =
+      row.amount ||
+      row.Amount ||
+      row.AMOUNT ||
+      row.importo ||
+      row.Importo ||
+      row.IMPORTO ||
+      0;
+
+    const amountNumber = Number(String(rawAmount).replace(',', '.'));
+
+    return {
+      description:
+        row.description ||
+        row.Description ||
+        row.descrizione ||
+        row.Descrizione ||
+        'Movimento',
+      amountCents: Math.round(amountNumber * 100),
+      type: normalizeType(row.type || row.Type || row.tipo || row.Tipo),
+      category:
+        row.category ||
+        row.Category ||
+        row.categoria ||
+        row.Categoria ||
+        'Generale',
+      date: row.date || row.Date || row.data || row.Data || new Date().toISOString(),
+    };
+  }
+
+  async function handleImport() {
+    setLoading(true);
+    setStatus('');
+    setDebug('');
+
+    try {
+      const token = getToken();
+
+      if (!token) {
+        setStatus('Token mancante. Fai login di nuovo.');
+        return;
+      }
+
+      if (rows.length === 0) {
+        setStatus('Nessuna riga da importare.');
+        return;
+      }
+
+      let endpoint = '';
+
+      if (type === 'members') endpoint = '/invitations';
+      if (type === 'events') endpoint = '/events';
+      if (type === 'finance') endpoint = '/finances/transactions';
+
+      let success = 0;
+      let failed = 0;
+      const errors: string[] = [];
+
+      for (let index = 0; index < rows.length; index += 1) {
+        const row = rows[index];
+        const body = mapRow(row);
+
+        const res = await fetch(`${API_URL}${endpoint}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify(body),
+        });
+
+        const text = await res.text();
+
+        let responseData: any = null;
+
+        try {
+          responseData = text ? JSON.parse(text) : null;
+        } catch {
+          responseData = text;
+        }
+
+        if (res.ok) {
+          success += 1;
+        } else {
+          failed += 1;
+          errors.push(
+            `Riga ${index + 1}: HTTP ${res.status} - ${JSON.stringify(
+              responseData,
+            )}`,
+          );
+        }
+      }
+
+      setStatus(`Import completato: ${success} salvati, ${failed} errori.`);
+
+      if (errors.length > 0) {
+        setDebug(errors.join('\n'));
+      } else {
+        setDebug('Tutte le righe sono state salvate correttamente.');
+      }
+    } catch (err: any) {
+      setStatus('Errore durante import.');
+      setDebug(String(err?.message || err));
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
-    <div className="flex min-h-screen bg-[#0f1117] text-white">
-      <DashboardSidebar />
+    <main className="min-h-screen bg-slate-50 p-6">
+      <div className="mx-auto max-w-6xl space-y-6">
+        <div>
+          <Link href="/files" className="text-sm text-slate-500">
+            ← Files
+          </Link>
 
-      <main className="flex-1 p-8 md:ml-72">
-        <div className="mx-auto max-w-7xl space-y-8">
-          <div>
-            <Link
-              href="/dashboard"
-              className="rounded-xl border border-white/10 px-4 py-2 text-sm transition hover:bg-white/5"
+          <h1 className="mt-2 text-3xl font-bold text-slate-900">
+            Import CSV/XLSX
+          </h1>
+
+          <p className="text-sm text-slate-500">
+            Importa membri, eventi o movimenti finanziari da CSV o Excel.
+          </p>
+        </div>
+
+        <section className="rounded-2xl border bg-white p-6 shadow-sm">
+          <div className="grid gap-4 md:grid-cols-3">
+            <select
+              className="rounded-xl border px-4 py-3"
+              value={type}
+              onChange={(e) => {
+                setType(e.target.value as ImportType);
+                setStatus('');
+                setDebug('');
+              }}
             >
-              ← Dashboard
-            </Link>
+              <option value="finance">Importa finanze</option>
+              <option value="members">Importa membri</option>
+              <option value="events">Importa eventi</option>
+            </select>
+
+            <input
+              type="file"
+              accept=".csv,.xlsx,.xls"
+              className="rounded-xl border px-4 py-3"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+
+                if (file) {
+                  handleFile(file);
+                }
+              }}
+            />
+
+            <button
+              type="button"
+              onClick={handleImport}
+              disabled={rows.length === 0 || loading}
+              className="rounded-xl bg-slate-950 px-4 py-3 font-semibold text-white disabled:opacity-50"
+            >
+              {loading ? 'Import in corso...' : 'Importa nel database'}
+            </button>
           </div>
 
-          <section className="relative overflow-hidden rounded-[2rem] border border-white/10 bg-[#111827] p-8 shadow-2xl">
-            <div className="absolute right-0 top-0 h-40 w-40 rounded-full bg-emerald-500/10 blur-3xl" />
+          {fileName && (
+            <p className="mt-4 text-sm text-slate-500">
+              File selezionato: {fileName}
+            </p>
+          )}
 
-            <div className="absolute bottom-0 left-0 h-40 w-40 rounded-full bg-indigo-500/10 blur-3xl" />
+          {status && (
+            <div className="mt-4 rounded-xl border bg-slate-50 p-4 text-sm font-semibold text-slate-700">
+              {status}
+            </div>
+          )}
 
-            <div className="relative flex flex-col gap-6 xl:flex-row xl:items-center xl:justify-between">
-              <div>
-                <p className="mb-3 inline-flex rounded-full border border-emerald-500/20 bg-emerald-500/10 px-4 py-2 text-sm text-emerald-300">
-                  Financial overview
+          {debug && (
+            <pre className="mt-4 whitespace-pre-wrap rounded-xl border bg-black p-4 text-xs text-white">
+              {debug}
+            </pre>
+          )}
+        </section>
+
+        <section className="rounded-2xl border bg-white shadow-sm">
+          <div className="border-b p-6">
+            <h2 className="text-xl font-semibold text-slate-900">
+              Anteprima dati
+            </h2>
+
+            <p className="text-sm text-slate-500">
+              Righe lette dal file prima dell’import.
+            </p>
+          </div>
+
+          {rows.length === 0 ? (
+            <div className="p-6 text-sm text-slate-500">
+              Nessun file caricato.
+            </div>
+          ) : (
+            <div className="overflow-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b bg-slate-50 text-left">
+                    {Object.keys(rows[0]).map((key) => (
+                      <th key={key} className="p-3 font-medium">
+                        {key}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+
+                <tbody>
+                  {rows.slice(0, 20).map((row, index) => (
+                    <tr key={index} className="border-b">
+                      {Object.keys(rows[0]).map((key) => (
+                        <td key={key} className="p-3">
+                          {String(row[key] ?? '')}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+
+              {rows.length > 20 && (
+                <p className="p-4 text-sm text-slate-500">
+                  Mostrate prime 20 righe su {rows.length}.
                 </p>
-
-                <h1 className="text-5xl font-bold">
-                  Finanze
-                </h1>
-
-                <p className="mt-3 max-w-2xl text-gray-400">
-                  Gestisci entrate,
-                  uscite, export e
-                  andamento finanziario
-                  della piattaforma.
-                </p>
-              </div>
-
-              <div className="flex flex-wrap gap-3">
-                <button
-                  onClick={() =>
-                    downloadExport(
-                      'csv',
-                    )
-                  }
-                  className="inline-flex items-center gap-2 rounded-2xl bg-indigo-600 px-5 py-3 font-semibold transition hover:bg-indigo-500"
-                >
-                  <Download size={18} />
-                  Export CSV
-                </button>
-
-                <button
-                  onClick={() =>
-                    downloadExport(
-                      'xlsx',
-                    )
-                  }
-                  className="inline-flex items-center gap-2 rounded-2xl border border-white/10 px-5 py-3 font-semibold transition hover:bg-white/5"
-                >
-                  <Download size={18} />
-                  Export XLSX
-                </button>
-              </div>
+              )}
             </div>
-          </section>
-
-          <section className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
-            <div className="rounded-[2rem] border border-white/10 bg-gradient-to-br from-emerald-500/20 to-[#1a1f2e] p-6 shadow-xl">
-              <div className="flex items-center justify-between">
-                <Wallet className="text-emerald-300" />
-
-                <span className="rounded-full bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-300">
-                  Saldo
-                </span>
-              </div>
-
-              <h2 className="mt-5 text-4xl font-bold">
-                {formatMoney(
-                  balanceCents,
-                )}
-              </h2>
-
-              <p className="mt-2 text-sm text-gray-400">
-                Disponibilità attuale
-              </p>
-            </div>
-
-            <div className="rounded-[2rem] border border-white/10 bg-gradient-to-br from-indigo-500/20 to-[#1a1f2e] p-6 shadow-xl">
-              <div className="flex items-center justify-between">
-                <ArrowUpRight className="text-indigo-300" />
-
-                <span className="rounded-full bg-indigo-500/10 px-3 py-1 text-xs font-semibold text-indigo-300">
-                  Entrate
-                </span>
-              </div>
-
-              <h2 className="mt-5 text-4xl font-bold">
-                {formatMoney(
-                  incomeCents,
-                )}
-              </h2>
-
-              <p className="mt-2 text-sm text-gray-400">
-                Totale entrate
-              </p>
-            </div>
-
-            <div className="rounded-[2rem] border border-white/10 bg-gradient-to-br from-red-500/20 to-[#1a1f2e] p-6 shadow-xl">
-              <div className="flex items-center justify-between">
-                <ArrowDownRight className="text-red-300" />
-
-                <span className="rounded-full bg-red-500/10 px-3 py-1 text-xs font-semibold text-red-300">
-                  Uscite
-                </span>
-              </div>
-
-              <h2 className="mt-5 text-4xl font-bold">
-                {formatMoney(
-                  expenseCents,
-                )}
-              </h2>
-
-              <p className="mt-2 text-sm text-gray-400">
-                Totale spese
-              </p>
-            </div>
-
-            <div className="rounded-[2rem] border border-white/10 bg-gradient-to-br from-cyan-500/20 to-[#1a1f2e] p-6 shadow-xl">
-              <div className="flex items-center justify-between">
-                <Wallet className="text-cyan-300" />
-
-                <span className="rounded-full bg-cyan-500/10 px-3 py-1 text-xs font-semibold text-cyan-300">
-                  Movimenti
-                </span>
-              </div>
-
-              <h2 className="mt-5 text-4xl font-bold">
-                {
-                  transactions.length
-                }
-              </h2>
-
-              <p className="mt-2 text-sm text-gray-400">
-                Transazioni registrate
-              </p>
-            </div>
-          </section>
-        </div>
-      </main>
-    </div>
+          )}
+        </section>
+      </div>
+    </main>
   );
 }

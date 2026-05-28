@@ -11,7 +11,6 @@ import {
 import Link from 'next/link';
 
 import {
-  Download,
   File,
   FileImage,
   FileText,
@@ -26,16 +25,17 @@ import { toast } from 'sonner';
 
 import DashboardSidebar from '@/components/dashboard-sidebar';
 
+import { API_URL, getAccessToken } from '@/lib/api';
+
 type AssociationFile = {
   id: string;
-  name: string;
-  type: string;
+  filename: string;
+  originalName: string;
+  mimetype: string;
   size: number;
-  url: string;
+  path: string;
   createdAt: string;
 };
-
-const STORAGE_KEY = 'demo-files';
 
 function formatFileSize(size: number) {
   if (size < 1024) return `${size} B`;
@@ -65,29 +65,130 @@ export default function FilesPage() {
   const [files, setFiles] = useState<AssociationFile[]>([]);
   const [dragActive, setDragActive] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<'ALL' | 'IMAGE' | 'DOCUMENT'>('ALL');
 
   useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
-
-    if (saved) {
-      try {
-        setFiles(JSON.parse(saved));
-      } catch {
-        setFiles([]);
-      }
-    }
+    loadFiles();
   }, []);
 
-  function saveFiles(updated: AssociationFile[]) {
-    setFiles(updated);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+  async function loadFiles() {
+    try {
+      setLoading(true);
+
+      const token = getAccessToken();
+
+      const res = await fetch(`${API_URL}/files`, {
+        headers: token
+          ? {
+              Authorization: `Bearer ${token}`,
+            }
+          : undefined,
+      });
+
+      if (!res.ok) {
+        throw new Error('Errore caricamento files');
+      }
+
+      const data = await res.json();
+
+      setFiles(Array.isArray(data) ? data : []);
+    } catch (error: any) {
+      console.error(error);
+      toast.error(error.message || 'Errore caricamento files');
+      setFiles([]);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function uploadFiles(fileList: FileList | null) {
+    if (!fileList || fileList.length === 0) return;
+
+    try {
+      setUploading(true);
+
+      const token = getAccessToken();
+
+      for (const file of Array.from(fileList)) {
+        const formData = new FormData();
+
+        formData.append('file', file);
+
+        const res = await fetch(`${API_URL}/files/upload`, {
+          method: 'POST',
+          headers: token
+            ? {
+                Authorization: `Bearer ${token}`,
+              }
+            : undefined,
+          body: formData,
+        });
+
+        if (!res.ok) {
+          const data = await res.json().catch(() => null);
+
+          throw new Error(data?.message || `Errore upload ${file.name}`);
+        }
+      }
+
+      await loadFiles();
+
+      toast.success(`${fileList.length} file caricati`);
+    } catch (error: any) {
+      console.error(error);
+      toast.error(error.message || 'Errore upload file');
+    } finally {
+      setUploading(false);
+
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  }
+
+  function handleFileInput(e: ChangeEvent<HTMLInputElement>) {
+    uploadFiles(e.target.files);
+  }
+
+  async function deleteFile(id: string) {
+    try {
+      const token = getAccessToken();
+
+      const res = await fetch(`${API_URL}/files/${id}`, {
+        method: 'DELETE',
+        headers: token
+          ? {
+              Authorization: `Bearer ${token}`,
+            }
+          : undefined,
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+
+        throw new Error(data?.message || 'Errore eliminazione file');
+      }
+
+      await loadFiles();
+
+      toast.success('File eliminato');
+    } catch (error: any) {
+      console.error(error);
+      toast.error(error.message || 'Errore eliminazione file');
+    }
+  }
+
+  async function deleteAllFiles() {
+    for (const file of files) {
+      await deleteFile(file.id);
+    }
   }
 
   const filteredFiles = useMemo(() => {
     return files.filter((file) => {
-      const matchesSearch = file.name
+      const matchesSearch = file.originalName
         .toLowerCase()
         .includes(query.toLowerCase());
 
@@ -95,74 +196,21 @@ export default function FilesPage() {
         filter === 'ALL'
           ? true
           : filter === 'IMAGE'
-            ? file.type.startsWith('image/')
-            : !file.type.startsWith('image/');
+            ? file.mimetype.startsWith('image/')
+            : !file.mimetype.startsWith('image/');
 
       return matchesSearch && matchesFilter;
     });
   }, [files, query, filter]);
 
-  function addFiles(fileList: FileList | null) {
-    if (!fileList || fileList.length === 0) return;
-
-    setUploading(true);
-
-    const newFiles: AssociationFile[] = Array.from(fileList).map((file) => ({
-      id: crypto.randomUUID(),
-      name: file.name,
-      type: file.type || 'application/octet-stream',
-      size: file.size,
-      url: URL.createObjectURL(file),
-      createdAt: new Date().toISOString(),
-    }));
-
-    saveFiles([...newFiles, ...files]);
-
-    setUploading(false);
-
-    toast.success(`${newFiles.length} file caricati`);
-  }
-
-  function handleFileInput(e: ChangeEvent<HTMLInputElement>) {
-    addFiles(e.target.files);
-
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
-  }
-
-  function deleteFile(id: string) {
-    const target = files.find((file) => file.id === id);
-
-    if (target) {
-      URL.revokeObjectURL(target.url);
-    }
-
-    const updated = files.filter((file) => file.id !== id);
-
-    saveFiles(updated);
-
-    toast.success('File eliminato');
-  }
-
-  function deleteAllFiles() {
-    files.forEach((file) => {
-      URL.revokeObjectURL(file.url);
-    });
-
-    saveFiles([]);
-
-    toast.success('Tutti i file eliminati');
-  }
-
   const totalStorage = files.reduce((sum, file) => sum + file.size, 0);
 
   const imagesCount = files.filter((file) =>
-    file.type.startsWith('image/'),
+    file.mimetype.startsWith('image/'),
   ).length;
 
   const documentsCount = files.filter(
-    (file) => !file.type.startsWith('image/'),
+    (file) => !file.mimetype.startsWith('image/'),
   ).length;
 
   return (
@@ -182,7 +230,6 @@ export default function FilesPage() {
 
           <section className="relative overflow-hidden rounded-[2rem] border border-white/10 bg-[#111827] p-8 shadow-2xl">
             <div className="absolute right-0 top-0 h-40 w-40 rounded-full bg-indigo-500/10 blur-3xl" />
-
             <div className="absolute bottom-0 left-0 h-40 w-40 rounded-full bg-cyan-500/10 blur-3xl" />
 
             <div className="relative">
@@ -193,8 +240,7 @@ export default function FilesPage() {
               <h1 className="text-5xl font-bold">Files</h1>
 
               <p className="mt-3 max-w-2xl text-gray-400">
-                Libreria documenti, immagini e file persistenti della
-                piattaforma.
+                Libreria documenti collegata al backend reale.
               </p>
             </div>
           </section>
@@ -202,28 +248,30 @@ export default function FilesPage() {
           <section className="grid gap-5 md:grid-cols-4">
             <div className="rounded-[2rem] border border-white/10 bg-gradient-to-br from-indigo-500/20 to-[#1a1f2e] p-6 shadow-xl">
               <p className="text-sm text-indigo-300">File totali</p>
-
-              <h2 className="mt-4 text-4xl font-bold">{files.length}</h2>
+              <h2 className="mt-4 text-4xl font-bold">
+                {loading ? '...' : files.length}
+              </h2>
             </div>
 
             <div className="rounded-[2rem] border border-white/10 bg-gradient-to-br from-cyan-500/20 to-[#1a1f2e] p-6 shadow-xl">
               <p className="text-sm text-cyan-300">Storage usato</p>
-
               <h2 className="mt-4 text-4xl font-bold">
-                {formatFileSize(totalStorage)}
+                {loading ? '...' : formatFileSize(totalStorage)}
               </h2>
             </div>
 
             <div className="rounded-[2rem] border border-white/10 bg-gradient-to-br from-emerald-500/20 to-[#1a1f2e] p-6 shadow-xl">
               <p className="text-sm text-emerald-300">Immagini</p>
-
-              <h2 className="mt-4 text-4xl font-bold">{imagesCount}</h2>
+              <h2 className="mt-4 text-4xl font-bold">
+                {loading ? '...' : imagesCount}
+              </h2>
             </div>
 
             <div className="rounded-[2rem] border border-white/10 bg-gradient-to-br from-amber-500/20 to-[#1a1f2e] p-6 shadow-xl">
               <p className="text-sm text-amber-300">Documenti</p>
-
-              <h2 className="mt-4 text-4xl font-bold">{documentsCount}</h2>
+              <h2 className="mt-4 text-4xl font-bold">
+                {loading ? '...' : documentsCount}
+              </h2>
             </div>
           </section>
 
@@ -235,10 +283,8 @@ export default function FilesPage() {
             onDragLeave={() => setDragActive(false)}
             onDrop={(e) => {
               e.preventDefault();
-
               setDragActive(false);
-
-              addFiles(e.dataTransfer.files);
+              uploadFiles(e.dataTransfer.files);
             }}
             className={`rounded-3xl border border-dashed p-8 text-center transition ${
               dragActive
@@ -280,7 +326,7 @@ export default function FilesPage() {
                 <h2 className="text-2xl font-bold">Libreria files</h2>
 
                 <p className="mt-1 text-gray-400">
-                  File persistenti salvati localmente
+                  File salvati su backend e database.
                 </p>
               </div>
 
@@ -304,9 +350,7 @@ export default function FilesPage() {
                   className="rounded-2xl border border-white/10 bg-[#111827] px-4 py-3 outline-none"
                 >
                   <option value="ALL">Tutti</option>
-
                   <option value="IMAGE">Immagini</option>
-
                   <option value="DOCUMENT">Documenti</option>
                 </select>
 
@@ -323,7 +367,9 @@ export default function FilesPage() {
               </div>
             </div>
 
-            {filteredFiles.length === 0 ? (
+            {loading ? (
+              <div className="mt-8 h-60 animate-pulse rounded-2xl bg-[#111827]" />
+            ) : filteredFiles.length === 0 ? (
               <div className="mt-8 flex min-h-60 flex-col items-center justify-center rounded-2xl border border-white/5 bg-[#111827] text-gray-400">
                 <FolderOpen className="mb-4 h-12 w-12" />
                 Nessun file trovato.
@@ -335,29 +381,21 @@ export default function FilesPage() {
                     key={file.id}
                     className="overflow-hidden rounded-3xl border border-white/10 bg-[#111827] shadow-xl transition hover:border-indigo-500/40"
                   >
-                    {file.type.startsWith('image/') ? (
-                      <img
-                        src={file.url}
-                        alt={file.name}
-                        className="h-52 w-full object-cover"
-                      />
-                    ) : (
-                      <div className="flex h-52 items-center justify-center bg-gradient-to-br from-indigo-500/10 to-cyan-500/10">
-                        <div className="flex h-20 w-20 items-center justify-center rounded-3xl border border-white/10 bg-[#1a1f2e]">
-                          {getFileIcon(file.type)}
-                        </div>
+                    <div className="flex h-52 items-center justify-center bg-gradient-to-br from-indigo-500/10 to-cyan-500/10">
+                      <div className="flex h-20 w-20 items-center justify-center rounded-3xl border border-white/10 bg-[#1a1f2e]">
+                        {getFileIcon(file.mimetype)}
                       </div>
-                    )}
+                    </div>
 
                     <div className="p-5">
                       <div className="flex items-start gap-4">
                         <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-white/5">
-                          {getFileIcon(file.type)}
+                          {getFileIcon(file.mimetype)}
                         </div>
 
                         <div className="min-w-0 flex-1">
                           <h3 className="truncate text-lg font-semibold">
-                            {file.name}
+                            {file.originalName}
                           </h3>
 
                           <p className="mt-1 text-sm text-gray-400">
@@ -371,14 +409,13 @@ export default function FilesPage() {
                       </div>
 
                       <div className="mt-5 flex gap-3">
-                        <a
-                          href={file.url}
-                          download={file.name}
-                          className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-3 text-sm font-semibold transition hover:bg-indigo-500"
+                        <button
+                          type="button"
+                          disabled
+                          className="inline-flex flex-1 items-center justify-center rounded-xl bg-white/10 px-4 py-3 text-sm font-semibold text-gray-400"
                         >
-                          <Download className="h-4 w-4" />
-                          Scarica
-                        </a>
+                          href={`${API_URL}/${file.path}`}
+                        </button>
 
                         <button
                           type="button"

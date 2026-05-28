@@ -6,19 +6,32 @@ import {
   Param,
   Patch,
   Post,
+  Req,
+  UseGuards,
 } from '@nestjs/common';
+
+import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
 
 import { CreateEventDto } from './dto/create-event.dto';
 import { UpdateEventDto } from './dto/update-event.dto';
 import { EventsService } from './events.service';
 
 @Controller('events')
+@UseGuards(JwtAuthGuard)
 export class EventsController {
-  constructor(private readonly eventsService: EventsService) {}
+  constructor(
+    private readonly eventsService: EventsService,
+  ) {}
 
   @Post()
-  create(@Body() dto: CreateEventDto) {
-    return this.eventsService.create(dto);
+  create(
+    @Body() dto: CreateEventDto,
+    @Req() req: any,
+  ) {
+    return this.eventsService.create({
+      ...dto,
+      associationId: req.user.associationId,
+    });
   }
 
   @Get()
@@ -27,7 +40,10 @@ export class EventsController {
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() dto: UpdateEventDto) {
+  update(
+    @Param('id') id: string,
+    @Body() dto: UpdateEventDto,
+  ) {
     return this.eventsService.update(id, dto);
   }
 
@@ -39,9 +55,12 @@ export class EventsController {
   @Post(':id/register')
   register(
     @Param('id') id: string,
-    @Body('userId') userId: string,
+    @Req() req: any,
   ) {
-    return this.eventsService.register(id, userId);
+    return this.eventsService.register(
+      id,
+      req.user.id,
+    );
   }
 
   @Get(':id/registrations')
@@ -52,8 +71,11 @@ export class EventsController {
   @Delete(':id/register')
   unregister(
     @Param('id') id: string,
-    @Body('userId') userId: string,
+    @Req() req: any,
   ) {
-    return this.eventsService.unregister(id, userId);
+    return this.eventsService.unregister(
+      id,
+      req.user.id,
+    );
   }
 }
