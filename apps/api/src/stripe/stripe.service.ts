@@ -1,15 +1,15 @@
 import { Injectable } from '@nestjs/common';
-import Stripe from 'stripe';
+import StripePackage from 'stripe';
 
 @Injectable()
 export class StripeService {
-  private readonly stripe: Stripe;
+  private readonly stripe: any;
 
   constructor() {
-    this.stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '');
+    this.stripe = new StripePackage(process.env.STRIPE_SECRET_KEY || '');
   }
 
-  get client(): Stripe {
+  get client(): any {
     return this.stripe;
   }
 }
