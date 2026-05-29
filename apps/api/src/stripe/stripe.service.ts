@@ -3,15 +3,13 @@ import Stripe from 'stripe';
 
 @Injectable()
 export class StripeService {
-  private stripe: Stripe.Stripe;
+  private readonly stripe: Stripe;
 
   constructor() {
-    this.stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-      apiVersion: '2026-04-22.dahlia',
-    });
+    this.stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '');
   }
 
-  get client() {
+  get client(): Stripe {
     return this.stripe;
   }
 }
