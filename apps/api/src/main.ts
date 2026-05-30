@@ -8,8 +8,8 @@ async function bootstrap() {
 
   app.enableCors({
     origin: [
-      'http://localhost:3001',
-      'http://127.0.0.1:3001',
+      'http://localhost:3000',
+      'http://127.0.0.1:3000',
     ],
     credentials: true,
   });
@@ -23,10 +23,11 @@ async function bootstrap() {
     }),
   );
 
-  await app.listen(3000, '127.0.0.1');
+  const port = process.env.PORT || 3001;
+await app.listen(port, '0.0.0.0');
 
   console.log(
-    'API running on http://127.0.0.1:3000/api',
+    'API running on http://127.0.0.1:3001/api',
   );
 }
 
