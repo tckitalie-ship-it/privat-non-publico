@@ -10,6 +10,7 @@ async function bootstrap() {
     origin: [
       'http://localhost:3000',
       'http://127.0.0.1:3000',
+      'https://privat-non-publico-web-tckitalie-ship-its-projects.vercel.app',
     ],
     credentials: true,
   });
@@ -22,13 +23,12 @@ async function bootstrap() {
       transform: true,
     }),
   );
-const port = Number(process.env.PORT) || 3000;
-await app.listen(port, '0.0.0.0');
-  
 
-  console.log(
-    'API running on http://127.0.0.1:3001/api',
-  );
+  const port = Number(process.env.PORT) || 3001;
+
+  await app.listen(port, '0.0.0.0');
+
+  console.log(`API running on port ${port}`);
 }
 
 bootstrap();
