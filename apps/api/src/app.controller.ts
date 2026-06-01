@@ -1,34 +1,39 @@
-import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
+import { ValidationPipe } from '@nestjs/common';
+import { NestFactory } from '@nestjs/core';
 
-import { AuthModule } from './auth/auth.module';
-import { AssociationsModule } from './associations/associations.module';
-import { BillingModule } from './billing/billing.module';
-import { DashboardModule } from './dashboard/dashboard.module';
-import { EventsModule } from './events/events.module';
-import { FinancesModule } from './finances/finances.module';
-import { InvitationsModule } from './invitations/invitations.module';
-import { MembershipsModule } from './memberships/memberships.module';
-import { UsersModule } from './users/users.module';
-import { TransactionsModule } from './transactions/transactions.module';
+import { AppModule } from './app.module';
 
-@Module({
-  imports: [
-    ConfigModule.forRoot({
-      isGlobal: true,
-      envFilePath: '.env',
+async function bootstrap() {
+  const app = await NestFactory.create(AppModule);
+
+  app.enableCors({
+    origin: [
+      'http://localhost:3000',
+      'http://127.0.0.1:3000',
+      'http://localhost:3001',
+      'http://127.0.0.1:3001',
+      'https://privat-non-publico-web-tckitalie-ship-its-projects.vercel.app',
+    ],
+    credentials: true,
+  });
+
+  app.setGlobalPrefix('api');
+
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      transform: true,
     }),
+  );
 
-    AuthModule,
-    UsersModule,
-    AssociationsModule,
-    MembershipsModule,
-    DashboardModule,
-    EventsModule,
-    InvitationsModule,
-    FinancesModule,
-    BillingModule,
-    TransactionsModule,
-  ],
-})
-export class AppModule {}
+  const port = process.env.PORT ? Number(process.env.PORT) : 3001;
+
+  console.log('PORT ENV =', process.env.PORT);
+  console.log('LISTENING ON =', port);
+
+  await app.listen(port, '0.0.0.0');
+
+  console.log(`API running on port ${port}`);
+}
+
+bootstrap();
