@@ -5,7 +5,8 @@ import { useRouter } from 'next/navigation';
 import { setAccessToken } from '@/lib/api';
 
 const API_URL =
-  process.env.NEXT_PUBLIC_API_URL || 'https://api-production-0f62.up.railway.app';
+  process.env.NEXT_PUBLIC_API_URL ||
+  'https://api-production-0f62.up.railway.app';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -27,10 +28,7 @@ export default function LoginPage() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          email,
-          password,
-        }),
+        body: JSON.stringify({ email, password }),
       });
 
       if (!res.ok) {
@@ -44,9 +42,8 @@ export default function LoginPage() {
       }
 
       setAccessToken(data.access_token);
-
       router.push('/dashboard');
-    } catch (err) {
+    } catch {
       setError('Email o password non validi');
     } finally {
       setLoading(false);
@@ -57,12 +54,16 @@ export default function LoginPage() {
     <main className="min-h-screen flex items-center justify-center bg-slate-950 px-4">
       <div className="w-full max-w-md rounded-2xl border border-slate-800 bg-white p-8 shadow-xl">
         <div className="mb-6">
+          <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-slate-500">
+            NPA
+          </p>
+
           <h1 className="text-2xl font-bold text-slate-900">
-            Association SaaS
+            News Platform Association
           </h1>
 
           <p className="text-sm text-slate-500 mt-2">
-            Login reale collegato al backend NestJS.
+            Accedi alla piattaforma di gestione della tua associazione.
           </p>
         </div>
 
