@@ -7,8 +7,9 @@ import { Toaster } from 'sonner';
 import { ThemeProvider } from '@/components/theme-provider';
 
 export const metadata: Metadata = {
-  title: 'Association SaaS',
-  description: 'Modern association platform',
+  title: 'News Platform Association (NPA)',
+  description:
+    'Piattaforma moderna per la gestione di associazioni, membri, eventi, finanze e comunicazioni.',
   manifest: '/manifest.webmanifest',
 };
 
