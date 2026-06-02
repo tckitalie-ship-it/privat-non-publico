@@ -2,11 +2,7 @@
 
 import Link from 'next/link';
 
-import {
-  useEffect,
-  useMemo,
-  useState,
-} from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import {
   ResponsiveContainer,
@@ -139,14 +135,14 @@ export default function DashboardPage() {
           <div className="mb-8 flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
             <div>
               <p className="text-sm font-medium text-indigo-400">
-                Overview piattaforma
+                News Platform Association
               </p>
 
-              <h1 className="mt-2 text-5xl font-bold">Dashboard</h1>
+              <h1 className="mt-2 text-5xl font-bold">Dashboard NPA</h1>
 
               <p className="mt-3 max-w-2xl text-gray-400">
-                Monitora attività, membri, eventi, registrazioni e dati reali
-                della tua associazione.
+                Monitora membri, eventi, finanze, registrazioni e attività
+                operative della News Platform Association.
               </p>
             </div>
 
@@ -154,7 +150,7 @@ export default function DashboardPage() {
               href="/events"
               className="inline-flex items-center justify-center rounded-2xl bg-indigo-600 px-6 py-4 font-semibold transition hover:bg-indigo-500"
             >
-              Nuovo evento
+              Crea evento
             </Link>
           </div>
 
@@ -173,7 +169,7 @@ export default function DashboardPage() {
               </h3>
 
               <p className="mt-2 text-sm text-gray-400">
-                Eventi creati nel database.
+                Eventi creati nella piattaforma NPA.
               </p>
             </div>
 
@@ -236,7 +232,7 @@ export default function DashboardPage() {
             <div className="rounded-3xl border border-white/5 bg-[#111827] p-8 shadow-xl">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-amber-300">Utenti</p>
+                  <p className="text-sm text-amber-300">Utenti NPA</p>
 
                   <h2 className="mt-3 text-4xl font-bold">
                     {loading ? '...' : stats.users}
@@ -256,7 +252,7 @@ export default function DashboardPage() {
             <div className="rounded-3xl border border-white/5 bg-[#111827] p-8 shadow-xl">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-blue-300">Workspace</p>
+                  <p className="text-sm text-blue-300">Associazioni</p>
 
                   <h2 className="mt-3 text-4xl font-bold">
                     {loading ? '...' : stats.associations}
@@ -269,7 +265,7 @@ export default function DashboardPage() {
               </div>
 
               <p className="mt-4 text-gray-400">
-                Associazioni create nel database.
+                Associazioni create e collegate al database.
               </p>
             </div>
           </section>
@@ -323,7 +319,7 @@ export default function DashboardPage() {
               <h2 className="mt-5 text-5xl font-bold">Online</h2>
 
               <p className="mt-3 text-gray-300">
-                Sistema operativo e collegato al backend.
+                Sistema NPA operativo e collegato al backend.
               </p>
             </div>
           </section>
@@ -331,7 +327,9 @@ export default function DashboardPage() {
           <section className="mt-8 rounded-3xl border border-white/5 bg-[#111827] p-8 shadow-xl">
             <div className="mb-6 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
               <div>
-                <p className="text-sm text-indigo-300">Revenue analytics</p>
+                <p className="text-sm text-indigo-300">
+                  Analisi finanziaria NPA
+                </p>
 
                 <h2 className="mt-2 text-3xl font-bold">
                   Entrate e uscite reali
