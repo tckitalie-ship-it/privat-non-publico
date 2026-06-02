@@ -1,14 +1,8 @@
 'use client';
 
-import {
-  useEffect,
-  useState,
-} from 'react';
-
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
-
 import { usePathname } from 'next/navigation';
-
 import io from 'socket.io-client';
 
 import {
@@ -40,25 +34,21 @@ const mainItems = [
     href: '/dashboard',
     icon: LayoutDashboard,
   },
-
   {
     label: 'Search',
     href: '/search',
     icon: Search,
   },
-
   {
     label: 'Assistant',
     href: '/assistant',
     icon: Bot,
   },
-
   {
     label: 'Chat',
     href: '/chat',
     icon: MessageCircle,
   },
-
   {
     label: 'Notifications',
     href: '/notifications',
@@ -72,21 +62,18 @@ const managementItems = [
     href: '/events',
     icon: CalendarDays,
   },
-
   {
     label: 'Membri',
     href: '/members',
     icon: Users,
   },
-
   {
     label: 'Files',
     href: '/files',
     icon: Folder,
   },
-
   {
-    label: 'Associations',
+    label: 'Associazioni',
     href: '/associations',
     icon: Building2,
   },
@@ -98,15 +85,13 @@ const businessItems = [
     href: '/finance',
     icon: Wallet,
   },
-
   {
     label: 'Billing',
     href: '/billing',
     icon: CreditCard,
   },
-
   {
-    label: 'Settings',
+    label: 'Impostazioni',
     href: '/settings',
     icon: Settings,
   },
@@ -115,62 +100,40 @@ const businessItems = [
 export default function DashboardSidebar() {
   const pathname = usePathname();
 
-  const [open, setOpen] =
-    useState(false);
-
-  const [
-    unreadCount,
-    setUnreadCount,
-  ] = useState(0);
+  const [open, setOpen] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
     loadNotifications();
 
-    socket.on(
-      'notification:new',
-      () => {
-        setUnreadCount(
-          (prev) => prev + 1,
-        );
-      },
-    );
+    socket.on('notification:new', () => {
+      setUnreadCount((prev) => prev + 1);
+    });
 
     return () => {
-      socket.off(
-        'notification:new',
-      );
+      socket.off('notification:new');
     };
   }, []);
 
   async function loadNotifications() {
     try {
-      const token =
-        localStorage.getItem(
-          'token',
-        );
+      const token = localStorage.getItem('token');
 
-      const res = await fetch(
-        `${API_URL}/notifications`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+      const res = await fetch(`${API_URL}/notifications`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
         },
-      );
+      });
 
       if (!res.ok) {
         return;
       }
 
-      const data =
-        await res.json();
+      const data = await res.json();
 
-      const unread =
-        data.filter(
-          (
-            notification: any,
-          ) => !notification.read,
-        ).length;
+      const unread = data.filter(
+        (notification: any) => !notification.read,
+      ).length;
 
       setUnreadCount(unread);
     } catch (error) {
@@ -194,24 +157,16 @@ export default function DashboardSidebar() {
         <nav className="space-y-1">
           {items.map((item) => {
             const active =
-              pathname === item.href ||
-              pathname.startsWith(
-                `${item.href}/`,
-              );
+              pathname === item.href || pathname.startsWith(`${item.href}/`);
 
             const Icon = item.icon;
-
-            const isNotifications =
-              item.href ===
-              '/notifications';
+            const isNotifications = item.href === '/notifications';
 
             return (
               <Link
                 key={item.href}
                 href={item.href}
-                onClick={() =>
-                  setOpen(false)
-                }
+                onClick={() => setOpen(false)}
                 className={`group flex items-center justify-between rounded-2xl px-3 py-3 text-sm font-medium transition-all duration-200 ${
                   active
                     ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-950/40'
@@ -229,20 +184,14 @@ export default function DashboardSidebar() {
                     <Icon size={18} />
                   </span>
 
-                  <span>
-                    {item.label}
-                  </span>
+                  <span>{item.label}</span>
                 </div>
 
-                {isNotifications &&
-                  unreadCount >
-                    0 && (
-                    <span className="flex h-6 min-w-[24px] items-center justify-center rounded-full bg-red-500 px-2 text-xs font-bold text-white">
-                      {
-                        unreadCount
-                      }
-                    </span>
-                  )}
+                {isNotifications && unreadCount > 0 && (
+                  <span className="flex h-6 min-w-[24px] items-center justify-center rounded-full bg-red-500 px-2 text-xs font-bold text-white">
+                    {unreadCount}
+                  </span>
+                )}
               </Link>
             );
           })}
@@ -254,24 +203,11 @@ export default function DashboardSidebar() {
   function NavLinks() {
     return (
       <div className="space-y-7">
-        <Section
-          title="Main"
-          items={mainItems}
-        />
+        <Section title="Main" items={mainItems} />
 
-        <Section
-          title="Gestione"
-          items={
-            managementItems
-          }
-        />
+        <Section title="Gestione" items={managementItems} />
 
-        <Section
-          title="Business"
-          items={
-            businessItems
-          }
-        />
+        <Section title="Business" items={businessItems} />
       </div>
     );
   }
@@ -281,16 +217,16 @@ export default function DashboardSidebar() {
       <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-4">
         <div className="flex items-center gap-3">
           <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-cyan-400 font-bold text-white">
-            AS
+            NPA
           </div>
 
           <div>
             <h2 className="text-base font-bold text-white">
-              Association SaaS
+              News Platform Association
             </h2>
 
             <p className="text-xs text-zinc-500">
-              Premium workspace
+              NPA Workspace
             </p>
           </div>
         </div>
@@ -303,19 +239,17 @@ export default function DashboardSidebar() {
       <header className="sticky top-0 z-50 flex items-center justify-between border-b border-white/10 bg-[#090D14]/95 px-4 py-3 text-white backdrop-blur md:hidden">
         <div>
           <h2 className="text-sm font-bold">
-            Association SaaS
+            News Platform Association
           </h2>
 
           <p className="text-xs text-zinc-500">
-            Dashboard
+            NPA Dashboard
           </p>
         </div>
 
         <button
           type="button"
-          onClick={() =>
-            setOpen(true)
-          }
+          onClick={() => setOpen(true)}
           className="rounded-xl border border-white/10 p-2 text-zinc-300 transition hover:bg-white/5"
         >
           <Menu size={22} />
@@ -330,9 +264,7 @@ export default function DashboardSidebar() {
 
               <button
                 type="button"
-                onClick={() =>
-                  setOpen(false)
-                }
+                onClick={() => setOpen(false)}
                 className="rounded-xl border border-white/10 p-2 text-zinc-300 transition hover:bg-white/5"
               >
                 <X size={20} />
