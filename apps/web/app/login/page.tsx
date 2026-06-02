@@ -4,11 +4,14 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { setAccessToken } from '@/lib/api';
 
+const API_URL =
+  process.env.NEXT_PUBLIC_API_URL || 'https://api-production-0f62.up.railway.app';
+
 export default function LoginPage() {
   const router = useRouter();
 
-  const [email, setEmail] = useState('test@example.com');
-  const [password, setPassword] = useState('123456');
+  const [email, setEmail] = useState('nuovo@example.com');
+  const [password, setPassword] = useState('12345678');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -19,7 +22,7 @@ export default function LoginPage() {
     setError('');
 
     try {
-      const res = await fetch('http://localhost:3000/api/auth/login', {
+      const res = await fetch(`${API_URL}/api/auth/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -73,7 +76,7 @@ export default function LoginPage() {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="test@example.com"
+              placeholder="nuovo@example.com"
               className="w-full rounded-xl border px-4 py-3 outline-none focus:ring-2 focus:ring-slate-900"
             />
           </div>
@@ -87,7 +90,7 @@ export default function LoginPage() {
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="123456"
+              placeholder="12345678"
               className="w-full rounded-xl border px-4 py-3 outline-none focus:ring-2 focus:ring-slate-900"
             />
           </div>
