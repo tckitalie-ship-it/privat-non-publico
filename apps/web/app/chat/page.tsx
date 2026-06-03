@@ -15,8 +15,9 @@ import {
 import { io, Socket } from 'socket.io-client';
 
 import DashboardSidebar from '@/components/dashboard-sidebar';
-
-const SOCKET_URL = 'http://localhost:3000';
+const SOCKET_URL =
+  process.env.NEXT_PUBLIC_API_URL ||
+  'https://api-production-0f62.up.railway.app';
 
 type ChatMessage = {
   id: string;
