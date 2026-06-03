@@ -21,8 +21,7 @@ import {
 import { toast } from 'sonner';
 
 import DashboardSidebar from '@/components/dashboard-sidebar';
-
-const API_URL = 'http://localhost:3000/api';
+import { API_URL } from '@/lib/api';
 
 type EventRegistration = {
   id: string;
@@ -318,11 +317,11 @@ export default function EventsPage() {
           <section className="rounded-[2rem] border border-white/10 bg-[#111827] p-8 shadow-2xl">
             <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
               <div>
-                <h1 className="text-5xl font-bold">Eventi</h1>
+                <h1 className="text-5xl font-bold">Eventi NPA</h1>
 
                 <p className="mt-3 text-zinc-400">
-                  Gestisci eventi, calendario, partecipazioni e notifiche
-                  realtime.
+                  Gestisci eventi, calendario e partecipazioni della News
+                  Platform Association.
                 </p>
               </div>
 
@@ -357,10 +356,10 @@ export default function EventsPage() {
                 <CalendarDays className="h-7 w-7 text-cyan-300" />
 
                 <div>
-                  <h2 className="text-2xl font-bold">Nuovo evento</h2>
+                  <h2 className="text-2xl font-bold">Nuovo evento NPA</h2>
 
                   <p className="text-sm text-zinc-400">
-                    Calendario avanzato pronto per future notifiche realtime.
+                    Crea e gestisci gli eventi della piattaforma.
                   </p>
                 </div>
               </div>
