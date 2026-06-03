@@ -5,9 +5,13 @@ import Link from 'next/link';
 import { Bell, CheckCheck, RefreshCw, Trash2, Wifi, WifiOff } from 'lucide-react';
 import { io, Socket } from 'socket.io-client';
 import DashboardSidebar from '@/components/dashboard-sidebar';
+import { API_URL } from '@/lib/api';
 
-const API_URL = 'http://localhost:3000/api';
-const SOCKET_URL = 'http://localhost:3000';
+import { API_URL } from '@/lib/api';
+
+const SOCKET_URL =
+  process.env.NEXT_PUBLIC_API_URL ||
+  'https://api-production-0f62.up.railway.app';
 
 type NotificationItem = {
   id: string;
