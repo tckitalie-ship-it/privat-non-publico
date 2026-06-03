@@ -3,9 +3,9 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { LogOut, RefreshCw, Save, Settings, User } from 'lucide-react';
-import DashboardSidebar from '@/components/dashboard-sidebar';
 
-const API_URL = 'http://localhost:3000/api';
+import DashboardSidebar from '@/components/dashboard-sidebar';
+import { API_URL } from '@/lib/api';
 
 type Me = {
   id: string;
@@ -24,7 +24,10 @@ function getAccessToken() {
 
   for (const cookie of cookies) {
     const [key, value] = cookie.trim().split('=');
-    if (key === 'access_token') return decodeURIComponent(value);
+
+    if (key === 'access_token') {
+      return decodeURIComponent(value);
+    }
   }
 
   return null;
@@ -103,9 +106,12 @@ export default function SettingsPage() {
                 </div>
 
                 <div>
-                  <h1 className="text-5xl font-bold">Settings</h1>
+                  <h1 className="text-5xl font-bold">
+                    Impostazioni NPA
+                  </h1>
+
                   <p className="mt-2 text-zinc-400">
-                    Profilo, sessione, sicurezza e logout.
+                    Gestione account News Platform Association.
                   </p>
                 </div>
               </div>
@@ -136,6 +142,7 @@ export default function SettingsPage() {
 
                 <div>
                   <h2 className="text-2xl font-bold">Profilo</h2>
+
                   <p className="text-sm text-zinc-400">
                     Dati utente letti dal backend.
                   </p>
@@ -143,23 +150,36 @@ export default function SettingsPage() {
               </div>
 
               {loading ? (
-                <p className="text-zinc-400">Caricamento profilo...</p>
+                <p className="text-zinc-400">
+                  Caricamento profilo...
+                </p>
               ) : (
                 <div className="space-y-4">
                   <div className="rounded-2xl border border-white/10 bg-[#0b1220] p-4">
-                    <p className="text-xs uppercase text-zinc-500">Email</p>
-                    <p className="mt-1 font-semibold">{me?.email || '-'}</p>
-                  </div>
+                    <p className="text-xs uppercase text-zinc-500">
+                      Email
+                    </p>
 
-                  <div className="rounded-2xl border border-white/10 bg-[#0b1220] p-4">
-                    <p className="text-xs uppercase text-zinc-500">Ruolo</p>
-                    <p className="mt-1 font-semibold">{me?.role || '-'}</p>
+                    <p className="mt-1 font-semibold">
+                      {me?.email || '-'}
+                    </p>
                   </div>
 
                   <div className="rounded-2xl border border-white/10 bg-[#0b1220] p-4">
                     <p className="text-xs uppercase text-zinc-500">
-                      Association ID
+                      Ruolo
                     </p>
+
+                    <p className="mt-1 font-semibold">
+                      {me?.role || '-'}
+                    </p>
+                  </div>
+
+                  <div className="rounded-2xl border border-white/10 bg-[#0b1220] p-4">
+                    <p className="text-xs uppercase text-zinc-500">
+                      ID Associazione
+                    </p>
+
                     <p className="mt-1 break-all text-sm font-semibold">
                       {me?.associationId || '-'}
                     </p>
@@ -170,9 +190,12 @@ export default function SettingsPage() {
 
             <div className="rounded-3xl border border-white/10 bg-[#111827] p-6 shadow-2xl">
               <div className="mb-6">
-                <h2 className="text-2xl font-bold">Sessione</h2>
+                <h2 className="text-2xl font-bold">
+                  Sessione
+                </h2>
+
                 <p className="text-sm text-zinc-400">
-                  Gestione accesso locale JWT.
+                  Gestione accesso JWT.
                 </p>
               </div>
 
@@ -196,10 +219,14 @@ export default function SettingsPage() {
           <section className="rounded-3xl border border-white/10 bg-[#111827] p-6 shadow-2xl">
             <div className="flex items-center gap-3">
               <Save className="h-6 w-6 text-cyan-300" />
+
               <div>
-                <h2 className="text-2xl font-bold">Opzioni future</h2>
+                <h2 className="text-2xl font-bold">
+                  Funzionalità future NPA
+                </h2>
+
                 <p className="text-sm text-zinc-400">
-                  Qui aggiungeremo cambio password, preferenze workspace,
+                  Cambio password, preferenze workspace,
                   lingua, tema e notifiche account.
                 </p>
               </div>
