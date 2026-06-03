@@ -7,7 +7,6 @@ import { io, Socket } from 'socket.io-client';
 import DashboardSidebar from '@/components/dashboard-sidebar';
 import { API_URL } from '@/lib/api';
 
-import { API_URL } from '@/lib/api';
 
 const SOCKET_URL =
   process.env.NEXT_PUBLIC_API_URL ||
