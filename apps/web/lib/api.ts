@@ -1,8 +1,10 @@
 import Cookies from 'js-cookie';
 
-export const API_URL =
+export const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL ||
   'https://api-production-0f62.up.railway.app';
+
+export const API_URL = `${API_BASE_URL}/api`;
 
 const ACCESS_TOKEN_KEY = 'access_token';
 
