@@ -1,0 +1,7 @@
+packages:
+  - apps/*
+
+ignoredBuiltDependencies:
+  - '@nestjs/core'
+  - '@prisma/engines'
+  - prisma
