@@ -2,7 +2,22 @@ import { Suspense } from 'react';
 
 import AcceptInviteContent from './accept-invite-content';
 
-export default function AcceptInvitePage() {
+type PageProps = {
+  searchParams: Promise<{
+    token?: string | string[];
+  }>;
+};
+
+export default async function AcceptInvitePage({
+  searchParams,
+}: PageProps) {
+  const params = await searchParams;
+  const rawToken = params.token;
+
+  const token = Array.isArray(rawToken)
+    ? rawToken[0] ?? null
+    : rawToken ?? null;
+
   return (
     <Suspense
       fallback={
@@ -11,7 +26,7 @@ export default function AcceptInvitePage() {
         </main>
       }
     >
-      <AcceptInviteContent />
+      <AcceptInviteContent token={token} />
     </Suspense>
   );
 }

@@ -1,7 +1,7 @@
 'use client';
 
 import { FormEvent, useEffect, useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 
 import { API_URL, setAccessToken } from '@/lib/api';
 
@@ -30,11 +30,8 @@ async function readResponse<T>(response: Response): Promise<T> {
   }
 }
 
-export default function AcceptInviteContent() {
+export default function AcceptInviteContent({ token }: { token: string | null }) {
   const router = useRouter();
-  const searchParams = useSearchParams();
-
-  const token = searchParams.get('token');
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -310,5 +307,6 @@ export default function AcceptInviteContent() {
     </main>
   );
 }
+
 
 
