@@ -1,198 +1,112 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
-import { API_URL, setAccessToken } from '@/lib/api';
+import { Suspense, useEffect, useState } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
 
-export default function AcceptInvitationPage() {
-  const router = useRouter();
+function AcceptInviteContent() {
   const searchParams = useSearchParams();
-
+  const router = useRouter();
   const token = searchParams.get('token');
 
-  const [loading, setLoading] = useState(true);
-  const [valid, setValid] = useState(false);
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [submitting, setSubmitting] = useState(false);
-  const [message, setMessage] = useState('');
+  const [message, setMessage] = useState('Accettazione invito...');
+  const [error, setError] = useState(false);
 
   useEffect(() => {
-    if (!token) {
-      setMessage('Token mancante');
-      setLoading(false);
-      return;
-    }
-
-    async function verifyToken() {
-      try {
-        const res = await fetch(
-          `${API_URL}/invitations/check/${token}`,
-        );
-
-        const data = await res.json();
-
-        if (!res.ok) {
-          setMessage(
-            data.message || 'Invito non valido',
-          );
-          setLoading(false);
-          return;
-        }
-
-        if (data.userExists) {
-          setMessage(
-            'Utente già esistente. Effettua il login.',
-          );
-          setLoading(false);
-          return;
-        }
-
-        setEmail(data.email);
-        setValid(true);
-      } catch {
-        setMessage(
-          'Errore di connessione al server',
-        );
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    verifyToken();
-  }, [token]);
-
-  async function handleSubmit(
-    e: React.FormEvent,
-  ) {
-    e.preventDefault();
-
-    if (!token) return;
-
-    setSubmitting(true);
-    setMessage('');
-
-    try {
-      const res = await fetch(
-        `${API_URL}/invitations/accept-register`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type':
-              'application/json',
-          },
-          body: JSON.stringify({
-            token,
-            password,
-          }),
-        },
-      );
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        setMessage(
-          data.message ||
-            'Errore durante registrazione',
-        );
+    async function acceptInvite() {
+      if (!token) {
+        setError(true);
+        setMessage('Token mancante');
         return;
       }
 
-      setAccessToken(data.access_token);
+      const authToken = localStorage.getItem('access_token');
 
-      setMessage(
-        'Registrazione completata!',
-      );
+      if (!authToken) {
+        setError(true);
+        setMessage('No auth token. Fai login prima di accettare l’invito.');
+        return;
+      }
 
-      setTimeout(() => {
-        router.push('/dashboard');
-      }, 1500);
-    } catch {
-      setMessage(
-        'Errore di connessione al server',
-      );
-    } finally {
-      setSubmitting(false);
+      try {
+        const response = await fetch('/api/invitations/accept', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${authToken}`,
+          },
+          body: JSON.stringify({ token }),
+        });
+
+        const text = await response.text();
+
+        let data: unknown = {};
+
+        try {
+          data = JSON.parse(text);
+        } catch {
+          throw new Error(text || 'Risposta non valida');
+        }
+
+        // -----------------------------
+        // 🔥 BLOCCO CORRETTO E CHIUSO
+        // -----------------------------
+        if (!response.ok) {
+          let msg = 'Errore';
+
+          if (
+            typeof data === 'object' &&
+            data !== null &&
+            'message' in data
+          ) {
+            const value = data as { message?: unknown };
+
+            if (typeof value.message === 'string') {
+              msg = value.message;
+            }
+          }
+
+          throw new Error(msg);
+        }
+
+        // 🔥 SUCCESSO — fuori dall'if
+        setMessage('Invito accettato con successo ✅');
+
+        // 🔥 Redirect dopo 1 secondo
+        setTimeout(() => {
+          router.push('/dashboard');
+        }, 1000);
+
+      } catch (err: unknown) {
+        setError(true);
+
+        if (err instanceof Error) {
+          setMessage(err.message);
+        } else {
+          setMessage('Errore accettazione invito');
+        }
+      }
     }
-  }
 
-  if (loading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        Verifica invito...
-      </div>
-    );
-  }
-
-  if (!valid) {
-    return (
-      <div className="flex min-h-screen items-center justify-center p-6">
-        <div className="w-full max-w-md rounded-xl border p-6 text-center">
-          <h1 className="mb-4 text-xl font-bold">
-            Invito non disponibile
-          </h1>
-
-          <p>{message}</p>
-        </div>
-      </div>
-    );
-  }
+    acceptInvite();
+  }, [token, router]);
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-950 p-6">
-      <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-xl">
-        <h1 className="mb-2 text-2xl font-bold text-slate-900">
-          Accetta invito
+    <main className="min-h-screen flex items-center justify-center">
+      <div className="border rounded-xl p-8 shadow-md max-w-md w-full text-center">
+        <h1 className="text-2xl font-bold mb-4">
+          {error ? 'Errore' : 'Invito'}
         </h1>
 
-        <p className="mb-6 text-sm text-slate-500">
-          Sei stato invitato come:
-        </p>
-
-        <div className="mb-6 rounded-lg bg-slate-100 p-3 text-sm font-medium">
-          {email}
-        </div>
-
-        <form
-          onSubmit={handleSubmit}
-          className="space-y-4"
-        >
-          <div>
-            <label className="mb-1 block text-sm font-medium">
-              Password
-            </label>
-
-            <input
-              type="password"
-              required
-              minLength={6}
-              value={password}
-              onChange={(e) =>
-                setPassword(
-                  e.target.value,
-                )
-              }
-              className="w-full rounded-xl border px-4 py-3"
-            />
-          </div>
-
-          {message && (
-            <div className="rounded-lg bg-slate-100 p-3 text-sm">
-              {message}
-            </div>
-          )}
-
-          <button
-            type="submit"
-            disabled={submitting}
-            className="w-full rounded-xl bg-slate-950 px-4 py-3 font-semibold text-white"
-          >
-            {submitting
-              ? 'Registrazione...'
-              : 'Crea account'}
-          </button>
-        </form>
+        <p>{message}</p>
       </div>
-    </div>
+    </main>
+  );
+}
+
+export default function AcceptInvitePage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <AcceptInviteContent />
+    </Suspense>
   );
 }
