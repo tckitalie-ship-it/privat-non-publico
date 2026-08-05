@@ -1,239 +1,197 @@
-'use client';
+"use client";
 
-import { useEffect, useState } from 'react';
-import Link from 'next/link';
-import { LogOut, RefreshCw, Save, Settings, User } from 'lucide-react';
-
-import DashboardSidebar from '@/components/dashboard-sidebar';
-import { API_URL } from '@/lib/api';
-
-type Me = {
-  id: string;
-  email: string;
-  associationId?: string;
-  role?: string;
-};
-
-function getAccessToken() {
-  if (typeof window === 'undefined') return null;
-
-  const localToken = localStorage.getItem('access_token');
-  if (localToken) return localToken;
-
-  const cookies = document.cookie.split(';');
-
-  for (const cookie of cookies) {
-    const [key, value] = cookie.trim().split('=');
-
-    if (key === 'access_token') {
-      return decodeURIComponent(value);
-    }
-  }
-
-  return null;
-}
-
-function clearAccessToken() {
-  localStorage.removeItem('access_token');
-  document.cookie = 'access_token=; Max-Age=0; path=/';
-}
+import { useState } from "react";
+import { Bell, Building2, Lock, Save, User } from "lucide-react";
+import { toast } from "sonner";
 
 export default function SettingsPage() {
-  const [me, setMe] = useState<Me | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [status, setStatus] = useState('');
+  const [associationName, setAssociationName] =
+    useState("Associazione Demo");
 
-  async function loadMe() {
-    try {
-      setLoading(true);
-      setStatus('');
+  const [email, setEmail] =
+    useState("admin@example.com");
 
-      const token = getAccessToken();
+  const [notificationsEnabled, setNotificationsEnabled] =
+    useState(true);
 
-      if (!token) {
-        throw new Error('Token mancante');
-      }
-
-      const res = await fetch(`${API_URL}/auth/me`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data?.message || 'Errore caricamento profilo');
-      }
-
-      setMe(data);
-    } catch (err: any) {
-      setStatus(String(err?.message || err));
-    } finally {
-      setLoading(false);
-    }
+  function saveGeneralSettings() {
+    toast.success("Impostazioni salvate");
   }
 
-  function logout() {
-    clearAccessToken();
-    window.location.href = '/login';
+  function changePassword() {
+    toast.info(
+      "La modifica password sarà collegata all'API nel prossimo passaggio",
+    );
   }
-
-  useEffect(() => {
-    loadMe();
-  }, []);
 
   return (
-    <div className="flex min-h-screen bg-[#0f1117] text-white">
-      <DashboardSidebar />
+    <div className="space-y-8">
+      <div>
+        <p className="text-xs font-semibold uppercase tracking-[0.25em] text-blue-400">
+          Sistema
+        </p>
 
-      <main className="flex-1 px-6 py-8 md:ml-72">
-        <div className="mx-auto max-w-7xl space-y-8">
-          <div>
-            <Link
-              href="/dashboard"
-              className="rounded-xl border border-white/10 px-4 py-2 text-sm transition hover:bg-white/5"
-            >
-              ← Dashboard
-            </Link>
+        <h1 className="mt-2 text-3xl font-bold text-white">
+          Impostazioni
+        </h1>
+
+        <p className="mt-2 text-gray-400">
+          Gestisci i dati dell&apos;associazione, il profilo e le preferenze.
+        </p>
+      </div>
+
+      <section className="grid gap-6 xl:grid-cols-2">
+        <article className="rounded-2xl border border-white/10 bg-[#0f172a] p-6">
+          <div className="mb-6 flex items-center gap-3">
+            <div className="rounded-xl bg-blue-500/10 p-3 text-blue-400">
+              <Building2 size={22} />
+            </div>
+
+            <div>
+              <h2 className="text-lg font-semibold text-white">
+                Associazione
+              </h2>
+
+              <p className="text-sm text-gray-400">
+                Informazioni principali dell&apos;associazione.
+              </p>
+            </div>
           </div>
 
-          <section className="rounded-[2rem] border border-white/10 bg-[#111827] p-8 shadow-2xl">
-            <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
-              <div className="flex items-center gap-4">
-                <div className="rounded-2xl bg-cyan-500/20 p-3 text-cyan-300">
-                  <Settings className="h-8 w-8" />
-                </div>
-
-                <div>
-                  <h1 className="text-5xl font-bold">
-                    Impostazioni NPA
-                  </h1>
-
-                  <p className="mt-2 text-zinc-400">
-                    Gestione account News Platform Association.
-                  </p>
-                </div>
-              </div>
-
-              <button
-                type="button"
-                onClick={loadMe}
-                className="inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-5 py-3 text-sm font-semibold text-white hover:bg-white/10"
+          <div className="space-y-4">
+            <div>
+              <label
+                htmlFor="association-name"
+                className="text-sm font-medium text-gray-300"
               >
-                <RefreshCw className="h-5 w-5" />
-                Aggiorna
-              </button>
-            </div>
-          </section>
+                Nome associazione
+              </label>
 
-          {status && (
-            <div className="rounded-2xl border border-yellow-500/30 bg-yellow-500/10 p-4 text-sm font-semibold text-yellow-300">
-              {status}
-            </div>
-          )}
-
-          <section className="grid gap-6 lg:grid-cols-2">
-            <div className="rounded-3xl border border-white/10 bg-[#111827] p-6 shadow-2xl">
-              <div className="mb-6 flex items-center gap-3">
-                <div className="rounded-2xl bg-cyan-500/20 p-3 text-cyan-300">
-                  <User className="h-6 w-6" />
-                </div>
-
-                <div>
-                  <h2 className="text-2xl font-bold">Profilo</h2>
-
-                  <p className="text-sm text-zinc-400">
-                    Dati utente letti dal backend.
-                  </p>
-                </div>
-              </div>
-
-              {loading ? (
-                <p className="text-zinc-400">
-                  Caricamento profilo...
-                </p>
-              ) : (
-                <div className="space-y-4">
-                  <div className="rounded-2xl border border-white/10 bg-[#0b1220] p-4">
-                    <p className="text-xs uppercase text-zinc-500">
-                      Email
-                    </p>
-
-                    <p className="mt-1 font-semibold">
-                      {me?.email || '-'}
-                    </p>
-                  </div>
-
-                  <div className="rounded-2xl border border-white/10 bg-[#0b1220] p-4">
-                    <p className="text-xs uppercase text-zinc-500">
-                      Ruolo
-                    </p>
-
-                    <p className="mt-1 font-semibold">
-                      {me?.role || '-'}
-                    </p>
-                  </div>
-
-                  <div className="rounded-2xl border border-white/10 bg-[#0b1220] p-4">
-                    <p className="text-xs uppercase text-zinc-500">
-                      ID Associazione
-                    </p>
-
-                    <p className="mt-1 break-all text-sm font-semibold">
-                      {me?.associationId || '-'}
-                    </p>
-                  </div>
-                </div>
-              )}
+              <input
+                id="association-name"
+                value={associationName}
+                onChange={(event) =>
+                  setAssociationName(event.target.value)
+                }
+                className="mt-2 w-full rounded-xl border border-white/10 bg-[#111827] px-4 py-3 text-white outline-none transition focus:border-blue-500"
+              />
             </div>
 
-            <div className="rounded-3xl border border-white/10 bg-[#111827] p-6 shadow-2xl">
-              <div className="mb-6">
-                <h2 className="text-2xl font-bold">
-                  Sessione
-                </h2>
+            <button
+              type="button"
+              onClick={saveGeneralSettings}
+              className="flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-3 font-semibold text-white transition hover:bg-blue-500"
+            >
+              <Save size={18} />
+              Salva modifiche
+            </button>
+          </div>
+        </article>
 
-                <p className="text-sm text-zinc-400">
-                  Gestione accesso JWT.
-                </p>
-              </div>
-
-              <div className="space-y-4">
-                <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-4 text-emerald-300">
-                  JWT attivo nel browser.
-                </div>
-
-                <button
-                  type="button"
-                  onClick={logout}
-                  className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-red-500 px-5 py-4 font-bold text-white hover:bg-red-600"
-                >
-                  <LogOut className="h-5 w-5" />
-                  Logout
-                </button>
-              </div>
+        <article className="rounded-2xl border border-white/10 bg-[#0f172a] p-6">
+          <div className="mb-6 flex items-center gap-3">
+            <div className="rounded-xl bg-violet-500/10 p-3 text-violet-400">
+              <User size={22} />
             </div>
-          </section>
 
-          <section className="rounded-3xl border border-white/10 bg-[#111827] p-6 shadow-2xl">
-            <div className="flex items-center gap-3">
-              <Save className="h-6 w-6 text-cyan-300" />
+            <div>
+              <h2 className="text-lg font-semibold text-white">
+                Profilo amministratore
+              </h2>
 
-              <div>
-                <h2 className="text-2xl font-bold">
-                  Funzionalità future NPA
-                </h2>
-
-                <p className="text-sm text-zinc-400">
-                  Cambio password, preferenze workspace,
-                  lingua, tema e notifiche account.
-                </p>
-              </div>
+              <p className="text-sm text-gray-400">
+                Dati dell&apos;account attualmente collegato.
+              </p>
             </div>
-          </section>
-        </div>
-      </main>
+          </div>
+
+          <div>
+            <label
+              htmlFor="admin-email"
+              className="text-sm font-medium text-gray-300"
+            >
+              Email
+            </label>
+
+            <input
+              id="admin-email"
+              type="email"
+              value={email}
+              onChange={(event) =>
+                setEmail(event.target.value)
+              }
+              className="mt-2 w-full rounded-xl border border-white/10 bg-[#111827] px-4 py-3 text-white outline-none transition focus:border-blue-500"
+            />
+          </div>
+        </article>
+
+        <article className="rounded-2xl border border-white/10 bg-[#0f172a] p-6">
+          <div className="mb-6 flex items-center gap-3">
+            <div className="rounded-xl bg-amber-500/10 p-3 text-amber-400">
+              <Bell size={22} />
+            </div>
+
+            <div>
+              <h2 className="text-lg font-semibold text-white">
+                Notifiche
+              </h2>
+
+              <p className="text-sm text-gray-400">
+                Gestisci gli avvisi della piattaforma.
+              </p>
+            </div>
+          </div>
+
+          <label className="flex cursor-pointer items-center justify-between rounded-xl border border-white/10 bg-[#111827] px-4 py-4">
+            <div>
+              <p className="font-medium text-white">
+                Notifiche abilitate
+              </p>
+
+              <p className="mt-1 text-sm text-gray-400">
+                Ricevi aggiornamenti su membri, eventi e finanze.
+              </p>
+            </div>
+
+            <input
+              type="checkbox"
+              checked={notificationsEnabled}
+              onChange={(event) =>
+                setNotificationsEnabled(
+                  event.target.checked,
+                )
+              }
+              className="h-5 w-5"
+            />
+          </label>
+        </article>
+
+        <article className="rounded-2xl border border-white/10 bg-[#0f172a] p-6">
+          <div className="mb-6 flex items-center gap-3">
+            <div className="rounded-xl bg-red-500/10 p-3 text-red-400">
+              <Lock size={22} />
+            </div>
+
+            <div>
+              <h2 className="text-lg font-semibold text-white">
+                Sicurezza
+              </h2>
+
+              <p className="text-sm text-gray-400">
+                Gestisci la password dell&apos;account.
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={changePassword}
+            className="rounded-xl border border-white/10 bg-[#111827] px-4 py-3 font-semibold text-white transition hover:bg-white/10"
+          >
+            Cambia password
+          </button>
+        </article>
+      </section>
     </div>
   );
 }

@@ -6,7 +6,10 @@ import { PrismaModule } from '../prisma/prisma.module';
 
 @Module({
   imports: [PrismaModule],
-  controllers: [BillingController, BillingWebhookController],
+  controllers: [
+    BillingController,        // /api/billing/checkout
+    BillingWebhookController, // /api/billing/webhook
+  ],
   providers: [BillingService],
 })
 export class BillingModule {}

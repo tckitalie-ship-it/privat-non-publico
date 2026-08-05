@@ -3,108 +3,165 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
-} from '@nestjs/common';
+} from "@nestjs/common";
+import { Role } from "@prisma/client";
 
-import { PrismaService } from '../prisma/prisma.service';
-import { NotificationsService } from '../notifications/notifications.service';
-
-import { CreateEventDto } from './dto/create-event.dto';
-import { EventsGateway } from './events.gateway';
+import { PrismaService } from "../prisma/prisma.service";
 
 @Injectable()
 export class EventsService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly eventsGateway: EventsGateway,
-    private readonly notificationsService: NotificationsService,
   ) {}
 
-  async create(currentUser: any, dto: CreateEventDto) {
-    if (!currentUser.associationId) {
-      throw new ForbiddenException('No active association selected');
+  async createEvent(
+    userId: string,
+    dto: {
+      associationId: string;
+      title: string;
+      description?: string | null;
+      startsAt: Date;
+      endsAt?: Date | null;
+      location?: string | null;
+    },
+  ) {
+    const membership =
+      await this.prisma.membership.findFirst({
+        where: {
+          userId,
+          associationId: dto.associationId,
+        },
+      });
+
+    if (!membership) {
+      throw new ForbiddenException(
+        "Non sei membro di questa associazione",
+      );
     }
 
-    const event = await this.prisma.event.create({
+    return this.prisma.event.create({
       data: {
-        associationId: currentUser.associationId,
+        associationId: dto.associationId,
         title: dto.title,
-        description: dto.description,
-        location: dto.location,
-        startsAt: new Date(dto.startsAt),
-        endsAt: dto.endsAt ? new Date(dto.endsAt) : null,
+        description: dto.description ?? null,
+        location: dto.location ?? null,
+        startsAt: dto.startsAt,
+        endsAt: dto.endsAt ?? null,
       },
     });
+  }
 
-    await this.notificationsService.create({
-      title: 'Nuovo evento',
-      message: `${event.title} è stato creato`,
-      associationId: currentUser.associationId,
-      userId: null,
+  async findAll(
+    associationId: string,
+    userId: string,
+  ) {
+    const membership =
+      await this.prisma.membership.findFirst({
+        where: {
+          userId,
+          associationId,
+        },
+      });
+
+    if (!membership) {
+      throw new ForbiddenException(
+        "Non sei membro di questa associazione",
+      );
+    }
+
+    return this.prisma.event.findMany({
+      where: {
+        associationId,
+      },
+      orderBy: {
+        startsAt: "asc",
+      },
+      include: {
+        registrations: true,
+      },
     });
+  }
 
-    this.eventsGateway.emitEventsChanged('Nuovo evento creato');
+  async findOne(
+    eventId: string,
+    userId: string,
+  ) {
+    const event =
+      await this.prisma.event.findUnique({
+        where: {
+          id: eventId,
+        },
+        include: {
+          registrations: true,
+          association: true,
+        },
+      });
+
+    if (!event) {
+      throw new NotFoundException(
+        "Evento non trovato",
+      );
+    }
+
+    const membership =
+      await this.prisma.membership.findFirst({
+        where: {
+          userId,
+          associationId: event.associationId,
+        },
+      });
+
+    if (!membership) {
+      throw new ForbiddenException(
+        "Non sei membro di questa associazione",
+      );
+    }
 
     return event;
   }
 
-  async findAll(currentUser: any) {
-    if (!currentUser.associationId) {
-      throw new ForbiddenException('No active association selected');
-    }
-
-    const events = await this.prisma.event.findMany({
-      where: {
-        associationId: currentUser.associationId,
-      },
-      orderBy: {
-        startsAt: 'asc',
-      },
-      include: {
-        registrations: {
-          select: {
-            userId: true,
-          },
+  async updateEvent(
+    eventId: string,
+    userId: string,
+    dto: {
+      title?: string;
+      description?: string | null;
+      startsAt?: Date;
+      endsAt?: Date | null;
+      location?: string | null;
+    },
+  ) {
+    const event =
+      await this.prisma.event.findUnique({
+        where: {
+          id: eventId,
         },
-      },
-    });
-
-    return events.map((event) => ({
-      id: event.id,
-      associationId: event.associationId,
-      title: event.title,
-      description: event.description,
-      location: event.location,
-      startsAt: event.startsAt,
-      endsAt: event.endsAt,
-      createdAt: event.createdAt,
-      updatedAt: event.updatedAt,
-      registrationsCount: event.registrations.length,
-      isRegistered: event.registrations.some(
-        (registration) => registration.userId === currentUser.id,
-      ),
-    }));
-  }
-
-  async update(currentUser: any, eventId: string, dto: CreateEventDto) {
-    if (!currentUser.associationId) {
-      throw new ForbiddenException('No active association selected');
-    }
-
-    const event = await this.prisma.event.findUnique({
-      where: {
-        id: eventId,
-      },
-    });
+      });
 
     if (!event) {
-      throw new NotFoundException('Event not found');
+      throw new NotFoundException(
+        "Evento non trovato",
+      );
     }
 
-    if (event.associationId !== currentUser.associationId) {
-      throw new ForbiddenException('Wrong association');
+    const membership =
+      await this.prisma.membership.findFirst({
+        where: {
+          userId,
+          associationId: event.associationId,
+        },
+      });
+
+    if (
+      !membership ||
+      membership.role === Role.MEMBER
+    ) {
+      throw new ForbiddenException(
+        "Non hai i permessi per modificare l’evento",
+      );
     }
 
-    const updatedEvent = await this.prisma.event.update({
+    return this.prisma.event.update({
       where: {
         id: eventId,
       },
@@ -112,33 +169,44 @@ export class EventsService {
         title: dto.title,
         description: dto.description,
         location: dto.location,
-        startsAt: new Date(dto.startsAt),
-        endsAt: dto.endsAt ? new Date(dto.endsAt) : null,
+        startsAt: dto.startsAt,
+        endsAt: dto.endsAt,
       },
     });
-
-    this.eventsGateway.emitEventsChanged('Evento aggiornato');
-
-    return updatedEvent;
   }
 
-  async remove(currentUser: any, eventId: string) {
-    if (!currentUser.associationId) {
-      throw new ForbiddenException('No active association selected');
-    }
-
-    const event = await this.prisma.event.findUnique({
-      where: {
-        id: eventId,
-      },
-    });
+  async deleteEvent(
+    eventId: string,
+    userId: string,
+  ) {
+    const event =
+      await this.prisma.event.findUnique({
+        where: {
+          id: eventId,
+        },
+      });
 
     if (!event) {
-      throw new NotFoundException('Event not found');
+      throw new NotFoundException(
+        "Evento non trovato",
+      );
     }
 
-    if (event.associationId !== currentUser.associationId) {
-      throw new ForbiddenException('Wrong association');
+    const membership =
+      await this.prisma.membership.findFirst({
+        where: {
+          userId,
+          associationId: event.associationId,
+        },
+      });
+
+    if (
+      !membership ||
+      membership.role === Role.MEMBER
+    ) {
+      throw new ForbiddenException(
+        "Non hai i permessi per eliminare l’evento",
+      );
     }
 
     await this.prisma.event.delete({
@@ -147,74 +215,95 @@ export class EventsService {
       },
     });
 
-    this.eventsGateway.emitEventsChanged('Evento eliminato');
-
     return {
-      success: true,
+      message: "Evento eliminato",
     };
   }
 
-  async register(currentUser: any, eventId: string) {
-    if (!currentUser.associationId) {
-      throw new ForbiddenException('No active association selected');
-    }
-
-    const event = await this.prisma.event.findUnique({
-      where: {
-        id: eventId,
-      },
-    });
+  async registerToEvent(
+    eventId: string,
+    userId: string,
+  ) {
+    const event =
+      await this.prisma.event.findUnique({
+        where: {
+          id: eventId,
+        },
+      });
 
     if (!event) {
-      throw new NotFoundException('Event not found');
+      throw new NotFoundException(
+        "Evento non trovato",
+      );
     }
 
-    if (event.associationId !== currentUser.associationId) {
-      throw new ForbiddenException('Wrong association');
-    }
-
-    const existing = await this.prisma.eventRegistration.findUnique({
-      where: {
-        eventId_userId: {
-          eventId,
-          userId: currentUser.id,
+    const membership =
+      await this.prisma.membership.findFirst({
+        where: {
+          userId,
+          associationId: event.associationId,
         },
-      },
-    });
+      });
+
+    if (!membership) {
+      throw new ForbiddenException(
+        "Non sei membro di questa associazione",
+      );
+    }
+
+    const existing =
+      await this.prisma.eventRegistration.findUnique({
+        where: {
+          eventId_userId: {
+            eventId,
+            userId,
+          },
+        },
+      });
 
     if (existing) {
-      throw new BadRequestException('Already registered');
+      throw new BadRequestException(
+        "Sei già registrato a questo evento",
+      );
     }
 
-    const registration = await this.prisma.eventRegistration.create({
+    return this.prisma.eventRegistration.create({
       data: {
         eventId,
-        userId: currentUser.id,
+        userId,
       },
     });
-
-    this.eventsGateway.emitEventsChanged('Nuova registrazione evento');
-
-    return registration;
   }
 
-  async findRegistrations(currentUser: any, eventId: string) {
-    if (!currentUser.associationId) {
-      throw new ForbiddenException('No active association selected');
-    }
-
-    const event = await this.prisma.event.findUnique({
-      where: {
-        id: eventId,
-      },
-    });
+  async getRegistrations(
+    eventId: string,
+    userId: string,
+  ) {
+    const event =
+      await this.prisma.event.findUnique({
+        where: {
+          id: eventId,
+        },
+      });
 
     if (!event) {
-      throw new NotFoundException('Event not found');
+      throw new NotFoundException(
+        "Evento non trovato",
+      );
     }
 
-    if (event.associationId !== currentUser.associationId) {
-      throw new ForbiddenException('Wrong association');
+    const membership =
+      await this.prisma.membership.findFirst({
+        where: {
+          userId,
+          associationId: event.associationId,
+        },
+      });
+
+    if (!membership) {
+      throw new ForbiddenException(
+        "Non sei membro di questa associazione",
+      );
     }
 
     return this.prisma.eventRegistration.findMany({
@@ -229,54 +318,71 @@ export class EventsService {
           },
         },
       },
+      orderBy: {
+        createdAt: "asc",
+      },
     });
   }
 
-  async unregister(currentUser: any, eventId: string) {
-    if (!currentUser.associationId) {
-      throw new ForbiddenException('No active association selected');
-    }
-
-    const event = await this.prisma.event.findUnique({
-      where: {
-        id: eventId,
-      },
-    });
+  async unregisterFromEvent(
+    eventId: string,
+    userId: string,
+  ) {
+    const event =
+      await this.prisma.event.findUnique({
+        where: {
+          id: eventId,
+        },
+      });
 
     if (!event) {
-      throw new NotFoundException('Event not found');
+      throw new NotFoundException(
+        "Evento non trovato",
+      );
     }
 
-    if (event.associationId !== currentUser.associationId) {
-      throw new ForbiddenException('Wrong association');
-    }
-
-    const registration = await this.prisma.eventRegistration.findUnique({
-      where: {
-        eventId_userId: {
-          eventId,
-          userId: currentUser.id,
+    const membership =
+      await this.prisma.membership.findFirst({
+        where: {
+          userId,
+          associationId: event.associationId,
         },
-      },
-    });
+      });
+
+    if (!membership) {
+      throw new ForbiddenException(
+        "Non sei membro di questa associazione",
+      );
+    }
+
+    const registration =
+      await this.prisma.eventRegistration.findUnique({
+        where: {
+          eventId_userId: {
+            eventId,
+            userId,
+          },
+        },
+      });
 
     if (!registration) {
-      throw new NotFoundException('Registration not found');
+      throw new BadRequestException(
+        "Non sei registrato a questo evento",
+      );
     }
 
     await this.prisma.eventRegistration.delete({
       where: {
         eventId_userId: {
           eventId,
-          userId: currentUser.id,
+          userId,
         },
       },
     });
 
-    this.eventsGateway.emitEventsChanged('Registrazione annullata');
-
     return {
       success: true,
+      message: "Registrazione annullata",
     };
   }
 }

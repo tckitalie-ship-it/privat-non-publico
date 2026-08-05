@@ -10,12 +10,17 @@ export async function POST(request: Request) {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          Authorization:
+            request.headers.get('authorization') || '',
         },
         body: JSON.stringify(body),
       },
     );
 
     const text = await response.text();
+
+    console.log('PROXY STATUS:', response.status);
+    console.log('PROXY RESPONSE:', text);
 
     try {
       const data = JSON.parse(text);
@@ -33,7 +38,9 @@ export async function POST(request: Request) {
         },
       );
     }
-  } catch {
+  } catch (error) {
+    console.error('PROXY ERROR:', error);
+
     return NextResponse.json(
       {
         message: 'Errore interno proxy invitations',

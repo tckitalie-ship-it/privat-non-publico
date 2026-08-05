@@ -1,116 +1,99 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { setAccessToken } from '@/lib/api';
-
-const API_URL =
-  process.env.NEXT_PUBLIC_API_URL ||
-  'https://api-production-0f62.up.railway.app';
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { setAccessToken } from "@/lib/api";
 
 export default function LoginPage() {
   const router = useRouter();
-
-  const [email, setEmail] = useState('nuovo@example.com');
-  const [password, setPassword] = useState('12345678');
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState<string | null>(null);
 
-  async function handleLogin(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-
     setLoading(true);
-    setError('');
+    setError(null);
 
     try {
-      const res = await fetch(`${API_URL}/api/auth/login`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
       });
 
       if (!res.ok) {
-        throw new Error('Login fallito');
+        throw new Error("Credenziali non valide");
       }
 
       const data = await res.json();
+      const token = data.accessToken;
 
-      if (!data.access_token) {
-        throw new Error('Token mancante');
-      }
+      // 🔵 SALVATAGGIO TOKEN
+      setAccessToken(token);
 
-      setAccessToken(data.access_token);
-      router.push('/dashboard');
-    } catch {
-      setError('Email o password non validi');
+      // 🔵 TEST RICHIESTO
+      alert(
+        localStorage.getItem("access_token")
+          ? "Token salvato correttamente"
+          : "Token NON salvato",
+      );
+
+      // 🔵 REDIRECT
+      router.replace("/dashboard");
+      router.refresh();
+    } catch (err: unknown) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Errore durante il login",
+      );
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <main className="min-h-screen flex items-center justify-center bg-slate-950 px-4">
-      <div className="w-full max-w-md rounded-2xl border border-slate-800 bg-white p-8 shadow-xl">
-        <div className="mb-6">
-          <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-slate-500">
-            NPA
+    <div className="flex min-h-screen items-center justify-center bg-[#0b1120] text-white">
+      <form
+        onSubmit={handleSubmit}
+        className="w-full max-w-sm space-y-4 rounded-xl bg-[#111827] p-6 shadow-xl"
+      >
+        <h1 className="text-xl font-semibold">Accedi</h1>
+
+        {error && (
+          <p className="rounded-md bg-red-600/20 p-2 text-sm text-red-400">
+            {error}
           </p>
+        )}
 
-          <h1 className="text-2xl font-bold text-slate-900">
-            News Platform Association
-          </h1>
+        <input
+          type="email"
+          placeholder="Email"
+          className="w-full rounded-md bg-[#1f2937] p-2 text-sm"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          required
+        />
 
-          <p className="text-sm text-slate-500 mt-2">
-            Accedi alla piattaforma di gestione della tua associazione.
-          </p>
-        </div>
+        <input
+          type="password"
+          placeholder="Password"
+          className="w-full rounded-md bg-[#1f2937] p-2 text-sm"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          required
+        />
 
-        <form onSubmit={handleLogin} className="space-y-4">
-          <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">
-              Email
-            </label>
-
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="nuovo@example.com"
-              className="w-full rounded-xl border px-4 py-3 outline-none focus:ring-2 focus:ring-slate-900"
-            />
-          </div>
-
-          <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">
-              Password
-            </label>
-
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="12345678"
-              className="w-full rounded-xl border px-4 py-3 outline-none focus:ring-2 focus:ring-slate-900"
-            />
-          </div>
-
-          {error && (
-            <div className="rounded-xl bg-red-50 p-3 text-sm text-red-600">
-              {error}
-            </div>
-          )}
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full rounded-xl bg-slate-950 px-4 py-3 font-semibold text-white disabled:opacity-60"
-          >
-            {loading ? 'Accesso...' : 'Entra'}
-          </button>
-        </form>
-      </div>
-    </main>
+        <button
+          type="submit"
+          disabled={loading}
+          className="w-full rounded-md bg-blue-600 py-2 text-sm font-semibold transition hover:bg-blue-700 disabled:opacity-50"
+        >
+          {loading ? "Accesso..." : "Login"}
+        </button>
+      </form>
+    </div>
   );
 }

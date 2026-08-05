@@ -1,25 +1,74 @@
 import {
-  BadRequestException,
   Controller,
-  Headers,
   Post,
   Req,
-} from '@nestjs/common';
-import { BillingService } from './billing.service';
+  Headers,
+  BadRequestException,
+} from "@nestjs/common";
+import { BillingService } from "./billing.service";
+import Stripe from "stripe";
 
-@Controller('billing')
+@Controller("billing/webhook")
 export class BillingWebhookController {
-  constructor(private readonly billingService: BillingService) {}
+  private stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+  apiVersion: "2025-02-24.acacia",
+  });
 
-  @Post('webhook')
-  async handleStripeWebhook(
+  constructor(private readonly billing: BillingService) {}
+
+  @Post()
+  async handleWebhook(
     @Req() req: any,
-    @Headers('stripe-signature') signature?: string,
+    @Headers("stripe-signature") signature: string
   ) {
-    if (!signature) {
-      throw new BadRequestException('Missing Stripe signature');
+    let event: Stripe.Event;
+
+    try {
+      event = this.stripe.webhooks.constructEvent(
+        req.rawBody,
+        signature,
+        process.env.STRIPE_WEBHOOK_SECRET!
+      );
+    } catch (err) {
+      throw new BadRequestException("Webhook signature invalid");
     }
 
-    return this.billingService.handleWebhook(req, signature);
+    switch (event.type) {
+      case "customer.subscription.created":
+      case "customer.subscription.updated": {
+        const subscription = event.data.object as Stripe.Subscription;
+        const customerId = subscription.customer as string;
+
+        const association = await this.billing.findByCustomerId(customerId);
+
+        await this.billing.updateSubscription(association.id, {
+          subscriptionStatus: subscription.status,
+          subscriptionCurrentPeriodEnd: new Date(
+            subscription.current_period_end * 1000
+          ),
+        });
+
+        break;
+      }
+
+      case "customer.subscription.deleted": {
+        const subscription = event.data.object as Stripe.Subscription;
+        const customerId = subscription.customer as string;
+
+        const association = await this.billing.findByCustomerId(customerId);
+
+        await this.billing.updateSubscription(association.id, {
+          subscriptionStatus: null,
+          subscriptionCurrentPeriodEnd: null,
+        });
+
+        break;
+      }
+
+      default:
+        break;
+    }
+
+    return { received: true };
   }
 }

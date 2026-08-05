@@ -1,0 +1,75 @@
+"use client";
+
+import { usePathname } from "next/navigation";
+import { Search, ChevronRight } from "lucide-react";
+import AssociationSwitcher from "@/components/association-switcher";
+import { NotificationBell } from "@/components/notification-bell";
+import ThemeToggle from "@/components/theme-toggle";
+import LogoutButton from "@/components/logout-button";
+
+export default function DashboardHeader() {
+  const pathname = usePathname();
+
+  // Breadcrumb dinamico
+  const segments = pathname
+    .split("/")
+    .filter(Boolean)
+    .slice(1); // rimuove "dashboard"
+
+  return (
+    <header className="sticky top-0 z-30 bg-[#0D1117] border-b border-[#1F2428]">
+      <div className="flex items-center justify-between px-6 h-16">
+        
+        {/* LEFT: Breadcrumb + Associazione */}
+        <div className="flex items-center gap-6">
+          {/* Breadcrumb */}
+          <div className="flex items-center gap-2 text-gray-400 text-sm">
+            <span className="text-white font-medium">Dashboard</span>
+
+            {segments.map((segment, index) => (
+              <div key={index} className="flex items-center gap-2">
+                <ChevronRight size={14} className="text-gray-600" />
+                <span className="capitalize text-gray-300">
+                  {segment.replace("-", " ")}
+                </span>
+              </div>
+            ))}
+          </div>
+
+          {/* Associazione */}
+          <div className="hidden md:block">
+            <AssociationSwitcher />
+          </div>
+        </div>
+
+        {/* RIGHT: Search + Notifiche + Tema + Avatar + Logout */}
+        <div className="flex items-center gap-4">
+
+          {/* Search bar */}
+          <div className="hidden md:flex items-center bg-[#1F2428] border border-[#2D333B] rounded-md px-3 py-1.5 w-64">
+            <Search size={16} className="text-gray-500" />
+            <input
+              type="text"
+              placeholder="Cerca..."
+              className="bg-transparent text-sm text-gray-300 ml-2 w-full outline-none"
+            />
+          </div>
+
+          {/* Notifiche */}
+          <NotificationBell />
+
+          {/* Tema */}
+          <ThemeToggle />
+
+          {/* Avatar */}
+          <div className="w-9 h-9 rounded-full bg-gray-600" />
+
+          {/* Logout */}
+          <div className="hidden md:block">
+            <LogoutButton />
+          </div>
+        </div>
+      </div>
+    </header>
+  );
+}

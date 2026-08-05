@@ -1,298 +1,151 @@
-'use client';
+"use client";
 
-import { useEffect, useState } from 'react';
-import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import io from 'socket.io-client';
-
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 import {
-  LayoutDashboard,
-  CalendarDays,
-  Wallet,
-  Users,
-  Settings,
-  CreditCard,
-  Bot,
-  MessageCircle,
-  Folder,
-  Building2,
-  Search,
-  Menu,
-  X,
   Bell,
-} from 'lucide-react';
+  Calendar,
+  Folder,
+  LayoutDashboard,
+  Settings,
+  Users,
+  Wallet,
+} from "lucide-react";
 
-import { API_URL } from '@/lib/api';
+import AssociationSwitcher from "@/components/association-switcher";
+import LogoutButton from "@/components/logout-button";
+import { NotificationBell } from "@/components/notification-bell";
+import ThemeToggle from "@/components/theme-toggle";
+import { cn } from "@/lib/utils";
 
-const socket = io(API_URL, {
-  transports: ['websocket'],
-});
-
-const mainItems = [
+const navigation = [
   {
-    label: 'Dashboard',
-    href: '/dashboard',
+    label: "Dashboard",
+    href: "/dashboard",
     icon: LayoutDashboard,
   },
   {
-    label: 'Search',
-    href: '/search',
-    icon: Search,
+    label: "Eventi",
+    href: "/dashboard/events",
+    icon: Calendar,
   },
   {
-    label: 'Assistant',
-    href: '/assistant',
-    icon: Bot,
-  },
-  {
-    label: 'Chat',
-    href: '/chat',
-    icon: MessageCircle,
-  },
-  {
-    label: 'Notifications',
-    href: '/notifications',
-    icon: Bell,
-  },
-];
-
-const managementItems = [
-  {
-    label: 'Eventi',
-    href: '/events',
-    icon: CalendarDays,
-  },
-  {
-    label: 'Membri',
-    href: '/members',
+    label: "Membri",
+    href: "/members",
     icon: Users,
   },
   {
-    label: 'Files',
-    href: '/files',
-    icon: Folder,
-  },
-  {
-    label: 'Associazioni',
-    href: '/associations',
-    icon: Building2,
-  },
-];
-
-const businessItems = [
-  {
-    label: 'Finanze',
-    href: '/finance',
+    label: "Finanze",
+    href: "/dashboard/finance",
     icon: Wallet,
   },
   {
-    label: 'Billing',
-    href: '/billing',
-    icon: CreditCard,
+    label: "Notifiche",
+    href: "/dashboard/notifications",
+    icon: Bell,
   },
   {
-    label: 'Impostazioni',
-    href: '/settings',
-    icon: Settings,
+    label: "File",
+    href: "/dashboard/files",
+    icon: Folder,
   },
 ];
 
 export default function DashboardSidebar() {
   const pathname = usePathname();
 
-  const [open, setOpen] = useState(false);
-  const [unreadCount, setUnreadCount] = useState(0);
-
-  useEffect(() => {
-    loadNotifications();
-
-    socket.on('notification:new', () => {
-      setUnreadCount((prev) => prev + 1);
-    });
-
-    return () => {
-      socket.off('notification:new');
-    };
-  }, []);
-
-  async function loadNotifications() {
-    try {
-      const token = localStorage.getItem('token');
-
-      const res = await fetch(`${API_URL}/notifications`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      if (!res.ok) {
-        return;
-      }
-
-      const data = await res.json();
-
-      const unread = data.filter(
-        (notification: any) => !notification.read,
-      ).length;
-
-      setUnreadCount(unread);
-    } catch (error) {
-      console.error(error);
+  function isActive(href: string) {
+    if (href === "/dashboard") {
+      return pathname === "/dashboard";
     }
+
+    return pathname === href || pathname.startsWith(`${href}/`);
   }
 
-  function Section({
-    title,
-    items,
-  }: {
-    title: string;
-    items: typeof mainItems;
-  }) {
-    return (
-      <div className="space-y-2">
-        <p className="px-3 text-xs font-semibold uppercase tracking-[0.2em] text-zinc-600">
-          {title}
+  return (
+    <div className="flex h-full min-h-0 w-full flex-col overflow-hidden bg-[#0d1117] text-gray-300">
+      {/* HEADER */}
+      <header className="shrink-0 border-b border-[#21262d] px-5 py-5">
+        <h1 className="text-xl font-bold leading-tight text-white">
+          Gestione Associazione
+        </h1>
+
+        <p className="mt-1 text-xs text-gray-500">
+          Dashboard amministrativa
+        </p>
+      </header>
+
+      {/* ASSOCIATION SWITCHER */}
+      <section className="shrink-0 border-b border-[#21262d] px-4 py-4">
+        <AssociationSwitcher />
+      </section>
+
+      {/* NAVIGATION */}
+      <nav className="min-h-0 flex-1 px-4 py-5">
+        <p className="mb-3 px-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-500">
+          Navigazione
         </p>
 
-        <nav className="space-y-1">
-          {items.map((item) => {
-            const active =
-              pathname === item.href || pathname.startsWith(`${item.href}/`);
-
+        <div className="space-y-1">
+          {navigation.map((item) => {
             const Icon = item.icon;
-            const isNotifications = item.href === '/notifications';
+            const active = isActive(item.href);
 
             return (
               <Link
                 key={item.href}
                 href={item.href}
-                onClick={() => setOpen(false)}
-                className={`group flex items-center justify-between rounded-2xl px-3 py-3 text-sm font-medium transition-all duration-200 ${
+                className={cn(
+                  "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition",
                   active
-                    ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-950/40'
-                    : 'text-zinc-400 hover:bg-white/[0.05] hover:text-white'
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <span
-                    className={`flex h-9 w-9 items-center justify-center rounded-xl transition ${
-                      active
-                        ? 'bg-white/15'
-                        : 'bg-white/[0.04] group-hover:bg-white/[0.08]'
-                    }`}
-                  >
-                    <Icon size={18} />
-                  </span>
-
-                  <span>{item.label}</span>
-                </div>
-
-                {isNotifications && unreadCount > 0 && (
-                  <span className="flex h-6 min-w-[24px] items-center justify-center rounded-full bg-red-500 px-2 text-xs font-bold text-white">
-                    {unreadCount}
-                  </span>
+                    ? "bg-blue-600 text-white shadow-lg shadow-blue-950/30"
+                    : "text-gray-400 hover:bg-[#161b22] hover:text-white",
                 )}
+              >
+                <Icon size={19} className="shrink-0" />
+
+                <span className="truncate">{item.label}</span>
               </Link>
             );
           })}
-        </nav>
-      </div>
-    );
-  }
-
-  function NavLinks() {
-    return (
-      <div className="space-y-7">
-        <Section title="Main" items={mainItems} />
-
-        <Section title="Gestione" items={managementItems} />
-
-        <Section title="Business" items={businessItems} />
-      </div>
-    );
-  }
-
-  function Brand() {
-    return (
-      <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-4">
-        <div className="flex items-center gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-cyan-400 font-bold text-white">
-            NPA
-          </div>
-
-          <div>
-            <h2 className="text-base font-bold text-white">
-              News Platform Association
-            </h2>
-
-            <p className="text-xs text-zinc-500">
-              NPA Workspace
-            </p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <>
-      <header className="sticky top-0 z-50 flex items-center justify-between border-b border-white/10 bg-[#090D14]/95 px-4 py-3 text-white backdrop-blur md:hidden">
-        <div>
-          <h2 className="text-sm font-bold">
-            News Platform Association
-          </h2>
-
-          <p className="text-xs text-zinc-500">
-            NPA Dashboard
-          </p>
         </div>
 
-        <button
-          type="button"
-          onClick={() => setOpen(true)}
-          className="rounded-xl border border-white/10 p-2 text-zinc-300 transition hover:bg-white/5"
+        <div className="my-5 border-t border-[#21262d]" />
+
+        <p className="mb-3 px-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-500">
+          Sistema
+        </p>
+
+        <Link
+          href="/dashboard/settings"
+          className={cn(
+            "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition",
+            isActive("/dashboard/settings")
+              ? "bg-blue-600 text-white shadow-lg shadow-blue-950/30"
+              : "text-gray-400 hover:bg-[#161b22] hover:text-white",
+          )}
         >
-          <Menu size={22} />
-        </button>
-      </header>
+          <Settings size={19} className="shrink-0" />
 
-      {open ? (
-        <div className="fixed inset-0 z-[60] bg-black/70 backdrop-blur-sm md:hidden">
-          <aside className="h-full w-80 max-w-[85vw] overflow-y-auto border-r border-white/10 bg-[#090D14] p-4 text-white shadow-2xl">
-            <div className="mb-6 flex items-center justify-between gap-3">
-              <Brand />
+          <span className="truncate">Impostazioni</span>
+        </Link>
+      </nav>
 
-              <button
-                type="button"
-                onClick={() => setOpen(false)}
-                className="rounded-xl border border-white/10 p-2 text-zinc-300 transition hover:bg-white/5"
-              >
-                <X size={20} />
-              </button>
-            </div>
-
-            <NavLinks />
-          </aside>
-        </div>
-      ) : null}
-
-      <aside className="fixed left-0 top-0 z-40 hidden h-screen w-72 flex-col border-r border-white/10 bg-[#090D14] px-4 py-5 text-white md:flex">
-        <Brand />
-
-        <div className="mt-8 flex-1 overflow-y-auto pr-1">
-          <NavLinks />
+      {/* FOOTER */}
+      <footer className="shrink-0 border-t border-[#21262d] px-4 py-4">
+        <div className="mb-4 flex items-center justify-between">
+          <NotificationBell />
+          <ThemeToggle />
         </div>
 
-        <div className="mt-6 rounded-3xl border border-emerald-500/20 bg-emerald-500/10 p-4">
-          <p className="text-sm font-semibold text-emerald-300">
-            Sistema realtime attivo
-          </p>
+        <div className="mb-3 rounded-xl border border-[#30363d] bg-[#161b22] px-4 py-3">
+          <p className="text-sm font-semibold text-white">Amministratore</p>
 
-          <p className="mt-1 text-xs text-zinc-400">
-            Websocket live online
-          </p>
+          <p className="mt-1 text-xs text-gray-400">Dashboard SaaS</p>
         </div>
-      </aside>
-    </>
+
+        <LogoutButton />
+      </footer>
+    </div>
   );
 }

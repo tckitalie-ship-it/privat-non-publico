@@ -1,565 +1,776 @@
-'use client';
-
-import Link from 'next/link';
+"use client";
 
 import {
-  FormEvent,
+  useCallback,
   useEffect,
   useMemo,
   useState,
-} from 'react';
+} from "react";
+import { toast } from "sonner";
 
-import {
-  CalendarDays,
-  MapPin,
-  Plus,
-  RefreshCw,
-  Search,
-  Trash2,
-} from 'lucide-react';
+import EventCalendar from "@/components/events/EventCalendar";
+import EventFilters from "@/components/events/EventFilters";
+import EventsHeader from "@/components/events/EventsHeader";
+import EventsList from "@/components/events/EventsList";
+import EventsStats from "@/components/events/EventsStats";
+import CreateEventModal from "@/components/events/CreateEventModal";
+import EditEventModal from "@/components/events/EditEventModal";
 
-import { toast } from 'sonner';
+import type { EventItem } from "@/components/events/EventCard";
 
-import { API_URL } from '@/lib/api';
+import { API_URL, getAccessToken } from "@/lib/api";
 
-type EventRegistration = {
+type DashboardEvent = {
   id: string;
-  userId?: string;
-  user?: {
-    id: string;
-    email: string;
-  };
-};
-
-type EventItem = {
-  id: string;
+  associationId: string;
   title: string;
   description?: string | null;
   location?: string | null;
-  startsAt?: string | null;
+  startsAt: string;
   endsAt?: string | null;
-  registrations?: EventRegistration[];
+  createdAt: string;
+  updatedAt?: string;
+  registrations?: {
+    id: string;
+    userId: string;
+    status?: string;
+  }[];
 };
 
-function getAccessToken() {
-  if (typeof window === 'undefined') return null;
+type MembershipResponse = {
+  id: string;
+  associationId?: string;
+  role: string;
+  association?: {
+    id: string;
+    name: string;
+  };
+};
 
-  const localToken = localStorage.getItem('access_token');
+type ApiErrorResponse = {
+  message?: string | string[];
+};
 
-  if (localToken) return localToken;
-
-  const cookies = document.cookie.split(';');
-
-  for (const cookie of cookies) {
-    const [key, value] = cookie.trim().split('=');
-
-    if (key === 'access_token') {
-      return decodeURIComponent(value);
-    }
+function getErrorMessage(
+  data: ApiErrorResponse | null,
+  fallback: string,
+) {
+  if (Array.isArray(data?.message)) {
+    return data.message.join(", ");
   }
 
-  return null;
+  if (typeof data?.message === "string") {
+    return data.message;
+  }
+
+  return fallback;
 }
 
-function getUserIdFromToken(token: string | null) {
-  if (!token) return null;
+function getCurrentUserId() {
+  const token = getAccessToken();
+
+  if (!token) {
+    return null;
+  }
 
   try {
-    const payload = JSON.parse(atob(token.split('.')[1]));
-    return payload.sub || null;
+    const payloadPart = token.split(".")[1];
+
+    if (!payloadPart) {
+      return null;
+    }
+
+    const normalized = payloadPart
+      .replace(/-/g, "+")
+      .replace(/_/g, "/");
+
+    const payload = JSON.parse(
+      decodeURIComponent(
+        Array.from(atob(normalized))
+          .map(
+            (character) =>
+              `%${character
+                .charCodeAt(0)
+                .toString(16)
+                .padStart(2, "0")}`,
+          )
+          .join(""),
+      ),
+    ) as { sub?: unknown };
+
+    return typeof payload.sub === "string"
+      ? payload.sub
+      : null;
   } catch {
     return null;
   }
 }
 
-export default function DashboardEventsPage() {
-  const [events, setEvents] = useState<EventItem[]>([]);
-  const [showForm, setShowForm] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [loadingEvents, setLoadingEvents] = useState(true);
-  const [search, setSearch] = useState('');
-  const [filter, setFilter] = useState<'ALL' | 'UPCOMING'>('ALL');
+async function requestAssociationId(
+  currentAssociationId: string | null,
+): Promise<string> {
+  if (currentAssociationId) {
+    return currentAssociationId;
+  }
 
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [location, setLocation] = useState('');
-  const [startsAt, setStartsAt] = useState('');
-  const [endsAt, setEndsAt] = useState('');
+  const token = getAccessToken();
+
+  if (!token) {
+    throw new Error(
+      "Sessione non disponibile. Effettua nuovamente il login.",
+    );
+  }
+
+  const response = await fetch(
+    `${API_URL}/memberships/me`,
+    {
+      method: "GET",
+      headers: {
+        Accept: "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      cache: "no-store",
+    },
+  );
+
+  const data =
+    (await response
+      .json()
+      .catch(() => null)) as
+      | (MembershipResponse & ApiErrorResponse)
+      | null;
+
+  if (!response.ok) {
+    throw new Error(
+      getErrorMessage(
+        data,
+        `Errore associazione (${response.status})`,
+      ),
+    );
+  }
+
+  const resolvedId =
+    data?.associationId ??
+    data?.association?.id;
+
+  if (!resolvedId) {
+    throw new Error(
+      "Nessuna associazione attiva disponibile.",
+    );
+  }
+
+  return resolvedId;
+}
+
+async function requestEvents(
+  currentAssociationId: string | null,
+): Promise<{
+  associationId: string;
+  events: DashboardEvent[];
+}> {
+  const token = getAccessToken();
+
+  if (!token) {
+    throw new Error(
+      "Sessione non disponibile. Effettua nuovamente il login.",
+    );
+  }
+
+  const resolvedAssociationId =
+    await requestAssociationId(
+      currentAssociationId,
+    );
+
+  const response = await fetch(
+    `${API_URL}/events/association/${resolvedAssociationId}`,
+    {
+      method: "GET",
+      headers: {
+        Accept: "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      cache: "no-store",
+    },
+  );
+
+  const data =
+    (await response
+      .json()
+      .catch(() => null)) as
+      | DashboardEvent[]
+      | ApiErrorResponse
+      | null;
+
+  if (!response.ok) {
+    throw new Error(
+      getErrorMessage(
+        data as ApiErrorResponse | null,
+        `Errore caricamento eventi (${response.status})`,
+      ),
+    );
+  }
+
+  return {
+    associationId: resolvedAssociationId,
+    events: Array.isArray(data)
+      ? data
+      : [],
+  };
+}
+
+export default function DashboardEventsPage() {
+  const [events, setEvents] =
+    useState<DashboardEvent[]>([]);
+
+  const [
+    associationId,
+    setAssociationId,
+  ] = useState<string | null>(null);
+
+  const [loading, setLoading] =
+    useState(true);
+
+  const [deletingId, setDeletingId] =
+    useState<string | null>(null);
+
+  const [
+    registrationLoadingId,
+    setRegistrationLoadingId,
+  ] = useState<string | null>(null);
+
+  const [search, setSearch] =
+    useState("");
+
+  const [status, setStatus] = useState<
+    "ALL" | "UPCOMING" | "PAST"
+  >("ALL");
+
+  const [createOpen, setCreateOpen] =
+    useState(false);
+
+  const [editOpen, setEditOpen] =
+    useState(false);
+
+  const [editEvent, setEditEvent] =
+    useState<DashboardEvent | null>(null);
+
+  const currentUserId =
+    getCurrentUserId();
+
+  const loadEvents = useCallback(
+    async () => {
+      try {
+        setLoading(true);
+
+        const result =
+          await requestEvents(
+            associationId,
+          );
+
+        setAssociationId(
+          result.associationId,
+        );
+        setEvents(result.events);
+      } catch (error) {
+        console.error(
+          "Errore caricamento eventi:",
+          error,
+        );
+
+        setEvents([]);
+
+        toast.error(
+          error instanceof Error
+            ? error.message
+            : "Impossibile caricare gli eventi",
+        );
+      } finally {
+        setLoading(false);
+      }
+    },
+    [associationId],
+  );
 
   useEffect(() => {
-    loadEvents();
-  }, []);
+    let cancelled = false;
 
-  async function loadEvents() {
-    try {
-      setLoadingEvents(true);
+    async function initializeEvents() {
+      try {
+        const result =
+          await requestEvents(null);
 
-      const token = getAccessToken();
-
-      const res = await fetch(`${API_URL}/events`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-      });
-
-      if (!res.ok) {
-        throw new Error('Errore caricamento eventi');
-      }
-
-      const data = await res.json();
-
-      setEvents(Array.isArray(data) ? data : []);
-    } catch (error) {
-      console.error(error);
-      toast.error('Errore caricamento eventi');
-      setEvents([]);
-    } finally {
-      setLoadingEvents(false);
-    }
-  }
-
-  async function handleCreateEvent(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-
-    try {
-      setLoading(true);
-
-      const token = getAccessToken();
-
-      if (!token) {
-        throw new Error('Login richiesto');
-      }
-
-      if (!title.trim()) {
-        throw new Error('Titolo obbligatorio');
-      }
-
-      if (!startsAt) {
-        throw new Error('Data inizio obbligatoria');
-      }
-
-      const res = await fetch(`${API_URL}/events`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          title: title.trim(),
-          description: description.trim(),
-          location: location.trim(),
-          startsAt: new Date(startsAt).toISOString(),
-          endsAt: endsAt ? new Date(endsAt).toISOString() : undefined,
-        }),
-      });
-
-      const data = await res.json().catch(() => null);
-
-      if (!res.ok) {
-        throw new Error(data?.message || 'Errore creazione evento');
-      }
-
-      setTitle('');
-      setDescription('');
-      setLocation('');
-      setStartsAt('');
-      setEndsAt('');
-      setShowForm(false);
-
-      await loadEvents();
-
-      toast.success('Evento creato');
-    } catch (error: any) {
-      console.error(error);
-      toast.error(error.message || 'Errore creazione evento');
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function deleteEvent(id: string) {
-    try {
-      const token = getAccessToken();
-
-      if (!token) {
-        throw new Error('Login richiesto');
-      }
-
-      const res = await fetch(`${API_URL}/events/${id}`, {
-        method: 'DELETE',
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      const data = await res.json().catch(() => null);
-
-      if (!res.ok) {
-        throw new Error(data?.message || 'Errore eliminazione evento');
-      }
-
-      await loadEvents();
-
-      toast.success('Evento eliminato');
-    } catch (error: any) {
-      console.error(error);
-      toast.error(error.message || 'Errore eliminazione evento');
-    }
-  }
-
-  async function registerToEvent(eventId: string) {
-    try {
-      const token = getAccessToken();
-      const userId = getUserIdFromToken(token);
-
-      if (!token || !userId) {
-        throw new Error('Utente non autenticato');
-      }
-
-      const res = await fetch(`${API_URL}/events/${eventId}/register`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          userId,
-        }),
-      });
-
-      const data = await res.json().catch(() => null);
-
-      if (!res.ok) {
-        if (data?.message === 'Already registered') {
-          await loadEvents();
-          toast.info('Sei già registrato a questo evento');
+        if (cancelled) {
           return;
         }
 
-        throw new Error(data?.message || 'Errore registrazione');
+        setAssociationId(
+          result.associationId,
+        );
+        setEvents(result.events);
+      } catch (error) {
+        if (cancelled) {
+          return;
+        }
+
+        console.error(
+          "Errore caricamento eventi:",
+          error,
+        );
+
+        setEvents([]);
+
+        toast.error(
+          error instanceof Error
+            ? error.message
+            : "Impossibile caricare gli eventi",
+        );
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
       }
-
-      await loadEvents();
-
-      toast.success('Registrazione completata');
-    } catch (error: any) {
-      console.error(error);
-      toast.error(error.message || 'Errore registrazione');
     }
-  }
 
-  async function unregisterFromEvent(eventId: string) {
+    void initializeEvents();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  async function deleteEvent(id: string) {
+    const token = getAccessToken();
+
+    if (!token) {
+      toast.error(
+        "Sessione non disponibile",
+      );
+      return;
+    }
+
+    const confirmed = window.confirm(
+      "Vuoi davvero eliminare questo evento?",
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
     try {
-      const token = getAccessToken();
-      const userId = getUserIdFromToken(token);
+      setDeletingId(id);
 
-      if (!token || !userId) {
-        throw new Error('Utente non autenticato');
-      }
-
-      const res = await fetch(`${API_URL}/events/${eventId}/register`, {
-        method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
+      const response = await fetch(
+        `${API_URL}/events/${id}`,
+        {
+          method: "DELETE",
+          headers: {
+            Accept:
+              "application/json",
+            Authorization: `Bearer ${token}`,
+          },
         },
-        body: JSON.stringify({
-          userId,
-        }),
-      });
+      );
 
-      const data = await res.json().catch(() => null);
+      const data =
+        (await response
+          .json()
+          .catch(() => null)) as
+          | ApiErrorResponse
+          | null;
 
-      if (!res.ok) {
-        throw new Error(data?.message || 'Errore annullamento');
+      if (!response.ok) {
+        throw new Error(
+          getErrorMessage(
+            data,
+            `Errore eliminazione evento (${response.status})`,
+          ),
+        );
       }
 
-      await loadEvents();
+      toast.success(
+        "Evento eliminato",
+      );
 
-      toast.success('Partecipazione annullata');
-    } catch (error: any) {
-      console.error(error);
-      toast.error(error.message || 'Errore annullamento');
+      setEvents((currentEvents) =>
+        currentEvents.filter(
+          (event) => event.id !== id,
+        ),
+      );
+    } catch (error) {
+      console.error(
+        "Errore eliminazione evento:",
+        error,
+      );
+
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Impossibile eliminare l'evento",
+      );
+    } finally {
+      setDeletingId(null);
     }
   }
+
+  async function registerToEvent(
+    eventId: string,
+  ) {
+    const token = getAccessToken();
+
+    if (!token) {
+      toast.error(
+        "Sessione non disponibile",
+      );
+      return;
+    }
+
+    try {
+      setRegistrationLoadingId(eventId);
+
+      const response = await fetch(
+        `${API_URL}/events/${eventId}/register`,
+        {
+          method: "POST",
+          headers: {
+            Accept:
+              "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      );
+
+      const data =
+        (await response
+          .json()
+          .catch(() => null)) as
+          | ApiErrorResponse
+          | null;
+
+      if (!response.ok) {
+        throw new Error(
+          getErrorMessage(
+            data,
+            `Errore registrazione (${response.status})`,
+          ),
+        );
+      }
+
+      toast.success(
+        "Registrazione completata",
+      );
+
+      await loadEvents();
+    } catch (error) {
+      console.error(
+        "Errore registrazione evento:",
+        error,
+      );
+
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Impossibile registrarsi all'evento",
+      );
+    } finally {
+      setRegistrationLoadingId(null);
+    }
+  }
+
+  async function unregisterFromEvent(
+    eventId: string,
+  ) {
+    const token = getAccessToken();
+
+    if (!token) {
+      toast.error(
+        "Sessione non disponibile",
+      );
+      return;
+    }
+
+    try {
+      setRegistrationLoadingId(eventId);
+
+      const response = await fetch(
+        `${API_URL}/events/${eventId}/register`,
+        {
+          method: "DELETE",
+          headers: {
+            Accept:
+              "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      );
+
+      const data =
+        (await response
+          .json()
+          .catch(() => null)) as
+          | ApiErrorResponse
+          | null;
+
+      if (!response.ok) {
+        throw new Error(
+          getErrorMessage(
+            data,
+            `Errore annullamento (${response.status})`,
+          ),
+        );
+      }
+
+      toast.success(
+        "Iscrizione annullata",
+      );
+
+      await loadEvents();
+    } catch (error) {
+      console.error(
+        "Errore annullamento iscrizione:",
+        error,
+      );
+
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Impossibile annullare l'iscrizione",
+      );
+    } finally {
+      setRegistrationLoadingId(null);
+    }
+  }
+
   const filteredEvents = useMemo(() => {
+    const normalizedSearch =
+      search.trim().toLowerCase();
+
     return events.filter((event) => {
-      const value = search.toLowerCase();
+      const title =
+        event.title?.toLowerCase() ?? "";
+
+      const description =
+        event.description?.toLowerCase() ??
+        "";
+
+      const location =
+        event.location?.toLowerCase() ?? "";
 
       const matchesSearch =
-        event.title?.toLowerCase().includes(value) ||
-        (event.description || '').toLowerCase().includes(value) ||
-        (event.location || '').toLowerCase().includes(value);
+        normalizedSearch.length === 0 ||
+        title.includes(normalizedSearch) ||
+        description.includes(
+          normalizedSearch,
+        ) ||
+        location.includes(
+          normalizedSearch,
+        );
 
-      const matchesFilter =
-        filter === 'ALL'
-          ? true
-          : new Date(event.startsAt || '') >= new Date();
+      const startsAt =
+        new Date(event.startsAt);
 
-      return matchesSearch && matchesFilter;
+      const isUpcoming =
+        !Number.isNaN(
+          startsAt.getTime(),
+        ) &&
+        startsAt >= new Date();
+
+      const matchesStatus =
+        status === "ALL" ||
+        (status === "UPCOMING" &&
+          isUpcoming) ||
+        (status === "PAST" &&
+          !isUpcoming);
+
+      return (
+        matchesSearch &&
+        matchesStatus
+      );
     });
-  }, [events, search, filter]);
+  }, [events, search, status]);
 
-  const currentUserId = getUserIdFromToken(getAccessToken());
+  const upcomingEvents = useMemo(() => {
+    const now = new Date();
+
+    return events.filter((event) => {
+      const eventDate =
+        new Date(event.startsAt);
+
+      return (
+        !Number.isNaN(
+          eventDate.getTime(),
+        ) &&
+        eventDate >= now
+      );
+    }).length;
+  }, [events]);
+
+  const eventCards: EventItem[] =
+    filteredEvents.map((event) => {
+      const registrations =
+        Array.isArray(
+          event.registrations,
+        )
+          ? event.registrations
+          : [];
+
+      return {
+        id: event.id,
+        title: event.title,
+        description:
+          event.description ?? "",
+        location:
+          event.location ??
+          "Luogo non specificato",
+        startAt: event.startsAt,
+        participants:
+          registrations.length,
+        isRegistered:
+          Boolean(currentUserId) &&
+          registrations.some(
+            (registration) =>
+              registration.userId ===
+              currentUserId,
+          ),
+      };
+    });
+
+  const calendarEvents =
+    filteredEvents.map((event) => ({
+      id: event.id,
+      title: event.title,
+      startAt: event.startsAt,
+    }));
+
+  const locationsCount = new Set(
+    events
+      .map((event) =>
+        event.location?.trim(),
+      )
+      .filter(
+        (
+          location,
+        ): location is string =>
+          Boolean(location),
+      ),
+  ).size;
+
+  const totalParticipants =
+    events.reduce(
+      (total, event) =>
+        total +
+        (Array.isArray(
+          event.registrations,
+        )
+          ? event.registrations.length
+          : 0),
+      0,
+    );
 
   return (
-    <main className="flex-1 px-6 py-8 md:ml-72">
-      <div className="mx-auto max-w-7xl">
-        <div className="mb-6">
-          <Link
-            href="/dashboard"
-            className="rounded-xl border border-white/10 px-4 py-2 text-sm transition hover:bg-white/5"
-          >
-            ← Dashboard
-          </Link>
+    <div className="min-w-0 space-y-8">
+      <EventsHeader
+        eventsCount={events.length}
+        upcomingCount={
+          upcomingEvents
+        }
+        onCreate={() => {
+          setCreateOpen(true);
+        }}
+      />
+
+      <EventsStats
+        totalEvents={events.length}
+        upcomingEvents={
+          upcomingEvents
+        }
+        participants={
+          totalParticipants
+        }
+        locations={locationsCount}
+      />
+
+      <EventFilters
+        search={search}
+        status={status}
+        onSearchChange={setSearch}
+        onStatusChange={(value) =>
+          setStatus(
+            value as
+              | "ALL"
+              | "UPCOMING"
+              | "PAST",
+          )
+        }
+      />
+
+      <EventCalendar
+        events={calendarEvents}
+      />
+
+      {deletingId && (
+        <div className="rounded-xl border border-amber-500/20 bg-amber-500/10 p-4 text-sm text-amber-300">
+          Eliminazione evento in corso...
         </div>
+      )}
 
-        <section className="rounded-[2rem] border border-white/10 bg-[#111827] p-8 shadow-2xl">
-          <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-              <h1 className="text-5xl font-bold">Eventi NPA</h1>
+      <EventsList
+        events={eventCards}
+        loading={loading}
+        registrationLoadingId={
+          registrationLoadingId
+        }
+        onRegister={(id) => {
+          void registerToEvent(id);
+        }}
+        onUnregister={(id) => {
+          void unregisterFromEvent(id);
+        }}
+        onEdit={(id) => {
+          const event = events.find(
+            (item) => item.id === id,
+          );
 
-              <p className="mt-3 text-zinc-400">
-                Gestisci eventi, calendario e partecipazioni della News
-                Platform Association.
-              </p>
-            </div>
+          if (!event) {
+            toast.error(
+              "Evento non trovato",
+            );
+            return;
+          }
 
-            <div className="flex flex-wrap gap-3">
-              <button
-                type="button"
-                onClick={() => setShowForm((value) => !value)}
-                className="inline-flex items-center gap-2 rounded-2xl bg-indigo-600 px-5 py-3 text-sm font-semibold text-white hover:bg-indigo-500"
-              >
-                <Plus className="h-5 w-5" />
-                Nuovo evento
-              </button>
+          setEditEvent(event);
+          setEditOpen(true);
+        }}
+        onDelete={(id) => {
+          void deleteEvent(id);
+        }}
+      />
 
-              <button
-                type="button"
-                onClick={loadEvents}
-                className="inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-5 py-3 text-sm font-semibold text-white hover:bg-white/10"
-              >
-                <RefreshCw className="h-5 w-5" />
-                Aggiorna
-              </button>
-            </div>
-          </div>
-        </section>
+      <CreateEventModal
+        open={createOpen}
+        associationId={associationId}
+        onClose={() => {
+          setCreateOpen(false);
+        }}
+        onCreated={async () => {
+          setCreateOpen(false);
+          await loadEvents();
+        }}
+      />
 
-        {showForm && (
-          <form
-            onSubmit={handleCreateEvent}
-            className="mt-8 rounded-3xl border border-cyan-500/20 bg-gradient-to-br from-cyan-500/10 to-indigo-500/10 p-6"
-          >
-            <div className="mb-6 flex items-center gap-3">
-              <CalendarDays className="h-7 w-7 text-cyan-300" />
-
-              <div>
-                <h2 className="text-2xl font-bold">Nuovo evento NPA</h2>
-
-                <p className="text-sm text-zinc-400">
-                  Crea e gestisci gli eventi della piattaforma.
-                </p>
-              </div>
-            </div>
-
-            <div className="grid gap-4 md:grid-cols-2">
-              <input
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="Titolo evento"
-                required
-                className="rounded-2xl border border-cyan-500/20 bg-[#0b1220] px-4 py-3 outline-none transition focus:border-cyan-400"
-              />
-
-              <input
-                value={location}
-                onChange={(e) => setLocation(e.target.value)}
-                placeholder="Luogo"
-                className="rounded-2xl border border-cyan-500/20 bg-[#0b1220] px-4 py-3 outline-none transition focus:border-cyan-400"
-              />
-
-              <div className="rounded-2xl border border-cyan-500/30 bg-cyan-500/10 p-4">
-                <p className="mb-2 text-xs font-bold uppercase tracking-wide text-cyan-300">
-                  Inizio evento
-                </p>
-
-                <input
-                  type="datetime-local"
-                  value={startsAt}
-                  onChange={(e) => setStartsAt(e.target.value)}
-                  required
-                  className="w-full rounded-xl border border-cyan-500/20 bg-[#0b1220] px-4 py-3"
-                />
-              </div>
-
-              <div className="rounded-2xl border border-violet-500/30 bg-violet-500/10 p-4">
-                <p className="mb-2 text-xs font-bold uppercase tracking-wide text-violet-300">
-                  Fine evento
-                </p>
-
-                <input
-                  type="datetime-local"
-                  value={endsAt}
-                  onChange={(e) => setEndsAt(e.target.value)}
-                  className="w-full rounded-xl border border-violet-500/20 bg-[#0b1220] px-4 py-3"
-                />
-              </div>
-            </div>
-
-            <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Descrizione evento"
-              rows={4}
-              className="mt-5 w-full rounded-2xl border border-cyan-500/20 bg-[#0b1220] px-4 py-3"
-            />
-
-            <div className="mt-5 flex flex-wrap gap-3">
-              <button
-                type="submit"
-                disabled={loading}
-                className="rounded-2xl bg-cyan-500 px-6 py-3 font-semibold text-black transition hover:bg-cyan-400 disabled:opacity-50"
-              >
-                {loading ? 'Creazione...' : 'Salva evento'}
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setShowForm(false)}
-                className="rounded-2xl border border-white/10 px-6 py-3 font-semibold text-white hover:bg-white/5"
-              >
-                Chiudi
-              </button>
-            </div>
-          </form>
-        )}
-
-        <section className="mt-8">
-          <div className="mb-6 flex flex-col gap-4 rounded-2xl border border-white/10 bg-[#111827] p-4 lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex flex-1 items-center gap-3 rounded-2xl border border-white/10 bg-[#0b1220] px-4">
-              <Search className="h-5 w-5 text-zinc-500" />
-
-              <input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Cerca evento..."
-                className="w-full bg-transparent py-3 outline-none"
-              />
-            </div>
-
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => setFilter('ALL')}
-                className={`rounded-xl px-4 py-2 text-sm font-semibold ${
-                  filter === 'ALL'
-                    ? 'bg-white text-black'
-                    : 'border border-white/10 bg-white/5 text-white'
-                }`}
-              >
-                Tutti
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setFilter('UPCOMING')}
-                className={`rounded-xl px-4 py-2 text-sm font-semibold ${
-                  filter === 'UPCOMING'
-                    ? 'bg-cyan-400 text-black'
-                    : 'border border-white/10 bg-white/5 text-white'
-                }`}
-              >
-                Futuri
-              </button>
-            </div>
-          </div>
-
-          {loadingEvents ? (
-            <div className="rounded-3xl border border-white/10 bg-[#111827] p-10 text-center text-zinc-400">
-              Caricamento eventi...
-            </div>
-          ) : filteredEvents.length === 0 ? (
-            <div className="rounded-3xl border border-white/10 bg-[#111827] p-10 text-center text-zinc-500">
-              Nessun evento trovato.
-            </div>
-          ) : (
-            <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-              {filteredEvents.map((event) => {
-                const isRegistered = event.registrations?.some(
-                  (registration) =>
-                    registration.user?.id === currentUserId ||
-                    registration.userId === currentUserId,
-                );
-
-                return (
-                  <div
-                    key={event.id}
-                    className="rounded-3xl border border-cyan-500/10 bg-[#111827] p-6 shadow-xl transition hover:border-cyan-400/30"
-                  >
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <CalendarDays className="h-5 w-5 text-cyan-300" />
-
-                          <h3 className="text-xl font-semibold">
-                            {event.title}
-                          </h3>
-                        </div>
-
-                        <p className="mt-3 text-sm text-zinc-400">
-                          {event.description || 'Nessuna descrizione'}
-                        </p>
-                      </div>
-
-                      <button
-                        type="button"
-                        onClick={() => deleteEvent(event.id)}
-                        className="rounded-xl border border-red-500/20 p-2 text-red-300 hover:bg-red-500/10"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </div>
-
-                    <div className="mt-6 space-y-3">
-                      <div className="flex items-center gap-2 text-sm text-zinc-400">
-                        <MapPin className="h-4 w-4 text-cyan-300" />
-
-                        {event.location || 'Luogo non specificato'}
-                      </div>
-
-                      <div className="rounded-2xl border border-cyan-500/10 bg-cyan-500/5 p-3 text-sm text-cyan-100">
-                        {event.startsAt
-                          ? new Date(event.startsAt).toLocaleString('it-IT')
-                          : 'Data non definita'}
-                      </div>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() =>
-                        isRegistered
-                          ? unregisterFromEvent(event.id)
-                          : registerToEvent(event.id)
-                      }
-                      className={`mt-6 w-full rounded-2xl px-4 py-3 text-sm font-semibold transition ${
-                        isRegistered
-                          ? 'border border-red-500/30 bg-red-500/10 text-red-300 hover:bg-red-500/20'
-                          : 'bg-cyan-500 text-black hover:bg-cyan-400'
-                      }`}
-                    >
-                      {isRegistered ? 'Annulla partecipazione' : 'Partecipa'}
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </section>
-      </div>
-    </main>
+      <EditEventModal
+        open={editOpen}
+        event={editEvent}
+        associationId={associationId}
+        onClose={() => {
+          setEditOpen(false);
+          setEditEvent(null);
+        }}
+        onUpdated={async () => {
+          setEditOpen(false);
+          setEditEvent(null);
+          await loadEvents();
+        }}
+      />
+    </div>
   );
 }

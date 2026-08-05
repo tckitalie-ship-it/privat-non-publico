@@ -8,49 +8,47 @@ import {
   UseGuards,
 } from '@nestjs/common';
 
-import { JwtAuthGuard } from './jwt-auth.guard';
 import { AuthService } from './auth.service';
-import { ChangePasswordDto } from './dto/change-password.dto';
+import { JwtAuthGuard } from './jwt-auth.guard';
 
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
+  @Post('register')
+  async register(@Body() body: Record<string, unknown>) {
+    return this.authService.register(body);
+  }
+
   @Post('login')
-  login(
-    @Body()
-    body: {
-      email: string;
-      password: string;
-    },
-  ) {
-    return this.authService.login(body.email, body.password);
+  async login(@Body() body: Record<string, unknown>) {
+    return this.authService.login(body);
   }
 
+  @UseGuards(JwtAuthGuard)
   @Get('me')
-  @UseGuards(JwtAuthGuard)
-  me(@Req() req: any) {
-    return this.authService.me(req.user);
+  async me(@Req() req: any) {
+    return this.authService.me(req.user.id);
   }
 
-  @Post('switch-association')
   @UseGuards(JwtAuthGuard)
-  switchAssociation(
+  @Patch('change-password')
+  async changePassword(
+    @Req() req: any,
+    @Body() body: Record<string, unknown>,
+  ) {
+    return this.authService.changePassword(req.user.id, body);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('switch-association')
+  async switchAssociation(
     @Req() req: any,
     @Body() body: { associationId: string },
   ) {
     return this.authService.switchAssociation(
-      req.user,
+      req.user.id,
       body.associationId,
     );
-  }
-
-  @Patch('change-password')
-  @UseGuards(JwtAuthGuard)
-  changePassword(
-    @Req() req: any,
-    @Body() dto: ChangePasswordDto,
-  ) {
-    return this.authService.changePassword(req.user, dto);
   }
 }

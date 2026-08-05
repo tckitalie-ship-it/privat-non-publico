@@ -1,156 +1,306 @@
-'use client';
+"use client";
 
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { toast } from 'sonner';
+import { useEffect, useState } from "react";
+import { ChevronDown, Loader2 } from "lucide-react";
 
-import { API_URL, getAccessToken, setAccessToken } from '@/lib/api';
+import {
+  API_URL,
+  getAccessToken,
+  setAccessToken,
+} from "@/lib/api";
 
-type AssociationItem = {
-  id?: string;
-  associationId?: string;
-  name?: string;
-  role?: string;
-  association?: {
-    id: string;
-    name: string;
-  };
-};
+import { cn } from "@/lib/utils";
+
+interface Association {
+  id: string;
+  name: string;
+}
+
+interface JwtPayload {
+  sub?: string;
+  email?: string;
+  associationId?: string | null;
+  role?: string | null;
+}
+
+function readJwtPayload(token: string): JwtPayload | null {
+  try {
+    const payload = token.split(".")[1];
+
+    if (!payload) {
+      return null;
+    }
+
+    const normalized = payload
+      .replace(/-/g, "+")
+      .replace(/_/g, "/");
+
+    const decoded = decodeURIComponent(
+      window
+        .atob(normalized)
+        .split("")
+        .map(
+          (character) =>
+            `%${character
+              .charCodeAt(0)
+              .toString(16)
+              .padStart(2, "0")}`,
+        )
+        .join(""),
+    );
+
+    return JSON.parse(decoded) as JwtPayload;
+  } catch (error) {
+    console.error("Errore lettura JWT:", error);
+    return null;
+  }
+}
 
 export default function AssociationSwitcher() {
-  const router = useRouter();
+  const [associations, setAssociations] = useState<Association[]>([]);
+  const [currentAssociation, setCurrentAssociation] =
+    useState<string | null>(null);
 
+  const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [switching, setSwitching] = useState(false);
-  const [associations, setAssociations] = useState<AssociationItem[]>([]);
-  const [activeAssociationId, setActiveAssociationId] = useState('');
+  const [switchingId, setSwitchingId] = useState<string | null>(null);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     async function loadAssociations() {
       const token = getAccessToken();
 
       if (!token) {
+        setError("Sessione non disponibile");
         setLoading(false);
         return;
       }
 
       try {
-        const meRes = await fetch(`${API_URL}/auth/me`, {
+        setError("");
+
+        const payload = readJwtPayload(token);
+
+        const response = await fetch(`${API_URL}/associations`, {
           headers: {
             Authorization: `Bearer ${token}`,
           },
+          cache: "no-store",
         });
 
-        const me = meRes.ok ? await meRes.json() : null;
+        if (!response.ok) {
+          const data = await response.json().catch(() => null);
 
-        if (me?.associationId) {
-          setActiveAssociationId(me.associationId);
+          throw new Error(
+            data?.message ||
+              `Errore caricamento associazioni (${response.status})`,
+          );
         }
 
-        const res = await fetch(`${API_URL}/associations/me`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
+        const data = await response.json();
 
-        if (!res.ok) {
-          throw new Error('Errore caricamento associazioni');
+        const associationList: Association[] = Array.isArray(data)
+          ? data
+          : [];
+
+        setAssociations(associationList);
+
+        const tokenAssociationId =
+          payload?.associationId ?? null;
+
+        const tokenAssociationExists = associationList.some(
+          (association) =>
+            association.id === tokenAssociationId,
+        );
+
+        if (tokenAssociationExists) {
+          setCurrentAssociation(tokenAssociationId);
+        } else if (associationList.length === 1) {
+          setCurrentAssociation(associationList[0].id);
+        } else {
+          setCurrentAssociation(null);
         }
-
-        const data = await res.json();
-
-        setAssociations(Array.isArray(data) ? data : [data]);
       } catch (error) {
-        console.error(error);
-        toast.error('Impossibile caricare le associazioni');
+        console.error("Errore caricamento associazioni:", error);
+
+        setError(
+          error instanceof Error
+            ? error.message
+            : "Impossibile caricare le associazioni",
+        );
       } finally {
         setLoading(false);
       }
     }
 
-    loadAssociations();
+    void loadAssociations();
   }, []);
 
   async function handleSwitch(associationId: string) {
     const token = getAccessToken();
 
-    if (!token || !associationId || associationId === activeAssociationId) {
+    if (!token || switchingId) {
       return;
     }
 
+    setSwitchingId(associationId);
+    setError("");
+
     try {
-      setSwitching(true);
-
-      const res = await fetch(`${API_URL}/auth/switch-association`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
+      const response = await fetch(
+        `${API_URL}/auth/switch-association`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ associationId }),
         },
-        body: JSON.stringify({
-          associationId,
-        }),
-      });
+      );
 
-      const data = await res.json();
+      const data = await response.json().catch(() => null);
 
-      if (!res.ok) {
-        throw new Error(data.message || 'Cambio associazione fallito');
+      if (!response.ok) {
+        throw new Error(
+          data?.message ||
+            `Errore cambio associazione (${response.status})`,
+        );
       }
 
-      setAccessToken(data.access_token);
-      setActiveAssociationId(associationId);
+       const newToken =
+  data?.accessToken ??
+  data?.access_token ??
+  data?.token;
 
-      toast.success('Associazione cambiata');
+if (!newToken) {
+  throw new Error("Il backend non ha restituito il nuovo token");
+}
+        data?.token ?? data?.access_token;
 
-      router.refresh();
+      if (!newToken) {
+        throw new Error(
+          "Il backend non ha restituito il nuovo token",
+        );
+      }
+
+      setAccessToken(newToken);
+      setCurrentAssociation(associationId);
+      setOpen(false);
+
       window.location.reload();
-    } catch (error: any) {
-      toast.error(error.message || 'Errore cambio associazione');
+    } catch (error) {
+      console.error("Errore cambio associazione:", error);
+
+      setError(
+        error instanceof Error
+          ? error.message
+          : "Impossibile cambiare associazione",
+      );
     } finally {
-      setSwitching(false);
+      setSwitchingId(null);
     }
   }
 
   if (loading) {
     return (
-      <div className="rounded-2xl border border-white/10 bg-white/5 p-3 text-sm text-gray-400">
+      <div className="flex items-center gap-2 text-sm text-gray-400">
+        <Loader2 size={18} className="animate-spin" />
         Caricamento associazioni...
       </div>
     );
   }
 
-  if (associations.length <= 1) {
-    return null;
+  if (error && associations.length === 0) {
+    return (
+      <div className="rounded-xl border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-300">
+        {error}
+      </div>
+    );
   }
 
+  if (associations.length === 0) {
+    return (
+      <div className="rounded-xl border border-[#21262d] bg-[#161b22] px-4 py-3 text-sm text-gray-400">
+        Nessuna associazione disponibile
+      </div>
+    );
+  }
+
+  const selectedAssociation = associations.find(
+    (association) =>
+      association.id === currentAssociation,
+  );
+
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
-      <label className="mb-2 block text-xs font-medium uppercase tracking-wide text-gray-400">
-        Associazione attiva
-      </label>
-
-      <select
-        value={activeAssociationId}
-        disabled={switching}
-        onChange={(e) => handleSwitch(e.target.value)}
-        className="w-full rounded-xl border border-white/10 bg-[#0f172a] px-3 py-2 text-sm text-white outline-none transition focus:border-indigo-500 disabled:opacity-60"
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((value) => !value)}
+        className="flex w-full items-center justify-between rounded-xl border border-[#21262d] bg-[#161b22] px-4 py-3 text-sm font-medium text-gray-300 transition hover:bg-[#1c2128]"
+        aria-expanded={open}
       >
-        <option value="" disabled>
-          Seleziona associazione
-        </option>
+        <span className="truncate">
+          {selectedAssociation?.name ??
+            "Seleziona associazione"}
+        </span>
 
-        {associations.map((item) => {
-          const id = item.association?.id || item.associationId || item.id || '';
-          const name = item.association?.name || item.name || 'Associazione';
+        <ChevronDown
+          size={18}
+          className={cn(
+            "shrink-0 transition-transform",
+            open && "rotate-180",
+          )}
+        />
+      </button>
 
-          return (
-            <option key={id} value={id}>
-              {name}
-            </option>
-          );
-        })}
-      </select>
+      {open && (
+        <div className="absolute left-0 right-0 z-50 mt-2 overflow-hidden rounded-xl border border-[#21262d] bg-[#161b22] shadow-xl">
+          {associations.map((association) => {
+            const active =
+              association.id === currentAssociation;
+
+            const switching =
+              switchingId === association.id;
+
+            return (
+              <button
+                key={association.id}
+                type="button"
+                onClick={() =>
+                  void handleSwitch(association.id)
+                }
+                disabled={switchingId !== null}
+                className={cn(
+                  "flex w-full items-center justify-between gap-3 px-4 py-3 text-left text-sm transition",
+                  active
+                    ? "bg-blue-600 text-white"
+                    : "text-gray-300 hover:bg-[#1c2128]",
+                  switchingId !== null &&
+                    "cursor-not-allowed opacity-70",
+                )}
+              >
+                <span className="truncate">
+                  {association.name}
+                </span>
+
+                {switching && (
+                  <Loader2
+                    size={16}
+                    className="shrink-0 animate-spin"
+                  />
+                )}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {error && (
+        <p className="mt-2 text-xs text-red-400">
+          {error}
+        </p>
+      )}
     </div>
   );
 }

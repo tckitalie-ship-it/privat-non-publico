@@ -1,137 +1,74 @@
-import {
-  ForbiddenException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateAssociationDto } from './dto/create-association.dto';
-
-type UpdateAssociationSettingsDto = {
-  name?: string;
-  description?: string | null;
-};
+import { UpdateAssociationDto } from './dto/update-association.dto';
 
 @Injectable()
 export class AssociationsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async create(currentUserId: string, dto: CreateAssociationDto) {
-    return this.prisma.$transaction(async (tx) => {
-      const association = await tx.association.create({
-        data: {
-          name: dto.name,
-          description: dto.description ?? null,
-        },
-      });
-
-      await tx.membership.create({
-        data: {
-          userId: currentUserId,
-          associationId: association.id,
-          role: 'OWNER',
-        },
-      });
-
-      return tx.association.findUnique({
-        where: { id: association.id },
-        include: {
-          memberships: {
-            include: {
-              user: {
-                select: {
-                  id: true,
-                  email: true,
-                },
-              },
-            },
-          },
-        },
-      });
+  async findAllForUser(userId: string) {
+    return this.prisma.association.findMany({
+      where: { memberships: { some: { userId } } },
+      include: { memberships: true, events: true },
     });
   }
 
-  async me(currentUser: any) {
-    if (!currentUser.associationId) {
-      throw new ForbiddenException('No active association selected');
-    }
-
+  async findOneForUser(id: string, userId: string) {
     const association = await this.prisma.association.findUnique({
-      where: {
-        id: currentUser.associationId,
-      },
-      include: {
-        memberships: true,
-        invitations: true,
-      },
+      where: { id },
+      include: { memberships: true, events: true },
     });
 
-    if (!association) {
-      throw new NotFoundException('Association not found');
-    }
+    if (!association) throw new NotFoundException('Associazione non trovata');
 
-    return {
-      id: association.id,
-      name: association.name,
-      description: association.description,
-      logoUrl: association.logoUrl,
-      isActive: association.isActive,
-      createdAt: association.createdAt,
-      membersCount: association.memberships.length,
-      invitationsCount: association.invitations.length,
-    };
+    const isMember = association.memberships.some(m => m.userId === userId);
+    if (!isMember) throw new ForbiddenException('Accesso negato');
+
+    return association;
   }
 
-  async updateMe(currentUser: any, dto: UpdateAssociationSettingsDto) {
-    if (!currentUser.associationId) {
-      throw new ForbiddenException('No active association selected');
-    }
-
-    if (!['OWNER', 'ADMIN'].includes(currentUser.role)) {
-      throw new ForbiddenException('Only OWNER or ADMIN can update settings');
-    }
-
-    return this.prisma.association.update({
-      where: {
-        id: currentUser.associationId,
-      },
+  async create(dto: CreateAssociationDto, userId: string) {
+    return this.prisma.association.create({
       data: {
         name: dto.name,
-        description: dto.description === '' ? null : dto.description,
+        description: dto.description ?? '',
+      
+        memberships: {
+          create: { userId, role: 'OWNER' },
+        },
       },
+      include: { memberships: true, events: true },
     });
   }
 
-  async updateLogo(currentUser: any, logoUrl: string) {
-    if (!currentUser.associationId) {
-      throw new ForbiddenException('No active association selected');
-    }
-
-    if (!['OWNER', 'ADMIN'].includes(currentUser.role)) {
-      throw new ForbiddenException('Only OWNER or ADMIN can update logo');
-    }
-
-    return this.prisma.association.update({
-      where: {
-        id: currentUser.associationId,
-      },
-      data: {
-        logoUrl,
-      },
-    });
-  }
-
-  async setActive(id: string, isActive: boolean, currentUser: any) {
-    if (currentUser.associationId !== id) {
-      throw new ForbiddenException('Wrong association');
-    }
-
-    if (currentUser.role !== 'OWNER') {
-      throw new ForbiddenException('Only OWNER can change association status');
-    }
+  async update(id: string, dto: UpdateAssociationDto, userId: string) {
+    await this.ensureOwnerOrAdmin(id, userId);
 
     return this.prisma.association.update({
       where: { id },
-      data: { isActive },
+      data: dto,
+      include: { memberships: true, events: true },
     });
+  }
+
+  async remove(id: string, userId: string) {
+    await this.ensureOwnerOrAdmin(id, userId);
+
+    return this.prisma.association.delete({
+      where: { id },
+    });
+  }
+
+  private async ensureOwnerOrAdmin(id: string, userId: string) {
+    const membership = await this.prisma.membership.findFirst({
+      where: { associationId: id, userId },
+    });
+
+    if (!membership) throw new ForbiddenException('Non sei membro di questa associazione');
+
+    if (membership.role !== 'OWNER' && membership.role !== 'ADMIN') {
+      throw new ForbiddenException('Permessi insufficienti');
+    }
   }
 }

@@ -6,65 +6,148 @@ import {
   Param,
   Patch,
   Post,
-  Req,
   UseGuards,
-} from '@nestjs/common';
+} from "@nestjs/common";
 
-import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { Roles } from '../auth/roles.decorator';
-import { RolesGuard } from '../auth/roles.guard';
-import { CreateEventDto } from './dto/create-event.dto';
-import { EventsService } from './events.service';
+import { CurrentUser } from "../auth/current-user.decorator";
+import { JwtAuthGuard } from "../auth/jwt-auth.guard";
 
-@Controller('events')
+import { EventsService } from "./events.service";
+
+@Controller("events")
 @UseGuards(JwtAuthGuard)
 export class EventsController {
-  constructor(private readonly eventsService: EventsService) {}
+  constructor(
+    private readonly events: EventsService,
+  ) {}
 
+  /**
+   * Crea un evento.
+   */
   @Post()
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('OWNER', 'ADMIN')
-  create(@Req() req: any, @Body() dto: CreateEventDto) {
-    return this.eventsService.create(req.user, dto);
-  }
-
-  @Get()
-  findAll(@Req() req: any) {
-    return this.eventsService.findAll(req.user);
-  }
-
-  @Patch(':id')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('OWNER', 'ADMIN')
-  update(
-    @Req() req: any,
-    @Param('id') eventId: string,
-    @Body() dto: CreateEventDto,
+  async create(
+    @CurrentUser() user: any,
+    @Body()
+    dto: {
+      associationId: string;
+      title: string;
+      description?: string | null;
+      startsAt: Date;
+      endsAt?: Date | null;
+      location?: string | null;
+    },
   ) {
-    return this.eventsService.update(req.user, eventId, dto);
+    return this.events.createEvent(
+      user.sub,
+      dto,
+    );
   }
 
-  @Delete(':id')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('OWNER', 'ADMIN')
-  remove(@Req() req: any, @Param('id') eventId: string) {
-    return this.eventsService.remove(req.user, eventId);
+  /**
+   * Elenco eventi dell'associazione.
+   */
+  @Get("association/:associationId")
+  async findAll(
+    @CurrentUser() user: any,
+    @Param("associationId")
+    associationId: string,
+  ) {
+    return this.events.findAll(
+      associationId,
+      user.sub,
+    );
   }
 
-  @Post(':id/register')
-  register(@Req() req: any, @Param('id') eventId: string) {
-    return this.eventsService.register(req.user, eventId);
+  /**
+   * Registra l'utente autenticato all'evento.
+   */
+  @Post(":eventId/register")
+  async register(
+    @CurrentUser() user: any,
+    @Param("eventId") eventId: string,
+  ) {
+    return this.events.registerToEvent(
+      eventId,
+      user.sub,
+    );
   }
 
-  @Get(':id/registrations')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('OWNER', 'ADMIN')
-  findRegistrations(@Req() req: any, @Param('id') eventId: string) {
-    return this.eventsService.findRegistrations(req.user, eventId);
+  /**
+   * Annulla la registrazione dell'utente.
+   */
+  @Delete(":eventId/register")
+  async unregister(
+    @CurrentUser() user: any,
+    @Param("eventId") eventId: string,
+  ) {
+    return this.events.unregisterFromEvent(
+      eventId,
+      user.sub,
+    );
   }
 
-  @Delete(':id/register')
-  unregister(@Req() req: any, @Param('id') eventId: string) {
-    return this.eventsService.unregister(req.user, eventId);
+  /**
+   * Elenco partecipanti dell'evento.
+   */
+  @Get(":eventId/registrations")
+  async registrations(
+    @CurrentUser() user: any,
+    @Param("eventId") eventId: string,
+  ) {
+    return this.events.getRegistrations(
+      eventId,
+      user.sub,
+    );
+  }
+
+  /**
+   * Dettaglio evento.
+   */
+  @Get(":eventId")
+  async findOne(
+    @CurrentUser() user: any,
+    @Param("eventId") eventId: string,
+  ) {
+    return this.events.findOne(
+      eventId,
+      user.sub,
+    );
+  }
+
+  /**
+   * Aggiorna evento.
+   */
+  @Patch(":eventId")
+  async update(
+    @CurrentUser() user: any,
+    @Param("eventId") eventId: string,
+    @Body()
+    dto: {
+      title?: string;
+      description?: string | null;
+      startsAt?: Date;
+      endsAt?: Date | null;
+      location?: string | null;
+    },
+  ) {
+    return this.events.updateEvent(
+      eventId,
+      user.sub,
+      dto,
+    );
+  }
+
+  /**
+   * Elimina evento.
+   */
+  @Delete(":eventId")
+  async delete(
+    @CurrentUser() user: any,
+    @Param("eventId") eventId: string,
+  ) {
+    return this.events.deleteEvent(
+      eventId,
+      user.sub,
+    );
   }
 }

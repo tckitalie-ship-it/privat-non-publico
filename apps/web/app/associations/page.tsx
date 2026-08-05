@@ -28,91 +28,71 @@ type Association = {
   createdAt: string;
 };
 
-const STORAGE_KEY = 'demo-associations';
+type Membership = {
+  id: string;
+  role: 'OWNER' | 'ADMIN' | 'MEMBER';
+};
 
-const defaultAssociations: Association[] = [
-  {
-    id: 'default-association',
-    name: 'Association SaaS',
-    description: 'Associazione principale della piattaforma.',
-    status: 'Attiva',
-    role: 'OWNER',
-    plan: 'Starter',
-    createdAt: new Date().toISOString(),
-  },
-];
+type Event = {
+  id: string;
+};
+
+type AssociationWithRelations = Association & {
+  memberships?: Membership[];
+  events?: Event[];
+};
 
 export default function AssociationsPage() {
-  const [associations, setAssociations] =
-    useState<Association[]>([]);
+  const [associations, setAssociations] = useState<AssociationWithRelations[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const [showForm, setShowForm] =
-    useState(false);
-
+  const [showForm, setShowForm] = useState(false);
   const [name, setName] = useState('');
-  const [description, setDescription] =
-    useState('');
+  const [description, setDescription] = useState('');
 
   useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
-
-    if (saved) {
+    async function load() {
       try {
-        setAssociations(JSON.parse(saved));
-      } catch {
-        setAssociations(defaultAssociations);
+        const res = await fetch('/api/associations');
+        const data = await res.json();
+
+        console.log('ASSOCIATIONS DATA:', data);
+
+        if (Array.isArray(data)) {
+          setAssociations(data as AssociationWithRelations[]);
+        } else {
+          console.warn("API /associations ha restituito un valore non-array:", data);
+          setAssociations([]);
+        }
+
+      } catch (err) {
+        console.error('Errore caricamento associazioni:', err);
+        setAssociations([]);
+      } finally {
+        setLoading(false);
       }
-    } else {
-      setAssociations(defaultAssociations);
-      localStorage.setItem(
-        STORAGE_KEY,
-        JSON.stringify(defaultAssociations),
-      );
     }
+
+    load();
   }, []);
-
-  function saveAssociations(updated: Association[]) {
-    setAssociations(updated);
-
-    localStorage.setItem(
-      STORAGE_KEY,
-      JSON.stringify(updated),
-    );
-  }
 
   function handleCreate(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-
-    if (!name.trim()) return;
-
-    const newAssociation: Association = {
-      id: crypto.randomUUID(),
-      name: name.trim(),
-      description:
-        description.trim() ||
-        'Nuova associazione demo.',
-      status: 'Attiva',
-      role: 'OWNER',
-      plan: 'Starter',
-      createdAt: new Date().toISOString(),
-    };
-
-    saveAssociations([
-      newAssociation,
-      ...associations,
-    ]);
-
+    setShowForm(false);
     setName('');
     setDescription('');
-    setShowForm(false);
   }
 
   function deleteAssociation(id: string) {
-    const updated = associations.filter(
-      (association) => association.id !== id,
-    );
+    console.log('DELETE non ancora implementato:', id);
+  }
 
-    saveAssociations(updated);
+  if (loading) {
+    return (
+      <div className="p-8 text-white">
+        Caricamento associazioni…
+      </div>
+    );
   }
 
   return (
@@ -141,8 +121,7 @@ export default function AssociationsPage() {
               </h1>
 
               <p className="mt-3 max-w-2xl text-gray-400">
-                Gestisci le associazioni, i membri collegati e le attività
-                principali della piattaforma.
+                Gestisci le associazioni, i membri collegati e le attività principali della piattaforma.
               </p>
             </div>
 
@@ -207,7 +186,9 @@ export default function AssociationsPage() {
               <p className="mt-4 text-sm text-gray-400">
                 Membri collegati
               </p>
-              <h2 className="mt-2 text-4xl font-bold">0</h2>
+              <h2 className="mt-2 text-4xl font-bold">
+                {associations.reduce((sum, a) => sum + (a.memberships?.length || 0), 0)}
+              </h2>
             </div>
 
             <div className="rounded-3xl border border-white/5 bg-[#1a1f2e] p-6">
@@ -215,7 +196,9 @@ export default function AssociationsPage() {
               <p className="mt-4 text-sm text-gray-400">
                 Eventi attivi
               </p>
-              <h2 className="mt-2 text-4xl font-bold">0</h2>
+              <h2 className="mt-2 text-4xl font-bold">
+                {associations.reduce((sum, a) => sum + (a.events?.length || 0), 0)}
+              </h2>
             </div>
           </section>
 
@@ -292,16 +275,14 @@ export default function AssociationsPage() {
                       Eventi
                     </Link>
 
-                    {association.id !== 'default-association' && (
-                      <button
-                        type="button"
-                        onClick={() => deleteAssociation(association.id)}
-                        className="inline-flex items-center gap-2 rounded-xl border border-red-500/30 px-4 py-2 text-sm text-red-300 transition hover:bg-red-500/10"
-                      >
-                        <Trash2 size={16} />
-                        Elimina
-                      </button>
-                    )}
+                    <button
+                      type="button"
+                      onClick={() => deleteAssociation(association.id)}
+                      className="inline-flex items-center gap-2 rounded-xl border border-red-500/30 px-4 py-2 text-sm text-red-300 transition hover:bg-red-500/10"
+                    >
+                      <Trash2 size={16} />
+                      Elimina
+                    </button>
                   </div>
                 </div>
               ))

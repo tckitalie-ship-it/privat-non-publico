@@ -1,258 +1,277 @@
 import {
-  BadRequestException,
   ForbiddenException,
   Injectable,
   NotFoundException,
-} from '@nestjs/common';
+} from "@nestjs/common";
 
-import * as ExcelJS from 'exceljs';
-import { PrismaService } from '../prisma/prisma.service';
-import { CreateTransactionDto } from './dto/create-transaction.dto';
-import { UpdateTransactionDto } from './dto/update-transaction.dto';
+import { PrismaService } from "../prisma/prisma.service";
+
+type TransactionType = "INCOME" | "EXPENSE";
 
 @Injectable()
 export class FinancesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+  ) {}
 
-  private normalizeAmountCents(dto: CreateTransactionDto | UpdateTransactionDto) {
-    const anyDto = dto as any;
+  private async ensureMembership(
+    userId: string,
+    associationId: string,
+  ) {
+    const membership =
+      await this.prisma.membership.findFirst({
+        where: {
+          userId,
+          associationId,
+        },
+      });
 
-    if (typeof anyDto.amountCents === 'number' && anyDto.amountCents > 0) {
-      return Math.round(anyDto.amountCents);
+    if (!membership) {
+      throw new ForbiddenException(
+        "Non sei membro di questa associazione",
+      );
     }
 
-    if (typeof anyDto.amount === 'number' && anyDto.amount > 0) {
-      return Math.round(anyDto.amount * 100);
-    }
-
-    throw new BadRequestException('Amount is required');
+    return membership;
   }
 
-  private mapTransaction(transaction: any) {
-    return {
-      ...transaction,
-      amount: transaction.amountCents / 100,
-    };
-  }
+  async createTransaction(
+    userId: string,
+    dto: {
+      associationId: string;
+      title?: string | null;
+      description?: string | null;
+      category?: string | null;
+      amountCents: number;
+      type: TransactionType;
+      date: Date;
+    },
+  ) {
+    await this.ensureMembership(
+      userId,
+      dto.associationId,
+    );
 
-  async createTransaction(currentUser: any, dto: CreateTransactionDto) {
-    if (!currentUser.associationId) {
-      throw new ForbiddenException('No active association selected');
-    }
-
-    const transaction = await this.prisma.transaction.create({
+    return this.prisma.transaction.create({
       data: {
-        associationId: currentUser.associationId,
+        associationId: dto.associationId,
+        title: dto.title ?? null,
+        description: dto.description ?? null,
+        category: dto.category ?? null,
+        amountCents: dto.amountCents,
         type: dto.type,
-        amountCents: this.normalizeAmountCents(dto),
-        category: dto.category ?? 'Generale',
-        description: dto.description ?? '',
-        date: dto.date ? new Date(dto.date) : new Date(),
+        date: dto.date,
       },
     });
-
-    return this.mapTransaction(transaction);
   }
 
-  async findTransactions(currentUser: any) {
-    if (!currentUser.associationId) {
-      throw new ForbiddenException('No active association selected');
-    }
+  async findAll(
+    associationId: string,
+    userId: string,
+  ) {
+    await this.ensureMembership(
+      userId,
+      associationId,
+    );
 
-    const transactions = await this.prisma.transaction.findMany({
+    return this.prisma.transaction.findMany({
       where: {
-        associationId: currentUser.associationId,
+        associationId,
       },
       orderBy: {
-        date: 'desc',
+        date: "desc",
       },
     });
-
-    return transactions.map((transaction) => this.mapTransaction(transaction));
   }
 
-  async findOneTransaction(currentUser: any, transactionId: string) {
-    if (!currentUser.associationId) {
-      throw new ForbiddenException('No active association selected');
-    }
-
-    const transaction = await this.prisma.transaction.findUnique({
-      where: {
-        id: transactionId,
-      },
-    });
+  async findOne(
+    id: string,
+    userId: string,
+  ) {
+    const transaction =
+      await this.prisma.transaction.findUnique({
+        where: {
+          id,
+        },
+      });
 
     if (!transaction) {
-      throw new NotFoundException('Transaction not found');
+      throw new NotFoundException(
+        "Transazione non trovata",
+      );
     }
 
-    if (transaction.associationId !== currentUser.associationId) {
-      throw new ForbiddenException('Wrong association');
-    }
+    await this.ensureMembership(
+      userId,
+      transaction.associationId,
+    );
 
-    return this.mapTransaction(transaction);
+    return transaction;
   }
 
   async updateTransaction(
-    currentUser: any,
-    transactionId: string,
-    dto: UpdateTransactionDto,
+    id: string,
+    userId: string,
+    dto: {
+      title?: string | null;
+      description?: string | null;
+      category?: string | null;
+      amountCents?: number;
+      type?: TransactionType;
+      date?: Date;
+    },
   ) {
-    await this.findOneTransaction(currentUser, transactionId);
+    const transaction =
+      await this.prisma.transaction.findUnique({
+        where: {
+          id,
+        },
+      });
 
-    const data: any = {
-      type: dto.type,
-      category: dto.category,
-      description: dto.description,
-      date: dto.date ? new Date(dto.date) : undefined,
-    };
-
-    const anyDto = dto as any;
-
-    if (
-      typeof anyDto.amountCents === 'number' ||
-      typeof anyDto.amount === 'number'
-    ) {
-      data.amountCents = this.normalizeAmountCents(dto);
+    if (!transaction) {
+      throw new NotFoundException(
+        "Transazione non trovata",
+      );
     }
 
-    const transaction = await this.prisma.transaction.update({
-      where: {
-        id: transactionId,
-      },
-      data,
-    });
+    await this.ensureMembership(
+      userId,
+      transaction.associationId,
+    );
 
-    return this.mapTransaction(transaction);
+    return this.prisma.transaction.update({
+      where: {
+        id,
+      },
+      data: {
+        title: dto.title,
+        description: dto.description,
+        category: dto.category,
+        amountCents: dto.amountCents,
+        type: dto.type,
+        date: dto.date,
+      },
+    });
   }
 
-  async deleteTransaction(currentUser: any, transactionId: string) {
-    await this.findOneTransaction(currentUser, transactionId);
+  async deleteTransaction(
+    id: string,
+    userId: string,
+  ) {
+    const transaction =
+      await this.prisma.transaction.findUnique({
+        where: {
+          id,
+        },
+      });
+
+    if (!transaction) {
+      throw new NotFoundException(
+        "Transazione non trovata",
+      );
+    }
+
+    await this.ensureMembership(
+      userId,
+      transaction.associationId,
+    );
 
     await this.prisma.transaction.delete({
       where: {
-        id: transactionId,
+        id,
       },
     });
 
     return {
-      success: true,
+      message: "Transazione eliminata",
     };
   }
 
-  async getSummary(currentUser: any) {
-    if (!currentUser.associationId) {
-      throw new ForbiddenException('No active association selected');
-    }
+  async getSummary(
+    associationId: string,
+    userId: string,
+  ) {
+    await this.ensureMembership(
+      userId,
+      associationId,
+    );
 
-    const transactions = await this.prisma.transaction.findMany({
-      where: {
-        associationId: currentUser.associationId,
-      },
-    });
-
-    const incomeCents = transactions
-      .filter((transaction) => transaction.type === 'INCOME')
-      .reduce((sum, transaction) => sum + transaction.amountCents, 0);
-
-    const expenseCents = transactions
-      .filter((transaction) => transaction.type === 'EXPENSE')
-      .reduce((sum, transaction) => sum + transaction.amountCents, 0);
-
-    return {
-      incomeCents,
-      expenseCents,
-      balanceCents: incomeCents - expenseCents,
-      income: incomeCents / 100,
-      expense: expenseCents / 100,
-      balance: (incomeCents - expenseCents) / 100,
-      transactionsCount: transactions.length,
-    };
-  }
-
-  async exportCsv(currentUser: any) {
-    if (!currentUser.associationId) {
-      throw new ForbiddenException('No active association selected');
-    }
-
-    const transactions = await this.prisma.transaction.findMany({
-      where: {
-        associationId: currentUser.associationId,
-      },
-      orderBy: {
-        date: 'desc',
-      },
-    });
-
-    const header = [
-      'id',
-      'type',
-      'category',
-      'description',
-      'amountCents',
-      'amount',
-      'date',
-      'createdAt',
-    ];
-
-    const escapeCsv = (value: unknown) => {
-      if (value === null || value === undefined) return '';
-      return `"${String(value).replace(/"/g, '""')}"`;
-    };
-
-    const rows = transactions.map((transaction) => [
-      transaction.id,
-      transaction.type,
-      transaction.category ?? '',
-      transaction.description ?? '',
-      transaction.amountCents,
-      (transaction.amountCents / 100).toFixed(2),
-      transaction.date.toISOString(),
-      transaction.createdAt.toISOString(),
-    ]);
-
-    return [
-      header.map(escapeCsv).join(','),
-      ...rows.map((row) => row.map(escapeCsv).join(',')),
-    ].join('\n');
-  }
-
-  async exportXlsx(currentUser: any) {
-    if (!currentUser.associationId) {
-      throw new ForbiddenException('No active association selected');
-    }
-
-    const transactions = await this.prisma.transaction.findMany({
-      where: {
-        associationId: currentUser.associationId,
-      },
-      orderBy: {
-        date: 'desc',
-      },
-    });
-
-    const workbook = new ExcelJS.Workbook();
-    const sheet = workbook.addWorksheet('Transactions');
-
-    sheet.columns = [
-      { header: 'Type', key: 'type', width: 15 },
-      { header: 'Category', key: 'category', width: 25 },
-      { header: 'Description', key: 'description', width: 30 },
-      { header: 'Amount', key: 'amount', width: 15 },
-      { header: 'Date', key: 'date', width: 25 },
-    ];
-
-    transactions.forEach((transaction) => {
-      sheet.addRow({
-        type: transaction.type,
-        category: transaction.category ?? '',
-        description: transaction.description ?? '',
-        amount: transaction.amountCents / 100,
-        date: transaction.date.toISOString(),
+    const income =
+      await this.prisma.transaction.aggregate({
+        where: {
+          associationId,
+          type: "INCOME",
+        },
+        _sum: {
+          amountCents: true,
+        },
       });
-    });
 
-    const buffer = await workbook.xlsx.writeBuffer();
-    return Buffer.from(buffer);
+    const expense =
+      await this.prisma.transaction.aggregate({
+        where: {
+          associationId,
+          type: "EXPENSE",
+        },
+        _sum: {
+          amountCents: true,
+        },
+      });
+
+    const totalIncome =
+      income._sum.amountCents ?? 0;
+
+    const totalExpense =
+      expense._sum.amountCents ?? 0;
+
+    return {
+      totalIncome,
+      totalExpense,
+      balance:
+        totalIncome - totalExpense,
+    };
+  }
+
+  async filter(
+    associationId: string,
+    userId: string,
+    filters: {
+      type?: TransactionType;
+      category?: string;
+      dateFrom?: Date;
+      dateTo?: Date;
+      minAmount?: number;
+      maxAmount?: number;
+    },
+  ) {
+    await this.ensureMembership(
+      userId,
+      associationId,
+    );
+
+    return this.prisma.transaction.findMany({
+      where: {
+        associationId,
+        type: filters.type,
+        category: filters.category
+          ? {
+              contains:
+                filters.category,
+              mode: "insensitive",
+            }
+          : undefined,
+        date: {
+          gte: filters.dateFrom,
+          lte: filters.dateTo,
+        },
+        amountCents: {
+          gte: filters.minAmount,
+          lte: filters.maxAmount,
+        },
+      },
+      orderBy: {
+        date: "desc",
+      },
+    });
   }
 }

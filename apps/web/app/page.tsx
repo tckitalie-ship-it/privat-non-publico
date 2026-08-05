@@ -100,6 +100,8 @@ export default function HomePage() {
             </div>
           </div>
 
+          {/* ---------------------- DASHBOARD CARD ---------------------- */}
+
           <div className="relative">
             <div className="rounded-[2rem] border border-white/10 bg-[#111827] p-5 shadow-2xl">
               <div className="rounded-[1.5rem] bg-[#0f172a] p-5">
@@ -114,13 +116,16 @@ export default function HomePage() {
                   </div>
                 </div>
 
+                {/* KPI GRID */}
                 <div className="grid gap-4 sm:grid-cols-2">
-                  {[
-                    ['Membri', '128', Users],
-                    ['Eventi', '24', CalendarDays],
-                    ['Entrate', '€8.420', Wallet],
-                    ['KPI', '+18%', BarChart3],
-                  ].map(([label, value, Icon]: any) => (
+                  {(
+                    [
+                      ['Membri', '128', Users],
+                      ['Eventi', '24', CalendarDays],
+                      ['Entrate', '€8.420', Wallet],
+                      ['KPI', '+18%', BarChart3],
+                    ] as const
+                  ).map(([label, value, Icon]) => (
                     <div
                       key={label}
                       className="rounded-2xl border border-white/10 bg-white/5 p-4"
@@ -135,6 +140,7 @@ export default function HomePage() {
                   ))}
                 </div>
 
+                {/* EVENTI */}
                 <div className="mt-5 rounded-2xl border border-white/10 bg-white/5 p-4">
                   <div className="mb-3 flex items-center justify-between">
                     <p className="font-semibold">Prossimi eventi</p>
@@ -160,6 +166,8 @@ export default function HomePage() {
               </div>
             </div>
           </div>
+
+          {/* ------------------------------------------------------------ */}
         </div>
       </section>
     </main>

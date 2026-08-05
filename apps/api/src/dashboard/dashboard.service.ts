@@ -1,196 +1,168 @@
-import {
-  Injectable,
-  UnauthorizedException,
-} from '@nestjs/common';
-
-import { PrismaService } from '../prisma/prisma.service';
+import { Injectable, ForbiddenException } from "@nestjs/common";
+import { PrismaService } from "../prisma/prisma.service";
 
 @Injectable()
 export class DashboardService {
-  constructor(
-    private readonly prisma: PrismaService,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
-  async getKpis(user: any) {
-    if (!user?.id) {
-      throw new UnauthorizedException(
-        'Utente non autenticato',
-      );
+  /**
+   * Verifica che l’utente appartenga all’associazione
+   */
+  private async ensureMembership(userId: string, associationId: string) {
+    const membership = await this.prisma.membership.findFirst({
+      where: { userId, associationId },
+    });
+
+    if (!membership) {
+      throw new ForbiddenException("Non sei membro di questa associazione");
     }
-
-    if (!user?.associationId) {
-      throw new UnauthorizedException(
-        'Nessuna associazione attiva',
-      );
-    }
-
-    const associationId = user.associationId;
-
-    const [
-      associationsCount,
-      membersCount,
-      eventsCount,
-      incomeAgg,
-      expenseAgg,
-    ] = await Promise.all([
-      this.prisma.membership.count({
-        where: {
-          userId: user.id,
-        },
-      }),
-
-      this.prisma.membership.count({
-        where: {
-          associationId,
-        },
-      }),
-
-      this.prisma.event.count({
-        where: {
-          associationId,
-        },
-      }),
-
-      this.prisma.transaction.aggregate({
-        where: {
-          associationId,
-          type: 'INCOME',
-        },
-        _sum: {
-          amountCents: true,
-        },
-      }),
-
-      this.prisma.transaction.aggregate({
-        where: {
-          associationId,
-          type: 'EXPENSE',
-        },
-        _sum: {
-          amountCents: true,
-        },
-      }),
-    ]);
-
-    const incomeCents =
-      incomeAgg._sum.amountCents ?? 0;
-
-    const expenseCents =
-      expenseAgg._sum.amountCents ?? 0;
-
-    return {
-      associationsCount,
-      membersCount,
-      eventsCount,
-      incomeCents,
-      expenseCents,
-      balanceCents:
-        incomeCents - expenseCents,
-    };
   }
 
-  async getRevenueChart(user: any) {
-    if (!user?.id) {
-      throw new UnauthorizedException(
-        'Utente non autenticato',
-      );
-    }
-
-    if (!user?.associationId) {
-      throw new UnauthorizedException(
-        'Nessuna associazione attiva',
-      );
-    }
-
-    const associationId = user.associationId;
+  /**
+   * KPI principali per la dashboard
+   */
+  async getKpis(associationId: string, userId: string) {
+    await this.ensureMembership(userId, associationId);
 
     const now = new Date();
 
-    const startDate = new Date(
-      now.getFullYear(),
-      now.getMonth() - 5,
-      1,
-    );
-
-    const transactions =
-      await this.prisma.transaction.findMany({
-        where: {
-          associationId,
-          date: {
-            gte: startDate,
+    const [totalMembers, pendingInvitations, activeEvents, transactions] =
+      await Promise.all([
+        this.prisma.membership.count({
+          where: {
+            associationId,
           },
-        },
-        select: {
-          type: true,
-          amountCents: true,
-          date: true,
-        },
-        orderBy: {
-          date: 'asc',
-        },
-      });
+        }),
 
-    const months = new Map<
-      string,
-      {
-        month: string;
-        revenue: number;
-        expenses: number;
-        balance: number;
-      }
-    >();
+        this.prisma.invitation.count({
+          where: {
+            associationId,
+            acceptedAt: null,
+          },
+        }),
 
-    for (let i = 5; i >= 0; i--) {
-      const date = new Date(
-        now.getFullYear(),
-        now.getMonth() - i,
-        1,
-      );
+        this.prisma.event.count({
+          where: {
+            associationId,
+            startsAt: {
+              gte: now,
+            },
+          },
+        }),
 
-      const key = `${date.getFullYear()}-${String(
-        date.getMonth() + 1,
-      ).padStart(2, '0')}`;
+        this.prisma.transaction.findMany({
+          where: {
+            associationId,
+          },
+          select: {
+            type: true,
+            amountCents: true,
+          },
+        }),
+      ]);
 
-      const month = date.toLocaleDateString(
-        'it-IT',
-        {
-          month: 'short',
-        },
-      );
+    const monthlyIncome = transactions
+      .filter((transaction) => transaction.type === "INCOME")
+      .reduce((total, transaction) => total + transaction.amountCents, 0);
 
-      months.set(key, {
-        month,
-        revenue: 0,
-        expenses: 0,
-        balance: 0,
-      });
-    }
+    const monthlyExpenses = transactions
+      .filter((transaction) => transaction.type === "EXPENSE")
+      .reduce((total, transaction) => total + transaction.amountCents, 0);
 
-    transactions.forEach((transaction) => {
-      const date = new Date(transaction.date);
+    return {
+      totalMembers,
+      pendingInvitations,
+      monthlyIncome,
+      monthlyExpenses,
+      activeEvents,
+    };
+  }
 
-      const key = `${date.getFullYear()}-${String(
-        date.getMonth() + 1,
-      ).padStart(2, '0')}`;
+  /**
+   * Trend finanziario mensile
+   */
+  async getFinanceTrend(associationId: string, userId: string) {
+    await this.ensureMembership(userId, associationId);
 
-      const item = months.get(key);
-
-      if (!item) return;
-
-      const amount = transaction.amountCents / 100;
-
-      if (transaction.type === 'INCOME') {
-        item.revenue += amount;
-      }
-
-      if (transaction.type === 'EXPENSE') {
-        item.expenses += amount;
-      }
-
-      item.balance =
-        item.revenue - item.expenses;
+    const transactions = await this.prisma.transaction.findMany({
+      where: { associationId },
+      orderBy: { date: "asc" },
     });
 
-    return Array.from(months.values());
+    const trend: Record<string, { income: number; expense: number }> = {};
+
+    for (const t of transactions) {
+      const key = `${t.date.getFullYear()}-${String(
+        t.date.getMonth() + 1
+      ).padStart(2, "0")}`;
+
+      if (!trend[key]) {
+        trend[key] = { income: 0, expense: 0 };
+      }
+
+      if (t.type === "INCOME") trend[key].income += t.amountCents;
+      else trend[key].expense += t.amountCents;
+    }
+
+    return Object.entries(trend).map(([month, data]) => ({
+      month,
+      income: data.income,
+      expense: data.expense,
+      balance: data.income - data.expense,
+    }));
+  }
+
+  /**
+   * Trend eventi mensile
+   */
+  async getEventsTrend(associationId: string, userId: string) {
+    await this.ensureMembership(userId, associationId);
+
+    const events = await this.prisma.event.findMany({
+      where: { associationId },
+      orderBy: { startsAt: "asc" },
+    });
+
+    const trend: Record<string, number> = {};
+
+    for (const e of events) {
+      const key = `${e.startsAt.getFullYear()}-${String(
+        e.startsAt.getMonth() + 1
+      ).padStart(2, "0")}`;
+
+      trend[key] = (trend[key] ?? 0) + 1;
+    }
+
+    return Object.entries(trend).map(([month, count]) => ({
+      month,
+      count,
+    }));
+  }
+
+  /**
+   * Ultime transazioni
+   */
+  async latestTransactions(associationId: string, userId: string) {
+    await this.ensureMembership(userId, associationId);
+
+    return this.prisma.transaction.findMany({
+      where: { associationId },
+      orderBy: { date: "desc" },
+      take: 10,
+    });
+  }
+
+  /**
+   * Ultimi eventi
+   */
+  async latestEvents(associationId: string, userId: string) {
+    await this.ensureMembership(userId, associationId);
+
+    return this.prisma.event.findMany({
+      where: { associationId },
+      orderBy: { startsAt: "desc" },
+      take: 10,
+    });
   }
 }
+

@@ -12,6 +12,7 @@ export type AuthUser = {
 export async function getCurrentUser(): Promise<AuthUser | null> {
   const token = getAccessToken();
 
+
   if (!token) {
     return null;
   }
@@ -22,6 +23,7 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
         Authorization: `Bearer ${token}`,
       },
     });
+
 
     if (!res.ok) {
       clearAccessToken();

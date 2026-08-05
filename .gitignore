@@ -27,3 +27,24 @@ build/
 .env.local
 env.local
 apps/web/env.local
+# File temporanei e backup
+*.bak
+*.backup
+*.backup.*
+*.corrotto.*
+*.tmp
+*.old
+*.tscode
+* -Force
+*.patch
+
+# Variabili ambiente locali
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+**/env
+
+# Upload locali
+**/uploads/

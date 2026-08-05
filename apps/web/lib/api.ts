@@ -1,37 +1,37 @@
-import Cookies from 'js-cookie';
+import Cookies from "js-cookie";
 
-export const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL ||
-  'https://api-production-0f62.up.railway.app';
+export const API_URL =
+  process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:3001/api";
 
-export const API_URL = `${API_BASE_URL}/api`;
-
-const ACCESS_TOKEN_KEY = 'access_token';
+const ACCESS_TOKEN_KEY = "access_token";
 
 export function setAccessToken(token: string) {
-  if (typeof window === 'undefined') return;
+  if (typeof window === "undefined") return;
 
-  localStorage.setItem(ACCESS_TOKEN_KEY, token);
-
+  // Scrivi sempre prima i cookie (usati dal server)
   Cookies.set(ACCESS_TOKEN_KEY, token, {
     expires: 7,
-    sameSite: 'lax',
+    sameSite: "lax",
   });
+
+  // Poi localStorage (solo client)
+  localStorage.setItem(ACCESS_TOKEN_KEY, token);
 }
 
 export function getAccessToken() {
-  if (typeof window === 'undefined') return null;
+  if (typeof window === "undefined") return null;
 
-  return (
-    localStorage.getItem(ACCESS_TOKEN_KEY) ||
-    Cookies.get(ACCESS_TOKEN_KEY) ||
-    null
-  );
+  // Cookie ha priorità: è più affidabile e leggibile dal server
+  const cookieToken = Cookies.get(ACCESS_TOKEN_KEY);
+  if (cookieToken) return cookieToken;
+
+  // Fallback al localStorage
+  return localStorage.getItem(ACCESS_TOKEN_KEY) || null;
 }
 
 export function clearAccessToken() {
-  if (typeof window === 'undefined') return;
+  if (typeof window === "undefined") return;
 
-  localStorage.removeItem(ACCESS_TOKEN_KEY);
   Cookies.remove(ACCESS_TOKEN_KEY);
+  localStorage.removeItem(ACCESS_TOKEN_KEY);
 }

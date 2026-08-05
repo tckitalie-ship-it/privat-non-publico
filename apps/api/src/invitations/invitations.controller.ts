@@ -5,53 +5,114 @@ import {
   Get,
   Param,
   Post,
-  Req,
   UseGuards,
-} from '@nestjs/common';
+} from "@nestjs/common";
+import { CurrentUser } from "../auth/current-user.decorator";
+import { JwtAuthGuard } from "../auth/jwt-auth.guard";
+import { InvitationsService } from "./invitations.service";
 
-import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { JwtUser } from '../auth/jwt-user.interface';
-
-import { AcceptInvitationDto } from './dto/accept-invitation.dto';
-import { CreateInvitationDto } from './dto/create-invitation.dto';
-import { InvitationsService } from './invitations.service';
-
-@Controller('invitations')
+@Controller("invitations")
 export class InvitationsController {
   constructor(
-    private readonly invitationsService: InvitationsService,
+    private readonly invitations: InvitationsService,
   ) {}
 
+  /**
+   * Tutti gli inviti dell'utente
+   * per tutte le sue associazioni.
+   */
+  @UseGuards(JwtAuthGuard)
   @Get()
-  @UseGuards(JwtAuthGuard)
-  findAll(@Req() req: { user: JwtUser }) {
-    return this.invitationsService.findAll(req.user);
+  async findAll(
+    @CurrentUser() user: any,
+  ) {
+    return this.invitations.findAll(user.sub);
   }
 
+  /**
+   * Crea un invito.
+   */
+  @UseGuards(JwtAuthGuard)
   @Post()
-  @UseGuards(JwtAuthGuard)
-  create(
-    @Req() req: { user: JwtUser },
-    @Body() dto: CreateInvitationDto,
+  async create(
+    @CurrentUser() user: any,
+    @Body()
+    dto: {
+      email: string;
+      role: string;
+      associationId?: string;
+    },
   ) {
-    return this.invitationsService.create(req.user, dto);
+    return this.invitations.createInvitation(
+      user.sub,
+      {
+        email: dto.email,
+        role: dto.role as any,
+        associationId:
+          dto.associationId ??
+          user.associationId,
+      },
+    );
   }
 
-  @Delete(':id')
+  /**
+   * Elimina un invito.
+   */
   @UseGuards(JwtAuthGuard)
-  remove(
-    @Req() req: { user: JwtUser },
-    @Param('id') id: string,
+  @Delete(":id")
+  async remove(
+    @CurrentUser() user: any,
+    @Param("id") id: string,
   ) {
-    return this.invitationsService.remove(req.user, id);
+    return this.invitations.removeInvitation(
+      id,
+      user.sub,
+    );
   }
 
-  @Post('accept')
-  @UseGuards(JwtAuthGuard)
-  accept(
-    @Req() req: { user: JwtUser },
-    @Body() dto: AcceptInvitationDto,
+  /**
+   * Verifica il token dell'invito.
+   */
+  @Get("check/:token")
+  async check(
+    @Param("token") token: string,
   ) {
-    return this.invitationsService.accept(req.user, dto.token);
+    return this.invitations.checkToken(token);
+  }
+
+  /**
+   * Accetta l'invito per un utente
+   * già registrato.
+   */
+  @UseGuards(JwtAuthGuard)
+  @Post("accept/:token")
+  async accept(
+    @CurrentUser() user: any,
+    @Param("token") token: string,
+  ) {
+    return this.invitations.acceptInvitation(
+      token,
+      user.sub,
+    );
+  }
+
+  /**
+   * Accetta l'invito e registra
+   * un nuovo utente.
+   */
+  @Post("accept-and-register")
+  async acceptAndRegister(
+    @Body()
+    dto: {
+      token: string;
+      email: string;
+      password: string;
+    },
+  ) {
+    return this.invitations.acceptAndRegister({
+      token: dto.token,
+      email: dto.email,
+      password: dto.password,
+    });
   }
 }

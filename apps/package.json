@@ -1,0 +1,13 @@
+{
+  "name": "privat-non-publico",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "dev:all": "concurrently \"pnpm --filter ./apps/api start:dev\" \"pnpm --filter ./apps/web dev\"",
+    "dev:api": "pnpm --filter ./apps/api start:dev",
+    "dev:web": "pnpm --filter ./apps/web dev"
+  },
+  "devDependencies": {
+    "concurrently": "^10.0.3"
+  }
+}

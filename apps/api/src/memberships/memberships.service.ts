@@ -1,128 +1,268 @@
 import {
+  BadRequestException,
   ForbiddenException,
   Injectable,
   NotFoundException,
-} from '@nestjs/common';
+} from "@nestjs/common";
+import { Role } from "@prisma/client";
 
-import { PrismaService } from '../prisma/prisma.service';
+import { PrismaService } from "../prisma/prisma.service";
 
-import { Role } from '@prisma/client';
+import { toMembershipDto } from "./memberships.mapper";
 
 @Injectable()
 export class MembershipsService {
   constructor(
-    private prisma: PrismaService,
+    private readonly prisma: PrismaService,
   ) {}
 
-  async findAll(user: any) {
-    if (!user.associationId) {
-      return [];
+  /**
+   * Recupera l'associazione attiva.
+   * Se non è presente nel JWT, usa la prima membership.
+   */
+  private async resolveAssociationId(
+    userId: string,
+    associationId?: string | null,
+  ): Promise<string> {
+    if (associationId) {
+      const membership =
+        await this.prisma.membership.findFirst({
+          where: {
+            userId,
+            associationId,
+          },
+          select: {
+            associationId: true,
+          },
+        });
+
+      if (membership) {
+        return membership.associationId;
+      }
     }
 
-    return this.prisma.membership.findMany({
-      where: {
-        associationId:
-          user.associationId,
-      },
-
-      include: {
-        user: {
-          select: {
-            id: true,
-            email: true,
-          },
+    const firstMembership =
+      await this.prisma.membership.findFirst({
+        where: {
+          userId,
         },
-
-        association: {
-          select: {
-            id: true,
-            name: true,
-          },
+        orderBy: {
+          createdAt: "asc",
         },
-      },
-    });
-  }
+        select: {
+          associationId: true,
+        },
+      });
 
-  async me(user: any) {
-    if (!user.associationId) {
-      return null;
+    if (!firstMembership) {
+      throw new NotFoundException(
+        "Nessuna associazione collegata all'utente",
+      );
     }
 
-    return this.prisma.membership.findFirst({
-      where: {
-        userId: user.id,
-        associationId:
-          user.associationId,
-      },
-
-      include: {
-        association: true,
-      },
-    });
+    return firstMembership.associationId;
   }
 
+  /**
+   * Controlla che l'utente sia Owner o Admin
+   * nell'associazione indicata.
+   */
+  private async ensureCanManageMembers(
+    userId: string,
+    associationId: string,
+  ) {
+    const membership =
+      await this.prisma.membership.findFirst({
+        where: {
+          userId,
+          associationId,
+        },
+      });
+
+    if (!membership) {
+      throw new ForbiddenException(
+        "Non appartieni a questa associazione",
+      );
+    }
+
+    if (
+      membership.role !== Role.OWNER &&
+      membership.role !== Role.ADMIN
+    ) {
+      throw new ForbiddenException(
+        "Non hai i permessi per gestire i membri",
+      );
+    }
+
+    return membership;
+  }
+
+  /**
+   * Elenco membri dell'associazione attiva.
+   */
+  async findAllForUser(
+    userId: string,
+    associationId?: string | null,
+  ) {
+    const resolvedAssociationId =
+      await this.resolveAssociationId(
+        userId,
+        associationId,
+      );
+
+    const memberships =
+      await this.prisma.membership.findMany({
+        where: {
+          associationId: resolvedAssociationId,
+        },
+        include: {
+          user: {
+            select: {
+              id: true,
+              email: true,
+            },
+          },
+        },
+        orderBy: {
+          createdAt: "desc",
+        },
+      });
+
+    return memberships.map(toMembershipDto);
+  }
+
+  /**
+   * Membership dell'utente autenticato.
+   */
+  async me(
+    userId: string,
+    associationId?: string | null,
+  ) {
+    const resolvedAssociationId =
+      await this.resolveAssociationId(
+        userId,
+        associationId,
+      );
+
+    const membership =
+      await this.prisma.membership.findFirst({
+        where: {
+          userId,
+          associationId: resolvedAssociationId,
+        },
+        include: {
+          user: {
+            select: {
+              id: true,
+              email: true,
+            },
+          },
+          association: true,
+        },
+      });
+
+    if (!membership) {
+      throw new NotFoundException(
+        "Membership non trovata",
+      );
+    }
+
+    return membership;
+  }
+
+  /**
+   * Aggiorna il ruolo di un membro.
+   */
   async updateRole(
-    id: string,
-    role: Role,
-    user: any,
+    membershipId: string,
+    role: string,
+    currentUserId: string,
   ) {
-    const membership =
-      await this.prisma.membership.findUnique(
-        {
-          where: { id },
+    if (!Object.values(Role).includes(role as Role)) {
+      throw new BadRequestException(
+        "Ruolo non valido",
+      );
+    }
+
+    const target =
+      await this.prisma.membership.findUnique({
+        where: {
+          id: membershipId,
         },
-      );
+      });
 
-    if (!membership) {
+    if (!target) {
       throw new NotFoundException(
-        'Membership not found',
+        "Membro non trovato",
       );
     }
 
-    if (
-      membership.associationId !==
-      user.associationId
-    ) {
-      throw new ForbiddenException();
-    }
-
-    return this.prisma.membership.update(
-      {
-        where: { id },
-
-        data: { role },
-      },
+    await this.ensureCanManageMembers(
+      currentUserId,
+      target.associationId,
     );
+
+    const updated =
+      await this.prisma.membership.update({
+        where: {
+          id: membershipId,
+        },
+        data: {
+          role: role as Role,
+        },
+        include: {
+          user: {
+            select: {
+              id: true,
+              email: true,
+            },
+          },
+        },
+      });
+
+    return toMembershipDto(updated);
   }
 
+  /**
+   * Rimuove un membro.
+   */
   async remove(
-    id: string,
-    user: any,
+    membershipId: string,
+    currentUserId: string,
   ) {
-    const membership =
-      await this.prisma.membership.findUnique(
-        {
-          where: { id },
+    const target =
+      await this.prisma.membership.findUnique({
+        where: {
+          id: membershipId,
         },
-      );
+      });
 
-    if (!membership) {
+    if (!target) {
       throw new NotFoundException(
-        'Membership not found',
+        "Membro non trovato",
       );
     }
 
-    if (
-      membership.associationId !==
-      user.associationId
-    ) {
-      throw new ForbiddenException();
+    await this.ensureCanManageMembers(
+      currentUserId,
+      target.associationId,
+    );
+
+    if (target.userId === currentUserId) {
+      throw new BadRequestException(
+        "Non puoi rimuovere la tua membership",
+      );
     }
 
-    return this.prisma.membership.delete(
-      {
-        where: { id },
+    await this.prisma.membership.delete({
+      where: {
+        id: membershipId,
       },
-    );
+    });
+
+    return {
+      success: true,
+      message: "Membro rimosso",
+    };
   }
 }

@@ -1,383 +1,149 @@
-'use client';
-
-import Link from 'next/link';
-
-import { useEffect, useMemo, useState } from 'react';
+"use client";
 
 import {
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  Bar as ReBar,
-  BarChart as RechartsBarChart,
-} from 'recharts';
+  fetchFinanceTrend,
+  fetchMembersTrend,
+  type FinanceTrendItem,
+  type MembersTrendItem,
+} from "@/lib/api/dashboard";
 
-import {
-  CalendarDays,
-  DollarSign,
-  FileText,
-  MessageCircle,
-  Bell,
-  Building2,
-  TrendingUp,
-  Users,
-} from 'lucide-react';
+import { useCallback, useEffect, useState } from "react";
 
-import { API_URL } from '@/lib/api';
+import { DashboardKpis } from "@/components/dashboard/DashboardKpis";
+import FinanceBarChart from "@/components/dashboard/FinanceBarChart";
+import FinanceTrendChart from "@/components/dashboard/FinanceTrendChart";
+import MembersTrendChart from "@/components/dashboard/MembersTrendChart";
+import RevenueChart from "@/components/dashboard/RevenueChart";
 
-import DashboardSidebar from '@/components/dashboard-sidebar';
+import LatestTransactions from "@/components/dashboard/LatestTransactions";
+import QuickActions from "@/components/dashboard/QuickActions";
+import RecentActivity from "@/components/dashboard/RecentActivity";
+import SystemStatus from "@/components/dashboard/SystemStatus";
+import UpcomingEvents from "@/components/dashboard/UpcomingEvents";
 
-type DashboardStats = {
-  associations: number;
-  users: number;
-  memberships: number;
-  events: number;
-  eventRegistrations: number;
-  transactions: number;
-  incomeCents: number;
-  expenseCents: number;
-  balanceCents: number;
-};
-
-type RevenueItem = {
-  id: string;
-  title: string;
-  type: string;
-  amount: number;
-  date: string;
-};
+import { PageHeader } from "@/components/ui";
 
 export default function DashboardPage() {
-  const [stats, setStats] = useState<DashboardStats>({
-    associations: 0,
-    users: 0,
-    memberships: 0,
-    events: 0,
-    eventRegistrations: 0,
-    transactions: 0,
-    incomeCents: 0,
-    expenseCents: 0,
-    balanceCents: 0,
-  });
+  const [financeData, setFinanceData] = useState<FinanceTrendItem[]>([]);
+  const [membersData, setMembersData] = useState<MembersTrendItem[]>([]);
+  const [loadingCharts, setLoadingCharts] = useState(true);
+  const [chartsError, setChartsError] = useState<string | null>(null);
 
-  const [revenueChart, setRevenueChart] = useState<RevenueItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  const loadCharts = useCallback(async () => {
+    setLoadingCharts(true);
+    setChartsError(null);
 
-  useEffect(() => {
-    loadDashboard();
-  }, []);
-
-  async function loadDashboard() {
     try {
-      setLoading(true);
-
-      const [kpisRes, chartRes] = await Promise.all([
-        fetch(`${API_URL}/dashboard/kpis`),
-        fetch(`${API_URL}/dashboard/revenue-chart`),
+      const [finance, members] = await Promise.all([
+        fetchFinanceTrend(),
+        fetchMembersTrend(),
       ]);
 
-      if (!kpisRes.ok) {
-        throw new Error('Errore caricamento KPI dashboard');
-      }
-
-      if (!chartRes.ok) {
-        throw new Error('Errore caricamento revenue chart');
-      }
-
-      const kpis = await kpisRes.json();
-      const chart = await chartRes.json();
-
-      setStats({
-        associations: kpis.associations || 0,
-        users: kpis.users || 0,
-        memberships: kpis.memberships || 0,
-        events: kpis.events || 0,
-        eventRegistrations: kpis.eventRegistrations || 0,
-        transactions: kpis.transactions || 0,
-        incomeCents: kpis.incomeCents || 0,
-        expenseCents: kpis.expenseCents || 0,
-        balanceCents: kpis.balanceCents || 0,
-      });
-
-      setRevenueChart(Array.isArray(chart) ? chart : []);
+      setFinanceData(Array.isArray(finance) ? finance : []);
+      setMembersData(Array.isArray(members) ? members : []);
     } catch (error) {
-      console.error(error);
+      console.error("Errore caricamento grafici dashboard:", error);
+
+      setFinanceData([]);
+      setMembersData([]);
+
+      setChartsError(
+        error instanceof Error
+          ? error.message
+          : "Impossibile caricare i grafici",
+      );
     } finally {
-      setLoading(false);
+      setLoadingCharts(false);
     }
-  }
+  }, []);
 
-  const growth = useMemo(() => {
-    return stats.memberships * 12;
-  }, [stats.memberships]);
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      void loadCharts();
+    }, 0);
 
-  const chartData = useMemo(() => {
-    return revenueChart.map((item) => ({
-      name: new Date(item.date).toLocaleDateString('it-IT', {
-        day: '2-digit',
-        month: 'short',
-      }),
-      entrate: item.type === 'INCOME' ? item.amount : 0,
-      uscite: item.type === 'EXPENSE' ? item.amount : 0,
-    }));
-  }, [revenueChart]);
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [loadCharts]);
 
-  function formatMoney(cents: number) {
-    return `€${(cents / 100).toFixed(2)}`;
-  }
+  useEffect(() => {
+    function handleStorage(event: StorageEvent) {
+      if (event.key === "kpisUpdated") {
+        void loadCharts();
+      }
+    }
+
+    window.addEventListener("storage", handleStorage);
+
+    return () => {
+      window.removeEventListener("storage", handleStorage);
+    };
+  }, [loadCharts]);
 
   return (
-    <div className="flex min-h-screen bg-[#0f1117] text-white">
-      <DashboardSidebar />
+    <div className="min-w-0 space-y-8">
+      <PageHeader
+        title="Dashboard Associazione"
+        description="Benvenuto nella piattaforma di gestione. Da questa dashboard puoi monitorare membri, eventi, finanze e tutte le attività principali dell'associazione in tempo reale."
+      />
 
-      <main className="flex-1 p-8 md:ml-72">
-        <div className="mx-auto max-w-7xl">
-          <div className="mb-8 flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-              <p className="text-sm font-medium text-indigo-400">
-                News Platform Association
-              </p>
+      <DashboardKpis />
 
-              <h1 className="mt-2 text-5xl font-bold">Dashboard NPA</h1>
-
-              <p className="mt-3 max-w-2xl text-gray-400">
-                Monitora membri, eventi, finanze, registrazioni e attività
-                operative della News Platform Association.
-              </p>
-            </div>
-
-            <Link
-              href="/events"
-              className="inline-flex items-center justify-center rounded-2xl bg-indigo-600 px-6 py-4 font-semibold transition hover:bg-indigo-500"
-            >
-              Crea evento
-            </Link>
+      <section className="min-w-0">
+        {loadingCharts ? (
+          <div className="rounded-2xl border border-white/10 bg-[#0f172a] p-8 text-gray-300">
+            Caricamento grafici...
           </div>
+        ) : chartsError ? (
+          <div className="rounded-2xl border border-red-500/20 bg-red-500/10 p-6">
+            <p className="font-medium text-red-300">
+              Impossibile caricare i grafici
+            </p>
 
-          <section className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
-            <div className="rounded-3xl border border-white/5 bg-[#111827] p-6 shadow-xl transition hover:border-indigo-500/30">
-              <div className="flex items-center justify-between">
-                <CalendarDays className="text-indigo-300" />
+            <p className="mt-2 text-sm text-red-200/70">
+              {chartsError}
+            </p>
 
-                <span className="rounded-full border border-indigo-500/20 bg-indigo-500/10 px-3 py-1 text-xs text-indigo-300">
-                  Eventi
-                </span>
-              </div>
-
-              <h3 className="mt-5 text-4xl font-bold">
-                {loading ? '...' : stats.events}
-              </h3>
-
-              <p className="mt-2 text-sm text-gray-400">
-                Eventi creati nella piattaforma NPA.
-              </p>
+            <button
+              type="button"
+              onClick={() => void loadCharts()}
+              className="mt-4 rounded-lg bg-red-500 px-4 py-2 text-sm font-medium text-white transition hover:bg-red-400"
+            >
+              Riprova
+            </button>
+          </div>
+        ) : (
+          <div className="grid min-w-0 gap-6 xl:grid-cols-2">
+            <div className="min-w-0">
+              <RevenueChart data={financeData} />
             </div>
 
-            <div className="rounded-3xl border border-white/5 bg-[#111827] p-6 shadow-xl transition hover:border-emerald-500/30">
-              <div className="flex items-center justify-between">
-                <Users className="text-emerald-300" />
-
-                <span className="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1 text-xs text-emerald-300">
-                  Membri
-                </span>
-              </div>
-
-              <h3 className="mt-5 text-4xl font-bold">
-                {loading ? '...' : stats.memberships}
-              </h3>
-
-              <p className="mt-2 text-sm text-gray-400">
-                Membership reali registrate.
-              </p>
+            <div className="min-w-0">
+              <FinanceBarChart data={financeData} />
             </div>
 
-            <div className="rounded-3xl border border-white/5 bg-[#111827] p-6 shadow-xl transition hover:border-cyan-500/30">
-              <div className="flex items-center justify-between">
-                <FileText className="text-cyan-300" />
-
-                <span className="rounded-full border border-cyan-500/20 bg-cyan-500/10 px-3 py-1 text-xs text-cyan-300">
-                  Movimenti
-                </span>
-              </div>
-
-              <h3 className="mt-5 text-4xl font-bold">
-                {loading ? '...' : stats.transactions}
-              </h3>
-
-              <p className="mt-2 text-sm text-gray-400">
-                Transazioni salvate nel database.
-              </p>
+            <div className="min-w-0">
+              <FinanceTrendChart data={financeData} />
             </div>
 
-            <div className="rounded-3xl border border-white/5 bg-[#111827] p-6 shadow-xl transition hover:border-pink-500/30">
-              <div className="flex items-center justify-between">
-                <Bell className="text-pink-300" />
-
-                <span className="rounded-full border border-pink-500/20 bg-pink-500/10 px-3 py-1 text-xs text-pink-300">
-                  Registrazioni
-                </span>
-              </div>
-
-              <h3 className="mt-5 text-4xl font-bold">
-                {loading ? '...' : stats.eventRegistrations}
-              </h3>
-
-              <p className="mt-2 text-sm text-gray-400">
-                Partecipazioni reali agli eventi.
-              </p>
+            <div className="min-w-0">
+              <MembersTrendChart data={membersData} />
             </div>
-          </section>
+          </div>
+        )}
+      </section>
 
-          <section className="mt-8 grid gap-5 lg:grid-cols-2">
-            <div className="rounded-3xl border border-white/5 bg-[#111827] p-8 shadow-xl">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-amber-300">Utenti NPA</p>
+      <QuickActions />
 
-                  <h2 className="mt-3 text-4xl font-bold">
-                    {loading ? '...' : stats.users}
-                  </h2>
-                </div>
+      <section className="grid min-w-0 gap-6 2xl:grid-cols-2">
+        <RecentActivity />
+        <UpcomingEvents />
+      </section>
 
-                <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-amber-500/10">
-                  <MessageCircle className="h-8 w-8 text-amber-300" />
-                </div>
-              </div>
+      <LatestTransactions />
 
-              <p className="mt-4 text-gray-400">
-                Utenti reali creati nella piattaforma.
-              </p>
-            </div>
-
-            <div className="rounded-3xl border border-white/5 bg-[#111827] p-8 shadow-xl">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-blue-300">Associazioni</p>
-
-                  <h2 className="mt-3 text-4xl font-bold">
-                    {loading ? '...' : stats.associations}
-                  </h2>
-                </div>
-
-                <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-blue-500/10">
-                  <Building2 className="h-8 w-8 text-blue-300" />
-                </div>
-              </div>
-
-              <p className="mt-4 text-gray-400">
-                Associazioni create e collegate al database.
-              </p>
-            </div>
-          </section>
-
-          <section className="mt-8 grid gap-5 lg:grid-cols-3">
-            <div className="rounded-3xl border border-white/5 bg-gradient-to-br from-emerald-500/20 to-[#111827] p-8 shadow-xl">
-              <div className="flex items-center justify-between">
-                <TrendingUp className="text-emerald-300" />
-
-                <span className="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1 text-xs text-emerald-300">
-                  Crescita
-                </span>
-              </div>
-
-              <h2 className="mt-5 text-5xl font-bold">
-                +{loading ? '...' : growth}%
-              </h2>
-
-              <p className="mt-3 text-gray-300">
-                Crescita calcolata dai membri reali.
-              </p>
-            </div>
-
-            <div className="rounded-3xl border border-white/5 bg-gradient-to-br from-indigo-500/20 to-[#111827] p-8 shadow-xl">
-              <div className="flex items-center justify-between">
-                <DollarSign className="text-indigo-300" />
-
-                <span className="rounded-full border border-indigo-500/20 bg-indigo-500/10 px-3 py-1 text-xs text-indigo-300">
-                  Saldo
-                </span>
-              </div>
-
-              <h2 className="mt-5 text-5xl font-bold">
-                {loading ? '...' : formatMoney(stats.balanceCents)}
-              </h2>
-
-              <p className="mt-3 text-gray-300">
-                Entrate meno uscite reali.
-              </p>
-            </div>
-
-            <div className="rounded-3xl border border-white/5 bg-gradient-to-br from-cyan-500/20 to-[#111827] p-8 shadow-xl">
-              <div className="flex items-center justify-between">
-                <Building2 className="text-cyan-300" />
-
-                <span className="rounded-full border border-cyan-500/20 bg-cyan-500/10 px-3 py-1 text-xs text-cyan-300">
-                  Stato
-                </span>
-              </div>
-
-              <h2 className="mt-5 text-5xl font-bold">Online</h2>
-
-              <p className="mt-3 text-gray-300">
-                Sistema NPA operativo e collegato al backend.
-              </p>
-            </div>
-          </section>
-
-          <section className="mt-8 rounded-3xl border border-white/5 bg-[#111827] p-8 shadow-xl">
-            <div className="mb-6 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-              <div>
-                <p className="text-sm text-indigo-300">
-                  Analisi finanziaria NPA
-                </p>
-
-                <h2 className="mt-2 text-3xl font-bold">
-                  Entrate e uscite reali
-                </h2>
-              </div>
-
-              <div className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-gray-300">
-                {loading ? '...' : revenueChart.length} movimenti
-              </div>
-            </div>
-
-            <div className="h-80">
-              {chartData.length === 0 ? (
-                <div className="flex h-full items-center justify-center rounded-3xl border border-dashed border-white/10 text-gray-500">
-                  Nessun dato finanziario disponibile
-                </div>
-              ) : (
-                <ResponsiveContainer width="100%" height="100%">
-                  <RechartsBarChart data={chartData}>
-                    <XAxis dataKey="name" stroke="#9CA3AF" />
-
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: '#111827',
-                        border: '1px solid #374151',
-                        borderRadius: '16px',
-                        color: '#fff',
-                      }}
-                    />
-
-                    <ReBar
-                      dataKey="entrate"
-                      fill="#34d399"
-                      radius={[10, 10, 0, 0]}
-                    />
-
-                    <ReBar
-                      dataKey="uscite"
-                      fill="#f87171"
-                      radius={[10, 10, 0, 0]}
-                    />
-                  </RechartsBarChart>
-                </ResponsiveContainer>
-              )}
-            </div>
-          </section>
-        </div>
-      </main>
+      <SystemStatus />
     </div>
   );
 }

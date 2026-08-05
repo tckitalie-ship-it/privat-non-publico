@@ -1,8 +1,16 @@
-import { Role } from '@prisma/client';
-
 export interface JwtUser {
+  /** ID utente (UUID Prisma) */
   id: string;
+
+  /** Alias standard JWT (uguale a id) */
+  sub: string;
+
+  /** Email dell’utente */
   email: string;
-  associationId?: string;
-  role?: Role;
+
+  /** Ruolo dell’utente: MEMBER | ADMIN | OWNER */
+  role: string;
+
+  /** Associazione attiva dell’utente */
+  associationId: string | null;
 }

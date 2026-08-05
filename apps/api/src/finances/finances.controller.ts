@@ -3,135 +3,160 @@ import {
   Controller,
   Delete,
   Get,
-  Header,
   Param,
   Patch,
   Post,
-  Req,
-  Res,
   UseGuards,
-} from '@nestjs/common';
+} from "@nestjs/common";
 
-import type { Response } from 'express';
+import { JwtAuthGuard } from "../auth/jwt-auth.guard";
+import { CurrentUser } from "../auth/current-user.decorator";
+import type { JwtUser } from "../auth/jwt-user.interface";
 
-import { AssociationActiveGuard } from '../auth/association-active.guard';
-import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { Roles } from '../auth/roles.decorator';
-import { RolesGuard } from '../auth/roles.guard';
+import { FinancesService } from "./finances.service";
 
-import { CreateTransactionDto } from './dto/create-transaction.dto';
-import { UpdateTransactionDto } from './dto/update-transaction.dto';
-
-import { FinancesService } from './finances.service';
-
-@Controller('finances')
-@UseGuards(
-  JwtAuthGuard,
-  AssociationActiveGuard,
-  RolesGuard,
-)
+@Controller("finances")
+@UseGuards(JwtAuthGuard)
 export class FinancesController {
   constructor(
-    private readonly financesService: FinancesService,
+    private readonly finances: FinancesService,
   ) {}
 
-  @Post('transactions')
-  @Roles('OWNER', 'ADMIN')
-  createTransaction(
-    @Req() req: any,
-    @Body() dto: CreateTransactionDto,
+  /**
+   * Crea una transazione
+   */
+  @Post()
+  async create(
+    @CurrentUser() user: JwtUser,
+    @Body()
+    dto: {
+      associationId: string;
+      title?: string | null;
+      description?: string | null;
+      category?: string | null;
+      amountCents: number;
+      type: "INCOME" | "EXPENSE";
+      date: string;
+    },
   ) {
-    return this.financesService.createTransaction(
-      req.user,
-      dto,
-    );
+    return this.finances.createTransaction(user.id, {
+      ...dto,
+      date: new Date(dto.date),
+    });
   }
 
-  @Get('transactions')
-  findTransactions(@Req() req: any) {
-    return this.financesService.findTransactions(
-      req.user,
-    );
-  }
-
-  @Get('transactions/:id')
-  findOneTransaction(
-    @Req() req: any,
-    @Param('id') transactionId: string,
+  /**
+   * Tutte le transazioni dell'associazione
+   */
+  @Get("association/:associationId")
+  async findAll(
+    @CurrentUser() user: JwtUser,
+    @Param("associationId") associationId: string,
   ) {
-    return this.financesService.findOneTransaction(
-      req.user,
-      transactionId,
+    return this.finances.findAll(
+      associationId,
+      user.id,
     );
   }
 
-  @Patch('transactions/:id')
-  @Roles('OWNER', 'ADMIN')
-  updateTransaction(
-    @Req() req: any,
-    @Param('id') transactionId: string,
-    @Body() dto: UpdateTransactionDto,
+  /**
+   * Riepilogo finanziario
+   */
+  @Get("summary/:associationId")
+  async summary(
+    @CurrentUser() user: JwtUser,
+    @Param("associationId") associationId: string,
   ) {
-    return this.financesService.updateTransaction(
-      req.user,
-      transactionId,
-      dto,
+    return this.finances.getSummary(
+      associationId,
+      user.id,
     );
   }
 
-  @Delete('transactions/:id')
-  @Roles('OWNER', 'ADMIN')
-  deleteTransaction(
-    @Req() req: any,
-    @Param('id') transactionId: string,
+  /**
+   * Filtri avanzati
+   */
+  @Post("filter/:associationId")
+  async filter(
+    @CurrentUser() user: JwtUser,
+    @Param("associationId") associationId: string,
+    @Body()
+    
+    filters: {
+  type?: "INCOME" | "EXPENSE";
+  category?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  minAmount?: number;
+  maxAmount?: number;
+},
   ) {
-    return this.financesService.deleteTransaction(
-      req.user,
-      transactionId,
+    return this.finances.filter(
+      associationId,
+      user.id,
+      {
+        ...filters,
+        dateFrom: filters.dateFrom
+          ? new Date(filters.dateFrom)
+          : undefined,
+        dateTo: filters.dateTo
+          ? new Date(filters.dateTo)
+          : undefined,
+      },
     );
   }
 
-  @Get('summary')
-  getSummary(@Req() req: any) {
-    return this.financesService.getSummary(
-      req.user,
-    );
-  }
-
-  @Get('export.csv')
-  @Roles('OWNER', 'ADMIN')
-  @Header('Content-Type', 'text/csv')
-  @Header(
-    'Content-Disposition',
-    'attachment; filename="transactions.csv"',
-  )
-  exportCsv(@Req() req: any) {
-    return this.financesService.exportCsv(
-      req.user,
-    );
-  }
-
-  @Get('export.xlsx')
-  @Roles('OWNER', 'ADMIN')
-  async exportXlsx(
-    @Req() req: any,
-    @Res() res: Response,
+  /**
+   * Dettaglio transazione
+   */
+  @Get(":id")
+  async findOne(
+    @CurrentUser() user: JwtUser,
+    @Param("id") id: string,
   ) {
-    const buffer =
-      await this.financesService.exportXlsx(
-        req.user,
-      );
+    return this.finances.findOne(id, user.id);
+  }
 
-    res.setHeader(
-      'Content-Type',
-      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  /**
+   * Aggiorna transazione
+   */
+  @Patch(":id")
+  async update(
+    @CurrentUser() user: JwtUser,
+    @Param("id") id: string,
+    @Body()
+    dto: {
+      title?: string | null;
+      description?: string | null;
+      category?: string | null;
+      amountCents?: number;
+      type?: "INCOME" | "EXPENSE";
+      date?: string;
+    },
+  ) {
+    return this.finances.updateTransaction(
+      id,
+      user.id,
+      {
+        ...dto,
+        date: dto.date
+          ? new Date(dto.date)
+          : undefined,
+      },
     );
+  }
 
-    res.setHeader(
-      'Content-Disposition',
-      'attachment; filename="transactions.xlsx"',
+  /**
+   * Elimina transazione
+   */
+  @Delete(":id")
+  async delete(
+    @CurrentUser() user: JwtUser,
+    @Param("id") id: string,
+  ) {
+    return this.finances.deleteTransaction(
+      id,
+      user.id,
     );
-
-    return res.send(buffer);
   }
 }

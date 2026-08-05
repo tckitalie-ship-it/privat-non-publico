@@ -1,98 +1,66 @@
 import {
   BadRequestException,
-  ForbiddenException,
+  ConflictException,
   Injectable,
   UnauthorizedException,
-} from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
-import * as bcrypt from 'bcrypt';
+} from "@nestjs/common";
+import { JwtService } from "@nestjs/jwt";
+import * as bcrypt from "bcrypt";
 
-import { PrismaService } from '../prisma/prisma.service';
-import { ChangePasswordDto } from './dto/change-password.dto';
+import { PrismaService } from "../prisma/prisma.service";
+
+type RegisterBody = {
+  email?: string;
+  password?: string;
+};
+
+type LoginBody = {
+  email?: string;
+  password?: string;
+};
+
+type ChangePasswordBody = {
+  currentPassword?: string;
+  oldPassword?: string;
+  newPassword?: string;
+  password?: string;
+};
 
 @Injectable()
 export class AuthService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly jwtService: JwtService,
+    private readonly jwtService: JwtService
   ) {}
 
-  async login(email: string, password: string) {
-    const user = await this.prisma.user.findUnique({
+  async register(body: RegisterBody) {
+    const email = body.email?.trim().toLowerCase();
+    const password = body.password;
+
+    if (!email || !password) {
+      throw new BadRequestException("Email e password sono obbligatorie");
+    }
+
+    if (password.length < 8) {
+      throw new BadRequestException(
+        "La password deve contenere almeno 8 caratteri"
+      );
+    }
+
+    const existingUser = await this.prisma.user.findUnique({
       where: { email },
     });
 
-    if (!user) {
-      throw new UnauthorizedException('Invalid credentials');
+    if (existingUser) {
+      throw new ConflictException("Esiste già un account con questa email");
     }
 
-    const isPasswordValid = await bcrypt.compare(
-      password,
-      user.passwordHash,
-    );
+    const passwordHash = await bcrypt.hash(password, 12);
 
-    if (!isPasswordValid) {
-      throw new UnauthorizedException('Invalid credentials');
-    }
-
-    const memberships = await this.prisma.membership.findMany({
-      where: {
-        userId: user.id,
-        association: {
-          isActive: true,
-        },
-      },
-      include: {
-        association: true,
-      },
-      orderBy: {
-        createdAt: 'asc',
-      },
-    });
-
-    const activeMembership = memberships[0];
-
-    if (!activeMembership) {
-      const payload = {
-        sub: user.id,
-        email: user.email,
-      };
-
-      return {
-        access_token: await this.jwtService.signAsync(payload),
-        user: {
-          id: user.id,
-          email: user.email,
-        },
-        association: null,
-      };
-    }
-
-    const payload = {
-      sub: user.id,
-      email: user.email,
-      associationId: activeMembership.associationId,
-      role: activeMembership.role,
-    };
-
-    return {
-      access_token: await this.jwtService.signAsync(payload),
-      user: {
-        id: user.id,
-        email: user.email,
-      },
-      association: {
-        id: activeMembership.association.id,
-        name: activeMembership.association.name,
-        role: activeMembership.role,
-      },
-    };
-  }
-
-  async me(currentUser: any) {
-    const user = await this.prisma.user.findUnique({
-      where: {
-        id: currentUser.id,
+    const user = await this.prisma.user.create({
+      data: {
+        email,
+        passwordHash,
       },
       select: {
         id: true,
@@ -101,95 +69,215 @@ export class AuthService {
       },
     });
 
-    if (!user) {
-      throw new UnauthorizedException('User not found');
-    }
+    const accessToken = await this.jwtService.signAsync({
+      sub: user.id,
+      email: user.email,
+    });
 
     return {
-      ...user,
-      associationId: currentUser.associationId,
-      role: currentUser.role,
+      accessToken,
+      user,
+      associations: [],
     };
   }
 
-  async switchAssociation(currentUser: any, associationId: string) {
-    const membership = await this.prisma.membership.findUnique({
-      where: {
-        userId_associationId: {
-          userId: currentUser.id,
-          associationId,
-        },
-      },
+  async login(body: LoginBody) {
+    const email = body.email?.trim().toLowerCase();
+    const password = body.password;
+
+    if (!email || !password) {
+      throw new BadRequestException("Email e password sono obbligatorie");
+    }
+
+    const user = await this.prisma.user.findUnique({
+      where: { email },
       include: {
-        association: true,
+        memberships: {
+          include: {
+            association: true,
+          },
+        },
       },
     });
 
-    if (!membership) {
-      throw new ForbiddenException('Membership not found');
+    if (!user) {
+      throw new UnauthorizedException("Email o password non corretti");
     }
 
-    if (!membership.association.isActive) {
-      throw new ForbiddenException('Association is inactive');
+    if (user.lockUntil && user.lockUntil > new Date()) {
+      throw new UnauthorizedException(
+        "Account temporaneamente bloccato. Riprova più tardi"
+      );
     }
 
-    const payload = {
-      sub: currentUser.id,
-      email: currentUser.email,
-      associationId: membership.associationId,
-      role: membership.role,
-    };
+    const passwordIsValid = await bcrypt.compare(
+      password,
+      user.passwordHash
+    );
+
+    if (!passwordIsValid) {
+      const failedAttempts = user.failedAttempts + 1;
+      const mustLock = failedAttempts >= 5;
+
+      await this.prisma.user.update({
+        where: { id: user.id },
+        data: {
+          failedAttempts: mustLock ? 0 : failedAttempts,
+          lockUntil: mustLock
+            ? new Date(Date.now() + 15 * 60 * 1000)
+            : null,
+        },
+      });
+
+      throw new UnauthorizedException("Email o password non corretti");
+    }
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        failedAttempts: 0,
+        lockUntil: null,
+      },
+    });
+
+    const firstMembership = user.memberships[0];
+
+    const accessToken = await this.jwtService.signAsync({
+      sub: user.id,
+      email: user.email,
+      associationId: firstMembership?.associationId,
+      role: firstMembership?.role,
+    });
 
     return {
-      access_token: await this.jwtService.signAsync(payload),
-      association: {
-        id: membership.association.id,
-        name: membership.association.name,
-        role: membership.role,
+      accessToken,
+      user: {
+        id: user.id,
+        email: user.email,
+        createdAt: user.createdAt,
       },
+      associations: user.memberships.map((membership) => ({
+        membershipId: membership.id,
+        role: membership.role,
+        association: membership.association,
+      })),
+      activeAssociationId: firstMembership?.associationId ?? null,
     };
   }
 
-  async changePassword(currentUser: any, dto: ChangePasswordDto) {
-    if (dto.currentPassword === dto.newPassword) {
+  async me(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        email: true,
+        createdAt: true,
+        updatedAt: true,
+        memberships: {
+          include: {
+            association: true,
+          },
+        },
+      },
+    });
+
+    if (!user) {
+      throw new UnauthorizedException("Utente non trovato");
+    }
+
+    return user;
+  }
+
+  async changePassword(userId: string, body: ChangePasswordBody) {
+    const currentPassword = body.currentPassword ?? body.oldPassword;
+    const newPassword = body.newPassword ?? body.password;
+
+    if (!currentPassword || !newPassword) {
       throw new BadRequestException(
-        'La nuova password deve essere diversa da quella attuale',
+        "Password attuale e nuova password sono obbligatorie"
+      );
+    }
+
+    if (newPassword.length < 8) {
+      throw new BadRequestException(
+        "La nuova password deve contenere almeno 8 caratteri"
       );
     }
 
     const user = await this.prisma.user.findUnique({
-      where: {
-        id: currentUser.id,
-      },
+      where: { id: userId },
     });
 
     if (!user) {
-      throw new UnauthorizedException('User not found');
+      throw new UnauthorizedException("Utente non trovato");
     }
 
-    const isCurrentPasswordValid = await bcrypt.compare(
-      dto.currentPassword,
-      user.passwordHash,
+    const passwordIsValid = await bcrypt.compare(
+      currentPassword,
+      user.passwordHash
     );
 
-    if (!isCurrentPasswordValid) {
-      throw new UnauthorizedException('Password attuale non corretta');
+    if (!passwordIsValid) {
+      throw new UnauthorizedException("Password attuale non corretta");
     }
 
-    const passwordHash = await bcrypt.hash(dto.newPassword, 10);
+    const passwordHash = await bcrypt.hash(newPassword, 12);
 
     await this.prisma.user.update({
-      where: {
-        id: user.id,
-      },
+      where: { id: userId },
       data: {
         passwordHash,
+        failedAttempts: 0,
+        lockUntil: null,
       },
     });
 
     return {
-      success: true,
-      message: 'Password aggiornata',
+      message: "Password aggiornata correttamente",
+    };
+  }
+
+  async switchAssociation(userId: string, associationId: string) {
+    if (!associationId) {
+      throw new BadRequestException("Association ID obbligatorio");
+    }
+
+    const membership = await this.prisma.membership.findUnique({
+      where: {
+        userId_associationId: {
+          userId,
+          associationId,
+        },
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+          },
+        },
+        association: true,
+      },
+    });
+
+    if (!membership || !membership.association.isActive) {
+      throw new UnauthorizedException(
+        "Non hai accesso a questa associazione"
+      );
+    }
+
+    const accessToken = await this.jwtService.signAsync({
+      sub: membership.user.id,
+      email: membership.user.email,
+      associationId: membership.associationId,
+      role: membership.role,
+    });
+
+    return {
+      accessToken,
+      activeAssociationId: membership.associationId,
+      role: membership.role,
+      association: membership.association,
     };
   }
 }
