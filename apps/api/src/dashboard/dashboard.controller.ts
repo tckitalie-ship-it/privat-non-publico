@@ -23,7 +23,7 @@ export class DashboardController {
   /**
    * Recupera l'associazione attiva.
    *
-   * Se associationId non è presente nel vecchio JWT,
+   * Se associationId non è presente nel JWT,
    * usa automaticamente la prima membership dell'utente.
    */
   private async resolveAssociationId(
@@ -140,6 +140,24 @@ export class DashboardController {
       await this.resolveAssociationId(user);
 
     return this.dashboard.latestEvents(
+      associationId,
+      user.id,
+    );
+  }
+
+  /**
+   * Attività recenti
+   *
+   * GET /api/dashboard/recent-activity
+   */
+  @Get("recent-activity")
+  async recentActivity(
+    @CurrentUser() user: JwtUser,
+  ) {
+    const associationId =
+      await this.resolveAssociationId(user);
+
+    return this.dashboard.recentActivity(
       associationId,
       user.id,
     );

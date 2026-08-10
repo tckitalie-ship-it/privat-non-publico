@@ -16,7 +16,7 @@ import MembersList from "@/components/members/MembersList";
 import MembersPendingInvitations from "@/components/members/MembersPendingInvitations";
 import MembersToolbar from "@/components/members/MembersToolbar";
 
-import { API_URL, getAccessToken } from "@/lib/api";
+import { getAccessToken } from "@/lib/api";
 
 type Role = "OWNER" | "ADMIN" | "MEMBER";
 
@@ -64,7 +64,7 @@ export default function MembersPage() {
     }
 
     try {
-      const response = await fetch(`${API_URL}/memberships`, {
+      const response = await fetch("/api/memberships", {
         headers: {
           Accept: "application/json",
           Authorization: `Bearer ${token}`,
@@ -108,7 +108,7 @@ export default function MembersPage() {
     }
 
     try {
-      const response = await fetch(`${API_URL}/invitations`, {
+      const response = await fetch("/api/invitations", {
         headers: {
           Accept: "application/json",
           Authorization: `Bearer ${token}`,
@@ -170,7 +170,7 @@ export default function MembersPage() {
     try {
       setLoadingInvite(true);
 
-      const response = await fetch(`${API_URL}/invitations`, {
+      const response = await fetch("/api/invitations", {
         method: "POST",
         headers: {
           Accept: "application/json",
@@ -228,7 +228,7 @@ export default function MembersPage() {
     }
 
     try {
-      const response = await fetch(`${API_URL}/memberships/${id}`, {
+      const response = await fetch(`/api/memberships/${id}`, {
         method: "DELETE",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -274,7 +274,7 @@ export default function MembersPage() {
     }
 
     try {
-      const response = await fetch(`${API_URL}/invitations/${id}`, {
+      const response = await fetch(`/api/invitations/${id}`, {
         method: "DELETE",
         headers: {
           Authorization: `Bearer ${token}`,

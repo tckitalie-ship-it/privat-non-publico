@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Link from 'next/link';
 
@@ -196,7 +196,7 @@ export default function EventsPage() {
         throw new Error('Login richiesto');
       }
 
-      const res = await fetch(`${API_URL}/events/${id}`, {
+      const res = await fetch(`/api/events/${id}`, {
         method: 'DELETE',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -282,7 +282,7 @@ export default function EventsPage() {
               href="/dashboard"
               className="rounded-xl border border-white/10 px-4 py-2 text-sm transition hover:bg-white/5"
             >
-              ← Dashboard
+              â† Dashboard
             </Link>
           </div>
 
@@ -297,7 +297,7 @@ export default function EventsPage() {
               </h1>
 
               <p className="mt-3 max-w-2xl text-gray-400">
-                Gestisci gli eventi, le registrazioni e le attività principali
+                Gestisci gli eventi, le registrazioni e le attivitÃ  principali
                 della piattaforma.
               </p>
             </div>
@@ -462,7 +462,7 @@ export default function EventsPage() {
               <span className="font-medium text-white">
                 {confirmDeleteEvent.title}
               </span>
-              . Questa operazione non può essere annullata.
+              . Questa operazione non puÃ² essere annullata.
             </p>
 
             <div className="mt-6 flex justify-end gap-3">
@@ -493,3 +493,4 @@ export default function EventsPage() {
     </div>
   );
 }
+

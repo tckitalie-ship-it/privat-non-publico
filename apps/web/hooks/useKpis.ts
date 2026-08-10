@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import {
   useCallback,
@@ -6,10 +6,7 @@ import {
   useState,
 } from "react";
 
-import {
-  API_URL,
-  getAccessToken,
-} from "@/lib/api";
+import { getAccessToken } from "@/lib/api";
 
 type DashboardKpiData = {
   membersCount: number;
@@ -31,7 +28,7 @@ async function requestKpis(): Promise<DashboardKpiData> {
   const token = getAccessToken();
 
   const response = await fetch(
-    `${API_URL}/dashboard/kpis`,
+    "/api/dashboard/kpis",
     {
       headers: token
         ? {

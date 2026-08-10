@@ -43,7 +43,39 @@ async function readErrorMessage(response: Response): Promise<string> {
 
   return `Errore ${response.status}`;
 }
+function getAssociationIdFromToken(): string | null {
+  const token = getAccessToken();
 
+  if (!token) return null;
+
+  try {
+    const payload = token.split(".")[1];
+    if (!payload) return null;
+
+    const normalized = payload
+      .replace(/-/g, "+")
+      .replace(/_/g, "/");
+
+    const decoded = JSON.parse(
+      decodeURIComponent(
+        atob(normalized)
+          .split("")
+          .map(
+            (character) =>
+              `%${character
+                .charCodeAt(0)
+                .toString(16)
+                .padStart(2, "0")}`,
+          )
+          .join(""),
+      ),
+    );
+
+    return decoded.associationId ?? null;
+  } catch {
+    return null;
+  }
+}
 export default function NotificationsPage() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
@@ -54,7 +86,15 @@ export default function NotificationsPage() {
     setError(null);
 
     try {
-      const response = await authenticatedFetch("/notifications/me");
+     const associationId = getAssociationIdFromToken();
+
+if (!associationId) {
+  throw new Error("Associazione attiva non disponibile.");
+}
+
+const response = await authenticatedFetch(
+  `/notifications/association/${associationId}`,
+);
 
       if (!response.ok) {
         throw new Error(await readErrorMessage(response));

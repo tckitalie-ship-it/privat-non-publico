@@ -6,13 +6,15 @@ import {
 } from "@nestjs/common";
 import { Role } from "@prisma/client";
 
+import { NotificationsService } from "../notifications/notifications.service";
 import { PrismaService } from "../prisma/prisma.service";
 
 @Injectable()
 export class EventsService {
   constructor(
-    private readonly prisma: PrismaService,
-  ) {}
+  private readonly prisma: PrismaService,
+  private readonly notificationsService: NotificationsService,
+) {}
 
   async createEvent(
     userId: string,
@@ -39,16 +41,25 @@ export class EventsService {
       );
     }
 
-    return this.prisma.event.create({
-      data: {
-        associationId: dto.associationId,
-        title: dto.title,
-        description: dto.description ?? null,
-        location: dto.location ?? null,
-        startsAt: dto.startsAt,
-        endsAt: dto.endsAt ?? null,
-      },
-    });
+    const event = await this.prisma.event.create({
+  data: {
+    associationId: dto.associationId,
+    title: dto.title,
+    description: dto.description ?? null,
+    location: dto.location ?? null,
+    startsAt: dto.startsAt,
+    endsAt: dto.endsAt ?? null,
+  },
+});
+
+await this.notificationsService.create({
+  associationId: dto.associationId,
+  title: "Nuovo evento creato",
+  message: `È stato creato l'evento: ${event.title}`,
+  userId: null,
+});
+
+return event;
   }
 
   async findAll(
@@ -161,18 +172,28 @@ export class EventsService {
       );
     }
 
-    return this.prisma.event.update({
-      where: {
-        id: eventId,
-      },
-      data: {
-        title: dto.title,
-        description: dto.description,
-        location: dto.location,
-        startsAt: dto.startsAt,
-        endsAt: dto.endsAt,
-      },
-    });
+    const updatedEvent =
+  await this.prisma.event.update({
+    where: {
+      id: eventId,
+    },
+    data: {
+      title: dto.title,
+      description: dto.description,
+      location: dto.location,
+      startsAt: dto.startsAt,
+      endsAt: dto.endsAt,
+    },
+  });
+
+await this.notificationsService.create({
+  associationId: event.associationId,
+  title: "Evento modificato",
+  message: `È stato modificato l'evento: ${updatedEvent.title}`,
+  userId: null,
+});
+
+return updatedEvent;
   }
 
   async deleteEvent(
@@ -210,14 +231,21 @@ export class EventsService {
     }
 
     await this.prisma.event.delete({
-      where: {
-        id: eventId,
-      },
-    });
+  where: {
+    id: eventId,
+  },
+});
 
-    return {
-      message: "Evento eliminato",
-    };
+await this.notificationsService.create({
+  associationId: event.associationId,
+  title: "Evento eliminato",
+  message: `È stato eliminato l'evento: ${event.title}`,
+  userId: null,
+});
+
+return {
+  message: "Evento eliminato",
+};
   }
 
   async registerToEvent(
@@ -267,12 +295,22 @@ export class EventsService {
       );
     }
 
-    return this.prisma.eventRegistration.create({
-      data: {
-        eventId,
-        userId,
-      },
-    });
+    const registration =
+  await this.prisma.eventRegistration.create({
+    data: {
+      eventId,
+      userId,
+    },
+  });
+
+await this.notificationsService.create({
+  associationId: event.associationId,
+  title: "Nuova partecipazione evento",
+  message: `Un membro si è registrato all'evento: ${event.title}`,
+  userId: null,
+});
+
+return registration;
   }
 
   async getRegistrations(

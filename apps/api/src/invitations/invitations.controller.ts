@@ -26,7 +26,7 @@ export class InvitationsController {
   async findAll(
     @CurrentUser() user: any,
   ) {
-    return this.invitations.findAll(user.sub);
+    return this.invitations.findAll(user.sub, user.associationId);
   }
 
   /**

@@ -15,6 +15,7 @@ import { BillingModule } from "./billing/billing.module";
 import { NotificationsModule } from "./notifications/notifications.module";
 import { FilesModule } from "./files/files.module";
 import { ChatModule } from "./modules/chat/chat.module";
+import { HealthController } from "./health.controller";
 
 @Module({
   imports: [
@@ -37,5 +38,7 @@ import { ChatModule } from "./modules/chat/chat.module";
     FilesModule,
     ChatModule,
   ],
+
+  controllers: [HealthController],
 })
 export class AppModule {}

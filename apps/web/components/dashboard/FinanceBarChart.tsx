@@ -30,8 +30,15 @@ export default function FinanceBarChart({ data }: { data: FinancePoint[] }) {
     <div className="rounded-xl border bg-white p-6 shadow-sm">
       <h2 className="text-lg font-semibold mb-4">Entrate e Uscite Mensili</h2>
 
-      <div className="h-[350px]">
-        <ResponsiveContainer width="100%" height="100%">
+      {/* 🔥 MODIFICA 1 */}
+      <div className="h-[350px] min-w-0">
+        {/* 🔥 MODIFICA 2 */}
+        <ResponsiveContainer
+          width="100%"
+          height="100%"
+          minWidth={0}
+          initialDimension={{ width: 500, height: 350 }}
+        >
           <BarChart data={formatted}>
             <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
 

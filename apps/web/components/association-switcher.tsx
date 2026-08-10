@@ -3,11 +3,7 @@
 import { useEffect, useState } from "react";
 import { ChevronDown, Loader2 } from "lucide-react";
 
-import {
-  API_URL,
-  getAccessToken,
-  setAccessToken,
-} from "@/lib/api";
+import { getAccessToken, setAccessToken } from "@/lib/api";
 
 import { cn } from "@/lib/utils";
 
@@ -81,7 +77,7 @@ export default function AssociationSwitcher() {
 
         const payload = readJwtPayload(token);
 
-        const response = await fetch(`${API_URL}/associations`, {
+        const response = await fetch("/api/associations", {
           headers: {
             Authorization: `Bearer ${token}`,
           },
@@ -148,7 +144,7 @@ export default function AssociationSwitcher() {
 
     try {
       const response = await fetch(
-        `${API_URL}/auth/switch-association`,
+        "/api/auth/switch-association",
         {
           method: "POST",
           headers: {

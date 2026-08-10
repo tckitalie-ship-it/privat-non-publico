@@ -17,7 +17,8 @@ import LogoutButton from "@/components/logout-button";
 import { NotificationBell } from "@/components/notification-bell";
 import ThemeToggle from "@/components/theme-toggle";
 import { cn } from "@/lib/utils";
-
+import { useEffect, useState } from "react";
+import { getAccessToken } from "@/lib/api";
 const navigation = [
   {
     label: "Dashboard",
@@ -50,7 +51,51 @@ const navigation = [
     icon: Folder,
   },
 ];
+function UserRoleCard() {
+  const [role, setRole] = useState<string>("");
 
+  useEffect(() => {
+    const token = getAccessToken();
+
+    if (!token) return;
+
+    try {
+      const payload = token.split(".")[1];
+      if (!payload) return;
+
+      const normalized = payload
+        .replace(/-/g, "+")
+        .replace(/_/g, "/");
+
+      const decoded = JSON.parse(atob(normalized));
+
+      setRole(decoded.role ?? "");
+    } catch {
+      setRole("");
+    }
+  }, []);
+
+  const label =
+    role === "OWNER"
+      ? "Proprietario"
+      : role === "ADMIN"
+        ? "Amministratore"
+        : role === "MEMBER"
+          ? "Membro"
+          : "Utente";
+
+  return (
+    <div className="mb-3 rounded-xl border border-[#30363d] bg-[#161b22] px-4 py-3">
+      <p className="text-sm font-semibold text-white">
+        {label}
+      </p>
+
+      <p className="mt-1 text-xs text-gray-400">
+        Gestione Associazione
+      </p>
+    </div>
+  );
+}
 export default function DashboardSidebar() {
   const pathname = usePathname();
 
@@ -70,9 +115,9 @@ export default function DashboardSidebar() {
           Gestione Associazione
         </h1>
 
-        <p className="mt-1 text-xs text-gray-500">
-          Dashboard amministrativa
-        </p>
+         <p className="mt-1 text-xs text-gray-400">
+            Gestione Associazione
+         </p>
       </header>
 
       {/* ASSOCIATION SWITCHER */}
@@ -138,11 +183,7 @@ export default function DashboardSidebar() {
           <ThemeToggle />
         </div>
 
-        <div className="mb-3 rounded-xl border border-[#30363d] bg-[#161b22] px-4 py-3">
-          <p className="text-sm font-semibold text-white">Amministratore</p>
-
-          <p className="mt-1 text-xs text-gray-400">Dashboard SaaS</p>
-        </div>
+        <UserRoleCard />
 
         <LogoutButton />
       </footer>

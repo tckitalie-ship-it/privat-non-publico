@@ -14,7 +14,7 @@ const actions = [
   {
     title: "Nuovo membro",
     description: "Aggiungi un nuovo socio",
-    href: "/members/new",
+    href: "/members",
     icon: UserPlus,
     color: "bg-blue-500",
   },
@@ -35,14 +35,14 @@ const actions = [
   {
     title: "Carica documento",
     description: "Aggiungi un file",
-    href: "/files/upload",
+    href: "/dashboard/files",
     icon: FolderPlus,
     color: "bg-orange-500",
   },
   {
     title: "Invia invito",
     description: "Invita un nuovo membro",
-    href: "/members/invite",
+    href: "/members",
     icon: MailPlus,
     color: "bg-cyan-500",
   },

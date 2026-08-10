@@ -1,11 +1,13 @@
 import { NextResponse } from "next/server";
 
 const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:3001/api";
+  process.env.NEXT_PUBLIC_API_URL ??
+  "http://127.0.0.1:3001/api";
 
 export async function GET(request: Request) {
   try {
-    const authorization = request.headers.get("authorization");
+    const authorization =
+      request.headers.get("authorization");
 
     if (!authorization) {
       return NextResponse.json(
@@ -18,14 +20,17 @@ export async function GET(request: Request) {
       );
     }
 
-    const response = await fetch(`${API_BASE_URL}/dashboard/kpis`, {
-      method: "GET",
-      headers: {
-        Accept: "application/json",
-        Authorization: authorization,
+    const response = await fetch(
+      `${API_BASE_URL}/dashboard/recent-activity`,
+      {
+        method: "GET",
+        headers: {
+          Accept: "application/json",
+          Authorization: authorization,
+        },
+        cache: "no-store",
       },
-      cache: "no-store",
-    });
+    );
 
     const text = await response.text();
 
@@ -43,7 +48,10 @@ export async function GET(request: Request) {
       status: response.status,
     });
   } catch (error) {
-    console.error("Dashboard KPI proxy error:", error);
+    console.error(
+      "Recent activity proxy error:",
+      error,
+    );
 
     return NextResponse.json(
       {

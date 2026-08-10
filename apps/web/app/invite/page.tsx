@@ -35,7 +35,7 @@ function InviteContent() {
         }
 
         const res = await fetch(
-          `${API_URL}/api/invitations/accept`,
+          `${API_URL}/invitations/accept`,
           {
             method: 'POST',
             headers: {

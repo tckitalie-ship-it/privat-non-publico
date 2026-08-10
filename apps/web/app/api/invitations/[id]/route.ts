@@ -5,8 +5,13 @@ const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL ??
   "http://127.0.0.1:3001/api";
 
-export async function POST(request: Request) {
+export async function DELETE(
+  request: Request,
+  context: { params: Promise<{ id: string }> },
+) {
   try {
+    const { id } = await context.params;
+
     const cookieStore = await cookies();
     const cookieToken =
       cookieStore.get("access_token")?.value;
@@ -25,17 +30,13 @@ export async function POST(request: Request) {
       );
     }
 
-    const body = await request.json();
-
     const response = await fetch(
-      `${API_BASE_URL}/auth/switch-association`,
+      `${API_BASE_URL}/invitations/${id}`,
       {
-        method: "POST",
+        method: "DELETE",
         headers: {
-          "Content-Type": "application/json",
           Authorization: authorization,
         },
-        body: JSON.stringify(body),
         cache: "no-store",
       },
     );
@@ -46,7 +47,7 @@ export async function POST(request: Request) {
       status: response.status,
     });
   } catch (error) {
-    console.error("Switch association proxy error:", error);
+    console.error("Delete invitation proxy error:", error);
 
     return NextResponse.json(
       { message: "Errore interno" },

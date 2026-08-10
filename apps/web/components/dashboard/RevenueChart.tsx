@@ -21,8 +21,13 @@ export default function RevenueChart({
         Entrate Mensili
       </h2>
 
-      <div className="h-[350px]">
-        <ResponsiveContainer width="100%" height="100%">
+      <div className="h-[350px] min-w-0">
+        <ResponsiveContainer
+          width="100%"
+          height="100%"
+          minWidth={0}
+          initialDimension={{ width: 500, height: 350 }}
+        >
           <BarChart data={data} barSize={40}>
             <CartesianGrid
               strokeDasharray="3 3"
