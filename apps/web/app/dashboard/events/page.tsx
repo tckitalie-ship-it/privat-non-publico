@@ -121,18 +121,16 @@ async function requestAssociationId(
     );
   }
 
-  const response = await fetch(
-    `${API_URL}/memberships/me`,
-    {
-      method: "GET",
-      headers: {
-        Accept: "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      cache: "no-store",
+ const response = await fetch(
+  "/api/memberships/me",
+  {
+    method: "GET",
+    headers: {
+      Accept: "application/json",
     },
-  );
-
+    cache: "no-store",
+  },
+);
   const data =
     (await response
       .json()
