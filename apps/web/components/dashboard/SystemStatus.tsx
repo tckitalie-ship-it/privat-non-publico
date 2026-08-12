@@ -9,7 +9,6 @@ import {
   ShieldCheck,
   XCircle,
 } from "lucide-react";
-import { API_URL } from "@/lib/api";
 
 type HealthResponse = {
   backend?: string;
@@ -56,14 +55,13 @@ export default function SystemStatus() {
   useEffect(() => {
     async function loadHealth() {
       try {
-        const response = await fetch(
-          `${API_URL}/health`,
-          {
-            method: "GET",
-            cache: "no-store",
-          },
-        );
-
+       const response = await fetch(
+  "/api/health",
+  {
+    method: "GET",
+    cache: "no-store",
+  },
+);
         const data: HealthResponse | null =
           await response.json().catch(() => null);
 
