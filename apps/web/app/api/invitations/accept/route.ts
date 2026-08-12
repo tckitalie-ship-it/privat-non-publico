@@ -1,11 +1,12 @@
 import { NextResponse } from 'next/server';
+import { getBackendApiUrl } from '@/lib/server-api';
 
 export async function POST(request: Request) {
   try {
     const body = await request.json();
 
     const response = await fetch(
-      'http://127.0.0.1:3001/api/invitations/accept',
+      getBackendApiUrl('invitations/accept'),
       {
         method: 'POST',
         headers: {

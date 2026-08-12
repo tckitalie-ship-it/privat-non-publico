@@ -1,7 +1,10 @@
 import Cookies from "js-cookie";
 
-export const API_URL =
-  process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:3001/api";
+const DEFAULT_API_URL = "http://127.0.0.1:3001/api";
+
+export const API_URL = (
+  process.env.NEXT_PUBLIC_API_URL?.trim() || DEFAULT_API_URL
+).replace(/\/+$/, "");
 
 const ACCESS_TOKEN_KEY = "access_token";
 

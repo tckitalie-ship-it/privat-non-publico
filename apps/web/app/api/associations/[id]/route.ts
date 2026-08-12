@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
+import { getBackendApiUrl } from "@/lib/server-api";
 
-const API_URL = "http://127.0.0.1:3001/api/associations";
+const API_URL = getBackendApiUrl("associations");
 
 export async function DELETE(
   _req: Request,

@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server';
+import { getBackendApiUrl } from '@/lib/server-api';
 
 export async function GET(request: Request) {
   const authorization = request.headers.get('authorization');
 
-  const response = await fetch('http://127.0.0.1:3001/api/memberships/me', {
+  const response = await fetch(getBackendApiUrl('memberships/me'), {
     method: 'GET',
     headers: {
       Authorization: authorization || '',

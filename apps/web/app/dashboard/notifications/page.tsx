@@ -1,20 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getAccessToken } from "@/lib/api";
+import { API_URL, getAccessToken } from "@/lib/api";
 import { Notification } from "@/types/notification";
-
-// ⭐ Aggiunta: API_URL + authenticatedFetch + readErrorMessage
-const API_URL =
-  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001/api";
 
 async function authenticatedFetch(
   path: string,
   options: RequestInit = {}
 ): Promise<Response> {
   const token = getAccessToken();
-
-  console.log("TOKEN:", token);
 
   return fetch(`${API_URL}${path}`, {
     ...options,

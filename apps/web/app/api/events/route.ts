@@ -1,8 +1,7 @@
 import { NextResponse } from 'next/server';
+import { getBackendApiUrl } from '@/lib/server-api';
 
-const BACKEND_URL =
-  process.env.NEXT_PUBLIC_API_URL ??
-  'http://127.0.0.1:3001/api';
+const BACKEND_URL = getBackendApiUrl();
 
 export async function GET(request: Request) {
   try {

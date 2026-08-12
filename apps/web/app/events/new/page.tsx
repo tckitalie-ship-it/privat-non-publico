@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { API_URL, getAccessToken } from "@/lib/api";
 
 export default function NewEventPage() {
   const [title, setTitle] = useState("");
@@ -11,10 +12,13 @@ export default function NewEventPage() {
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    const res = await fetch("http://localhost:3001/events", {
+    const token = getAccessToken();
+
+    const res = await fetch(`${API_URL}/events`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
       body: JSON.stringify({
         title,
