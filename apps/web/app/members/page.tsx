@@ -38,28 +38,6 @@ type Invitation = {
   createdAt: string;
 };
 
-function getCurrentUserRole(): Role | null {
-  if (typeof window === "undefined") {
-    return null;
-  }
-
-  const token = getAccessToken();
-
-  if (!token) {
-    return null;
-  }
-
-  try {
-    const payload = JSON.parse(
-      atob(token.split(".")[1]),
-    ) as { role?: Role };
-
-    return payload.role ?? null;
-  } catch {
-    return null;
-  }
-}
-
 export default function MembersPage() {
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<Role>("MEMBER");
@@ -76,7 +54,57 @@ export default function MembersPage() {
   const [showInviteForm, setShowInviteForm] = useState(false);
   const [loadingInvite, setLoadingInvite] = useState(false);
   const [loadingMembers, setLoadingMembers] = useState(true);
-  const [loadingInvitations, setLoadingInvitations] = useState(true);
+  const [loadingInvitations, setLoadingInvitations] =
+    useState(true);
+  const [loadingRole, setLoadingRole] = useState(true);
+
+  const fetchCurrentMembership = useCallback(async () => {
+    const token = getAccessToken();
+
+    if (!token) {
+      setCurrentUserRole(null);
+      setLoadingRole(false);
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        "/api/memberships/me",
+        {
+          headers: {
+            Accept: "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          cache: "no-store",
+        },
+      );
+
+      const data = await response.json().catch(() => null);
+      console.log("MEMBERSHIP ME DEBUG:", data);
+      if (!response.ok) {
+        throw new Error(
+          data?.message ||
+            `Errore caricamento ruolo (${response.status})`,
+        );
+      }
+
+      setCurrentUserRole(
+        data?.role === "OWNER" ||
+          data?.role === "ADMIN" ||
+          data?.role === "MEMBER"
+          ? data.role
+          : null,
+      );
+    } catch (error) {
+      console.error(
+        "Errore caricamento membership corrente:",
+        error,
+      );
+      setCurrentUserRole(null);
+    } finally {
+      setLoadingRole(false);
+    }
+  }, []);
 
   const fetchMembers = useCallback(async () => {
     setLoadingMembers(true);
@@ -167,20 +195,25 @@ export default function MembersPage() {
   }, []);
 
   useEffect(() => {
-    setCurrentUserRole(getCurrentUserRole());
-  }, []);
-
-  useEffect(() => {
     const timeoutId = window.setTimeout(() => {
-      void Promise.all([fetchMembers(), fetchInvitations()]);
+      void Promise.all([
+        fetchCurrentMembership(),
+        fetchMembers(),
+        fetchInvitations(),
+      ]);
     }, 0);
 
     return () => {
       window.clearTimeout(timeoutId);
     };
-  }, [fetchMembers, fetchInvitations]);
-
-  async function handleInvite(event: FormEvent<HTMLFormElement>) {
+  }, [
+    fetchCurrentMembership,
+    fetchMembers,
+    fetchInvitations,
+  ]);
+    async function handleInvite(
+    event: FormEvent<HTMLFormElement>,
+  ) {
     event.preventDefault();
 
     const cleanEmail = email.trim().toLowerCase();
@@ -339,18 +372,22 @@ export default function MembersPage() {
     return members.filter((member) => {
       const matchesSearch =
         normalizedSearch.length === 0 ||
-        member.user.email.toLowerCase().includes(normalizedSearch);
+        member.user.email
+          .toLowerCase()
+          .includes(normalizedSearch);
 
       const matchesRole =
-        roleFilter.length === 0 || roleFilter.includes(member.role);
+        roleFilter.length === 0 ||
+        roleFilter.includes(member.role);
 
       return matchesSearch && matchesRole;
     });
   }, [members, roleFilter, search]);
 
   const canManageMembers =
-    currentUserRole === "OWNER" ||
-    currentUserRole === "ADMIN";
+    !loadingRole &&
+    (currentUserRole === "OWNER" ||
+      currentUserRole === "ADMIN");
 
   return (
     <div className="mx-auto w-full max-w-6xl min-w-0 space-y-6">
@@ -373,15 +410,16 @@ export default function MembersPage() {
           onSubmit={handleInvite}
         />
       )}
-
-      <Link
+            <Link
         href="/dashboard"
         className="inline-flex items-center text-sm font-medium text-slate-600 hover:text-slate-900"
       >
         ← Dashboard
       </Link>
 
-      <h2 className="text-lg font-semibold text-white">Membri</h2>
+      <h2 className="text-lg font-semibold text-white">
+        Membri
+      </h2>
 
       <MembersToolbar
         search={search}
@@ -397,10 +435,11 @@ export default function MembersPage() {
       />
 
       <MembersPendingInvitations
-        invitations={invitations}
-        loading={loadingInvitations}
-        onRemove={removeInvitation}
-      />
+  invitations={invitations}
+  loading={loadingInvitations}
+  canManageMembers={canManageMembers}
+  onRemove={removeInvitation}
+/>
     </div>
   );
 }

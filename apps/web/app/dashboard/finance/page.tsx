@@ -24,6 +24,11 @@ import {
   getAccessToken,
 } from "@/lib/api";
 
+type Role =
+  | "OWNER"
+  | "ADMIN"
+  | "MEMBER";
+
 type Transaction = {
   id: string;
   type: "INCOME" | "EXPENSE";
@@ -41,39 +46,73 @@ type JwtPayload = {
   role?: string | null;
 };
 
-function getAssociationIdFromToken(
+function getJwtPayload(
   token: string,
-): string | null {
+): JwtPayload | null {
   try {
-    const payloadPart = token.split(".")[1];
+    const payloadPart =
+      token.split(".")[1];
 
     if (!payloadPart) {
       return null;
     }
 
-    const normalized = payloadPart
-      .replace(/-/g, "+")
-      .replace(/_/g, "/");
+    const normalized =
+      payloadPart
+        .replace(/-/g, "+")
+        .replace(/_/g, "/");
 
-    const padded = normalized.padEnd(
-      normalized.length +
-        ((4 - (normalized.length % 4)) % 4),
-      "=",
-    );
+    const padded =
+      normalized.padEnd(
+        normalized.length +
+          ((4 -
+            (normalized.length % 4)) %
+            4),
+        "=",
+      );
 
-    const payload = JSON.parse(
+    return JSON.parse(
       window.atob(padded),
     ) as JwtPayload;
-
-    return payload.associationId ?? null;
   } catch (error) {
     console.error(
-      "Errore lettura associationId dal token:",
+      "Errore lettura JWT:",
       error,
     );
 
     return null;
   }
+}
+
+function getAssociationIdFromToken(
+  token: string,
+): string | null {
+  const payload =
+    getJwtPayload(token);
+
+  return payload?.associationId ?? null;
+}
+
+function getCurrentUserRole(): Role | null {
+  const token =
+    getAccessToken();
+
+  if (!token) {
+    return null;
+  }
+
+  const payload =
+    getJwtPayload(token);
+
+  if (
+    payload?.role === "OWNER" ||
+    payload?.role === "ADMIN" ||
+    payload?.role === "MEMBER"
+  ) {
+    return payload.role;
+  }
+
+  return null;
 }
 
 export default function FinancePage() {
@@ -83,10 +122,13 @@ export default function FinancePage() {
   const [loading, setLoading] =
     useState(true);
 
+  const [currentUserRole, setCurrentUserRole] =
+    useState<Role | null>(null);
+
   const [type, setType] =
-    useState<"INCOME" | "EXPENSE">(
-      "INCOME",
-    );
+    useState<
+      "INCOME" | "EXPENSE"
+    >("INCOME");
 
   const [description, setDescription] =
     useState("");
@@ -111,11 +153,21 @@ export default function FinancePage() {
   const [editLoading, setEditLoading] =
     useState(false);
 
+  const canManageFinance =
+    currentUserRole === "OWNER" ||
+    currentUserRole === "ADMIN";
+      useEffect(() => {
+    setCurrentUserRole(
+      getCurrentUserRole(),
+    );
+  }, []);
+
   const summary = useMemo(() => {
     const income = transactions
       .filter(
         (transaction) =>
-          transaction.type === "INCOME",
+          transaction.type ===
+          "INCOME",
       )
       .reduce(
         (total, transaction) =>
@@ -140,29 +192,35 @@ export default function FinancePage() {
     return {
       income,
       expense,
-      balance: income - expense,
+      balance:
+        income - expense,
     };
   }, [transactions]);
 
   const loadTransactions =
     useCallback(async () => {
-      const token = getAccessToken();
+      const token =
+        getAccessToken();
 
       if (!token) {
         toast.error(
           "Sessione non disponibile",
         );
+
         setLoading(false);
         return;
       }
 
       const associationId =
-        getAssociationIdFromToken(token);
+        getAssociationIdFromToken(
+          token,
+        );
 
       if (!associationId) {
         toast.error(
           "Nessuna associazione attiva selezionata",
         );
+
         setLoading(false);
         return;
       }
@@ -170,26 +228,34 @@ export default function FinancePage() {
       try {
         setLoading(true);
 
-        const response = await fetch(
-          `${API_URL}/finances/association/${associationId}`,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
+        const response =
+          await fetch(
+            `${API_URL}/finances/association/${associationId}`,
+            {
+              headers: {
+                Authorization:
+                  `Bearer ${token}`,
+              },
+              cache: "no-store",
             },
-            cache: "no-store",
-          },
-        );
+          );
 
-        const data = await response
-          .json()
-          .catch(() => null);
+        const data =
+          await response
+            .json()
+            .catch(
+              () => null,
+            );
 
         if (!response.ok) {
-          const message = Array.isArray(
-            data?.message,
-          )
-            ? data.message.join(", ")
-            : data?.message;
+          const message =
+            Array.isArray(
+              data?.message,
+            )
+              ? data.message.join(
+                  ", ",
+                )
+              : data?.message;
 
           throw new Error(
             message ||
@@ -208,6 +274,8 @@ export default function FinancePage() {
           error,
         );
 
+        setTransactions([]);
+
         toast.error(
           error instanceof Error
             ? error.message
@@ -218,27 +286,41 @@ export default function FinancePage() {
       }
     }, []);
 
-      useEffect(() => {
-  const timeoutId = window.setTimeout(() => {
-    void loadTransactions();
-  }, 0);
+  useEffect(() => {
+    const timeoutId =
+      window.setTimeout(() => {
+        void loadTransactions();
+      }, 0);
 
-  return () => {
-    window.clearTimeout(timeoutId);
-  };
-}, [loadTransactions]);
+    return () => {
+      window.clearTimeout(
+        timeoutId,
+      );
+    };
+  }, [loadTransactions]);
 
   const createTransaction =
     useCallback(async () => {
+      if (!canManageFinance) {
+        toast.error(
+          "Non hai i permessi per gestire le finanze",
+        );
+        return;
+      }
+
       const cleanDescription =
         description.trim();
 
       const cleanCategory =
         category.trim();
 
-      const numericAmount = Number(
-        amount.replace(",", "."),
-      );
+      const numericAmount =
+        Number(
+          amount.replace(
+            ",",
+            ".",
+          ),
+        );
 
       if (
         !cleanDescription ||
@@ -254,7 +336,8 @@ export default function FinancePage() {
         return;
       }
 
-      const token = getAccessToken();
+      const token =
+        getAccessToken();
 
       if (!token) {
         toast.error(
@@ -264,7 +347,9 @@ export default function FinancePage() {
       }
 
       const associationId =
-        getAssociationIdFromToken(token);
+        getAssociationIdFromToken(
+          token,
+        );
 
       if (!associationId) {
         toast.error(
@@ -274,40 +359,53 @@ export default function FinancePage() {
       }
 
       try {
-        const response = await fetch(
-          `${API_URL}/finances`,
-          {
-            method: "POST",
-            headers: {
-              Authorization: `Bearer ${token}`,
-              "Content-Type":
-                "application/json",
+        const response =
+          await fetch(
+            `${API_URL}/finances`,
+            {
+              method: "POST",
+              headers: {
+                Authorization:
+                  `Bearer ${token}`,
+                "Content-Type":
+                  "application/json",
+              },
+              body: JSON.stringify({
+                associationId,
+                type,
+                title:
+                  cleanDescription,
+                description:
+                  cleanDescription,
+                category:
+                  cleanCategory,
+                amountCents:
+                  Math.round(
+                    numericAmount *
+                      100,
+                  ),
+                date:
+                  new Date().toISOString(),
+              }),
             },
-            body: JSON.stringify({
-              associationId,
-              type,
-              title: cleanDescription,
-              description:
-                cleanDescription,
-              category: cleanCategory,
-              amountCents: Math.round(
-                numericAmount * 100,
-              ),
-              date: new Date().toISOString(),
-            }),
-          },
-        );
+          );
 
-        const data = await response
-          .json()
-          .catch(() => null);
+        const data =
+          await response
+            .json()
+            .catch(
+              () => null,
+            );
 
         if (!response.ok) {
-          const message = Array.isArray(
-            data?.message,
-          )
-            ? data.message.join(", ")
-            : data?.message;
+          const message =
+            Array.isArray(
+              data?.message,
+            )
+              ? data.message.join(
+                  ", ",
+                )
+              : data?.message;
 
           throw new Error(
             message ||
@@ -343,16 +441,24 @@ export default function FinancePage() {
       }
     }, [
       amount,
+      canManageFinance,
       category,
       description,
       loadTransactions,
       type,
     ]);
-
-  const deleteTransaction =
+      const deleteTransaction =
     useCallback(
       async (id: string) => {
-        const token = getAccessToken();
+        if (!canManageFinance) {
+          toast.error(
+            "Non hai i permessi per gestire le finanze",
+          );
+          return;
+        }
+
+        const token =
+          getAccessToken();
 
         if (!token) {
           toast.error(
@@ -362,26 +468,33 @@ export default function FinancePage() {
         }
 
         try {
-          const response = await fetch(
-            `${API_URL}/finances/${id}`,
-            {
-              method: "DELETE",
-              headers: {
-                Authorization: `Bearer ${token}`,
+          const response =
+            await fetch(
+              `${API_URL}/finances/${id}`,
+              {
+                method: "DELETE",
+                headers: {
+                  Authorization:
+                    `Bearer ${token}`,
+                },
               },
-            },
-          );
+            );
 
-          const data = await response
-            .json()
-            .catch(() => null);
+          const data =
+            await response
+              .json()
+              .catch(
+                () => null,
+              );
 
           if (!response.ok) {
             const message =
               Array.isArray(
                 data?.message,
               )
-                ? data.message.join(", ")
+                ? data.message.join(
+                    ", ",
+                  )
                 : data?.message;
 
             throw new Error(
@@ -413,7 +526,10 @@ export default function FinancePage() {
           );
         }
       },
-      [loadTransactions],
+      [
+        canManageFinance,
+        loadTransactions,
+      ],
     );
 
   const updateTransaction =
@@ -426,6 +542,13 @@ export default function FinancePage() {
         category: string;
         amountCents: number;
       }) => {
+        if (!canManageFinance) {
+          toast.error(
+            "Non hai i permessi per gestire le finanze",
+          );
+          return;
+        }
+
         if (!editingTransaction) {
           toast.error(
             "Transazione non disponibile",
@@ -466,33 +589,37 @@ export default function FinancePage() {
         try {
           setEditLoading(true);
 
-          const response = await fetch(
-            `${API_URL}/finances/${editingTransaction.id}`,
-            {
-              method: "PATCH",
-              headers: {
-                Authorization: `Bearer ${token}`,
-                "Content-Type":
-                  "application/json",
+          const response =
+            await fetch(
+              `${API_URL}/finances/${editingTransaction.id}`,
+              {
+                method: "PATCH",
+                headers: {
+                  Authorization:
+                    `Bearer ${token}`,
+                  "Content-Type":
+                    "application/json",
+                },
+                body: JSON.stringify({
+                  type: data.type,
+                  title:
+                    cleanDescription,
+                  description:
+                    cleanDescription,
+                  category:
+                    cleanCategory,
+                  amountCents:
+                    data.amountCents,
+                }),
               },
-              body: JSON.stringify({
-                type: data.type,
-                title:
-                  cleanDescription,
-                description:
-                  cleanDescription,
-                category:
-                  cleanCategory,
-                amountCents:
-                  data.amountCents,
-              }),
-            },
-          );
+            );
 
           const responseData =
             await response
               .json()
-              .catch(() => null);
+              .catch(
+                () => null,
+              );
 
           if (!response.ok) {
             const message =
@@ -515,7 +642,9 @@ export default function FinancePage() {
           );
 
           setEditOpen(false);
-          setEditingTransaction(null);
+          setEditingTransaction(
+            null,
+          );
 
           await loadTransactions();
 
@@ -539,6 +668,7 @@ export default function FinancePage() {
         }
       },
       [
+        canManageFinance,
         editingTransaction,
         loadTransactions,
       ],
@@ -565,8 +695,7 @@ export default function FinancePage() {
           "Senza categoria",
       }),
     );
-
-  return (
+      return (
     <div className="space-y-10">
       <div>
         <p className="text-xs font-semibold uppercase tracking-[0.25em] text-blue-400">
@@ -594,29 +723,57 @@ export default function FinancePage() {
         transactions={transactions}
       />
 
-      <FinanceForm
-        type={type}
-        description={description}
-        category={category}
-        amount={amount}
-        setType={setType}
-        setDescription={
-          setDescription
-        }
-        setCategory={setCategory}
-        setAmount={setAmount}
-        onSubmit={createTransaction}
-      />
+      {canManageFinance && (
+        <>
+          <FinanceForm
+            type={type}
+            description={description}
+            category={category}
+            amount={amount}
+            setType={setType}
+            setDescription={
+              setDescription
+            }
+            setCategory={
+              setCategory
+            }
+            setAmount={setAmount}
+            onSubmit={
+              createTransaction
+            }
+          />
 
-      <section className="flex flex-wrap gap-3">
-        <FinanceExportCSV
-          transactions={transactions}
-        />
+          <section className="flex flex-wrap gap-3">
+            <FinanceExportCSV
+              transactions={
+                transactions
+              }
+            />
 
-        <FinanceExportExcel
-          transactions={transactions}
-        />
-      </section>
+            <FinanceExportExcel
+              transactions={
+                transactions
+              }
+            />
+          </section>
+        </>
+      )}
+
+      {!canManageFinance && (
+        <div className="rounded-2xl border border-white/10 bg-[#0f172a] p-5">
+          <p className="font-semibold text-white">
+            Accesso in sola lettura
+          </p>
+
+          <p className="mt-1 text-sm text-gray-400">
+            Puoi consultare le finanze
+            dell&apos;associazione, ma
+            solo Owner e Admin possono
+            creare, modificare o
+            eliminare transazioni.
+          </p>
+        </div>
+      )}
 
       {transactions.length === 0 ? (
         <div className="rounded-2xl border border-white/10 bg-[#0f172a] p-8 text-center">
@@ -625,49 +782,65 @@ export default function FinancePage() {
           </p>
 
           <p className="mt-2 text-sm text-gray-400">
-            Registra la prima entrata o
-            uscita usando il modulo qui
-            sopra.
+            {canManageFinance
+              ? "Registra la prima entrata o uscita usando il modulo qui sopra."
+              : "Non sono presenti transazioni da visualizzare."}
           </p>
         </div>
       ) : (
-        <FinanceTable
-          transactions={tableTransactions}
-          onDelete={deleteTransaction}
-          onEdit={(transaction) => {
-            setEditingTransaction({
-              id: transaction.id,
-              type: transaction.type,
-              description: transaction.description ?? "",
-              category: transaction.category ?? "",
-              amountCents: transaction.amountCents,
-            });
-
-            setEditOpen(true);
-          }}
-        />
-      )}
-
-      <EditFinanceModal
-        open={editOpen}
-        transaction={
-          editingTransaction
+              <FinanceTable
+        transactions={tableTransactions}
+        onDelete={
+          canManageFinance
+            ? deleteTransaction
+            : () => {
+                toast.error(
+                  "Non hai i permessi per eliminare transazioni",
+                );
+              }
         }
-        loading={editLoading}
-        onClose={() => {
-          if (editLoading) {
-            return;
-          }
+        onEdit={
+          canManageFinance
+            ? (transaction) => {
+                setEditingTransaction({
+                  id: transaction.id,
+                  type: transaction.type,
+                  description:
+                    transaction.description ?? "",
+                  category:
+                    transaction.category ?? "",
+                  amountCents:
+                    transaction.amountCents,
+                });
 
-          setEditOpen(false);
-          setEditingTransaction(
-            null,
-          );
-        }}
-        onSave={
-          updateTransaction
+                setEditOpen(true);
+              }
+            : undefined
         }
       />
+      )}
+            {canManageFinance && (
+        <EditFinanceModal
+          open={editOpen}
+          transaction={
+            editingTransaction
+          }
+          loading={editLoading}
+          onClose={() => {
+            if (editLoading) {
+              return;
+            }
+
+            setEditOpen(false);
+            setEditingTransaction(
+              null,
+            );
+          }}
+          onSave={
+            updateTransaction
+          }
+        />
+      )}
     </div>
   );
 }

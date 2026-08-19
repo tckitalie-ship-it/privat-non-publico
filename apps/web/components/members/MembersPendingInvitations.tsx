@@ -16,12 +16,14 @@ type Invitation = {
 interface MembersPendingInvitationsProps {
   invitations: Invitation[];
   loading?: boolean;
+  canManageMembers: boolean;
   onRemove: (id: string) => void | Promise<void>;
 }
 
 export default function MembersPendingInvitations({
   invitations,
   loading = false,
+  canManageMembers,
   onRemove,
 }: MembersPendingInvitationsProps) {
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -100,30 +102,39 @@ export default function MembersPendingInvitations({
               </p>
             </div>
 
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => void copyInvitationLink(invitation)}
-                className="rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-500"
-              >
-                {copiedId === invitation.id
-                  ? "Copiato!"
-                  : "Copia link"}
-              </button>
+            {canManageMembers && (
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() =>
+                    void copyInvitationLink(invitation)
+                  }
+                  className="rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-500"
+                >
+                  {copiedId === invitation.id
+                    ? "Copiato!"
+                    : "Copia link"}
+                </button>
 
-              <button
-                type="button"
-                onClick={() => void handleRemove(invitation.id)}
-                disabled={removing}
-                className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-3 py-2 text-sm font-medium text-white hover:bg-red-500 disabled:opacity-50"
-              >
-                {removing && (
-                  <Loader2 size={15} className="animate-spin" />
-                )}
+                <button
+                  type="button"
+                  onClick={() =>
+                    void handleRemove(invitation.id)
+                  }
+                  disabled={removing}
+                  className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-3 py-2 text-sm font-medium text-white hover:bg-red-500 disabled:opacity-50"
+                >
+                  {removing && (
+                    <Loader2
+                      size={15}
+                      className="animate-spin"
+                    />
+                  )}
 
-                Elimina
-              </button>
-            </div>
+                  Elimina
+                </button>
+              </div>
+            )}
           </article>
         );
       })}
