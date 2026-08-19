@@ -22,6 +22,8 @@ type ToastState = {
   message: string;
 } | null;
 
+type UserRole = "OWNER" | "ADMIN" | "MEMBER";
+
 async function authenticatedFetch(
   path: string,
   options: RequestInit = {},
@@ -119,6 +121,51 @@ function getAssociationIdFromToken(): string | null {
   }
 }
 
+function getRoleFromToken(): UserRole | null {
+  const token = getAccessToken();
+
+  if (!token) {
+    return null;
+  }
+
+  try {
+    const payload = token.split(".")[1];
+
+    if (!payload) {
+      return null;
+    }
+
+    const normalized = payload
+      .replace(/-/g, "+")
+      .replace(/_/g, "/");
+
+    const decoded = JSON.parse(
+      decodeURIComponent(
+        window
+          .atob(normalized)
+          .split("")
+          .map(
+            (character) =>
+              `%${character
+                .charCodeAt(0)
+                .toString(16)
+                .padStart(2, "0")}`,
+          )
+          .join(""),
+      ),
+    ) as { role?: UserRole };
+
+    return decoded.role ?? null;
+  } catch (error) {
+    console.error(
+      "Errore lettura ruolo dal JWT:",
+      error,
+    );
+
+    return null;
+  }
+}
+
 function Toast({
   toast,
 }: {
@@ -153,6 +200,9 @@ export default function NotificationsPage() {
   const [toast, setToast] =
     useState<ToastState>(null);
 
+  const [currentUserRole, setCurrentUserRole] =
+    useState<UserRole | null>(null);
+
   function showToast(
     type: "success" | "error",
     message: string,
@@ -166,7 +216,12 @@ export default function NotificationsPage() {
       setToast(null);
     }, 3000);
   }
-    const loadNotifications = useCallback(
+
+  useEffect(() => {
+    setCurrentUserRole(getRoleFromToken());
+  }, []);
+
+  const loadNotifications = useCallback(
     async (showLoading = true) => {
       if (showLoading) {
         setLoading(true);
@@ -336,7 +391,8 @@ export default function NotificationsPage() {
       setActionId(null);
     }
   }
-    async function markAllAsRead() {
+
+  async function markAllAsRead() {
     setMarkingAll(true);
 
     try {
@@ -450,6 +506,10 @@ export default function NotificationsPage() {
       (notification) => !notification.read,
     ).length;
 
+  const canCreateNotifications =
+    currentUserRole === "OWNER" ||
+    currentUserRole === "ADMIN";
+
   return (
     <div className="mx-auto w-full max-w-4xl space-y-6 px-6 py-10">
       {toast && <Toast toast={toast} />}
@@ -510,25 +570,28 @@ export default function NotificationsPage() {
 
             Segna tutte come lette
           </button>
-                    <button
-            type="button"
-            onClick={() =>
-              void createTestNotification()
-            }
-            disabled={creating}
-            className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-medium text-white transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {creating ? (
-              <Loader2
-                size={17}
-                className="animate-spin"
-              />
-            ) : (
-              <Bell size={17} />
-            )}
 
-            Crea notifica di prova
-          </button>
+          {canCreateNotifications && (
+            <button
+              type="button"
+              onClick={() =>
+                void createTestNotification()
+              }
+              disabled={creating}
+              className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-medium text-white transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {creating ? (
+                <Loader2
+                  size={17}
+                  className="animate-spin"
+                />
+              ) : (
+                <Bell size={17} />
+              )}
+
+              Crea notifica di prova
+            </button>
+          )}
         </div>
       </div>
 

@@ -5,11 +5,13 @@ import { Users, UserPlus } from "lucide-react";
 interface MembersHeaderProps {
   membersCount: number;
   invitationsCount: number;
+  canManageMembers: boolean;
   onInviteClick?: () => void;
 }
 
 export default function MembersHeader({
   onInviteClick,
+  canManageMembers,
 }: MembersHeaderProps) {
   return (
     <section className="flex flex-col gap-4 rounded-2xl border border-white/10 bg-[#111827] px-5 py-4 shadow-lg sm:flex-row sm:items-center sm:justify-between">
@@ -29,14 +31,16 @@ export default function MembersHeader({
         </div>
       </div>
 
-      <button
-        type="button"
-        onClick={onInviteClick}
-        className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-500"
-      >
-        <UserPlus size={17} />
-        Invita membro
-      </button>
+      {canManageMembers && (
+        <button
+          type="button"
+          onClick={onInviteClick}
+          className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-500"
+        >
+          <UserPlus size={17} />
+          Invita membro
+        </button>
+      )}
     </section>
   );
 }

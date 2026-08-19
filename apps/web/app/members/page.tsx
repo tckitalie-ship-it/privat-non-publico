@@ -38,6 +38,28 @@ type Invitation = {
   createdAt: string;
 };
 
+function getCurrentUserRole(): Role | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  const token = getAccessToken();
+
+  if (!token) {
+    return null;
+  }
+
+  try {
+    const payload = JSON.parse(
+      atob(token.split(".")[1]),
+    ) as { role?: Role };
+
+    return payload.role ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export default function MembersPage() {
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<Role>("MEMBER");
@@ -47,6 +69,9 @@ export default function MembersPage() {
 
   const [members, setMembers] = useState<Membership[]>([]);
   const [invitations, setInvitations] = useState<Invitation[]>([]);
+
+  const [currentUserRole, setCurrentUserRole] =
+    useState<Role | null>(null);
 
   const [showInviteForm, setShowInviteForm] = useState(false);
   const [loadingInvite, setLoadingInvite] = useState(false);
@@ -139,6 +164,10 @@ export default function MembersPage() {
     } finally {
       setLoadingInvitations(false);
     }
+  }, []);
+
+  useEffect(() => {
+    setCurrentUserRole(getCurrentUserRole());
   }, []);
 
   useEffect(() => {
@@ -319,15 +348,22 @@ export default function MembersPage() {
     });
   }, [members, roleFilter, search]);
 
+  const canManageMembers =
+    currentUserRole === "OWNER" ||
+    currentUserRole === "ADMIN";
+
   return (
     <div className="mx-auto w-full max-w-6xl min-w-0 space-y-6">
       <MembersHeader
         membersCount={members.length}
         invitationsCount={invitations.length}
-        onInviteClick={() => setShowInviteForm((current) => !current)}
+        canManageMembers={canManageMembers}
+        onInviteClick={() =>
+          setShowInviteForm((current) => !current)
+        }
       />
 
-      {showInviteForm && (
+      {showInviteForm && canManageMembers && (
         <MembersInviteForm
           email={email}
           role={role}
@@ -342,7 +378,7 @@ export default function MembersPage() {
         href="/dashboard"
         className="inline-flex items-center text-sm font-medium text-slate-600 hover:text-slate-900"
       >
-        ÔåÉ Dashboard
+        ← Dashboard
       </Link>
 
       <h2 className="text-lg font-semibold text-white">Membri</h2>
@@ -353,17 +389,18 @@ export default function MembersPage() {
         onSearchChange={setSearch}
         onRoleFilterChange={setRoleFilter}
       />
-      <MembersList
-  members={filteredMembers}
-  loading={loadingMembers}
-  onRemove={removeMember}
-/>
 
-<MembersPendingInvitations
-  invitations={invitations}
-  loading={loadingInvitations}
-  onRemove={removeInvitation}
-/>
+      <MembersList
+        members={filteredMembers}
+        loading={loadingMembers}
+        onRemove={removeMember}
+      />
+
+      <MembersPendingInvitations
+        invitations={invitations}
+        loading={loadingInvitations}
+        onRemove={removeInvitation}
+      />
     </div>
   );
 }
