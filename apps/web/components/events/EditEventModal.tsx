@@ -15,7 +15,7 @@ import {
 
 type EditableEvent = {
   id: string;
-  associationId: string;
+  associationId?: string | null;
   title: string;
   description?: string | null;
   location?: string | null;
@@ -26,7 +26,7 @@ type EditableEvent = {
 type EditEventModalProps = {
   open: boolean;
   event: EditableEvent | null;
-  associationId: string | null;
+  associationId?: string | null;
   onClose: () => void;
   onUpdated: () => void | Promise<void>;
 };
@@ -42,10 +42,12 @@ function toDateTimeLocal(value?: string | null) {
     return "";
   }
 
-  const timezoneOffset = date.getTimezoneOffset();
+  const timezoneOffset =
+    date.getTimezoneOffset();
 
   const localDate = new Date(
-    date.getTime() - timezoneOffset * 60 * 1000,
+    date.getTime() -
+      timezoneOffset * 60 * 1000,
   );
 
   return localDate.toISOString().slice(0, 16);
@@ -54,7 +56,6 @@ function toDateTimeLocal(value?: string | null) {
 export default function EditEventModal({
   open,
   event,
-  associationId,
   onClose,
   onUpdated,
 }: EditEventModalProps) {
@@ -70,12 +71,11 @@ export default function EditEventModal({
   const [loading, setLoading] =
     useState(false);
 
-    useEffect(() => {
-  if (!open || !event) {
-    return;
-  }
+  useEffect(() => {
+    if (!open || !event) {
+      return;
+    }
 
-  const timeoutId = window.setTimeout(() => {
     setTitle(event.title ?? "");
     setDescription(event.description ?? "");
     setLocation(event.location ?? "");
@@ -85,17 +85,14 @@ export default function EditEventModal({
     setEndsAt(
       toDateTimeLocal(event.endsAt),
     );
-  }, 0);
-
-  return () => {
-    window.clearTimeout(timeoutId);
-  };
-}, [event, open]);
+  }, [event, open]);
 
   if (!open || !event) {
     return null;
   }
+
   const eventId = event.id;
+
   function closeModal() {
     if (loading) {
       return;
@@ -109,16 +106,14 @@ export default function EditEventModal({
   ) {
     formEvent.preventDefault();
 
-    if (!associationId) {
-      toast.error(
-        "Associazione non disponibile",
-      );
-      return;
-    }
+    console.log(
+      "[EDIT EVENT] submit",
+      eventId,
+    );
 
     if (!title.trim()) {
       toast.error(
-        "Inserisci il titolo dell’evento",
+        "Inserisci il titolo dell'evento",
       );
       return;
     }
@@ -131,6 +126,7 @@ export default function EditEventModal({
     }
 
     const startDate = new Date(startsAt);
+
     const endDate = endsAt
       ? new Date(endsAt)
       : null;
@@ -158,7 +154,7 @@ export default function EditEventModal({
         startDate.getTime()
     ) {
       toast.error(
-        "La fine deve essere successiva all’inizio",
+        "La fine deve essere successiva all'inizio",
       );
       return;
     }
@@ -175,42 +171,64 @@ export default function EditEventModal({
     try {
       setLoading(true);
 
-      const response = await fetch(
-        `${API_URL}/events/${eventId}`,
-        {
-          method: "PATCH",
-          headers: {
-            Accept: "application/json",
-            "Content-Type":
-              "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            associationId,
-            title: title.trim(),
-            description:
-              description.trim() || null,
-            location:
-              location.trim() || null,
-            startsAt:
-              startDate.toISOString(),
-            endsAt: endDate
-              ? endDate.toISOString()
-              : null,
-          }),
-        },
+      const url =
+        `${API_URL}/events/${eventId}`;
+
+      console.log(
+        "[EDIT EVENT] PATCH",
+        url,
       );
 
-      const data = await response
-        .json()
-        .catch(() => null);
+      const response = await fetch(url, {
+        method: "PATCH",
+        headers: {
+          Accept: "application/json",
+          "Content-Type":
+            "application/json",
+          Authorization:
+            `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          title: title.trim(),
+          description:
+            description.trim() || null,
+          location:
+            location.trim() || null,
+          startsAt:
+            startDate.toISOString(),
+          endsAt: endDate
+            ? endDate.toISOString()
+            : null,
+        }),
+        cache: "no-store",
+      });
+
+      const text =
+        await response.text();
+
+      let data: any = null;
+
+      try {
+        data = text
+          ? JSON.parse(text)
+          : null;
+      } catch {
+        data = {
+          message: text,
+        };
+      }
+
+      console.log(
+        "[EDIT EVENT] response",
+        response.status,
+        data,
+      );
 
       if (!response.ok) {
-        const message = Array.isArray(
-          data?.message,
-        )
-          ? data.message.join(", ")
-          : data?.message;
+        const message =
+          Array.isArray(data?.message)
+            ? data.message.join(", ")
+            : data?.message;
 
         throw new Error(
           message ||
@@ -223,16 +241,18 @@ export default function EditEventModal({
       );
 
       await onUpdated();
+
+      onClose();
     } catch (error) {
       console.error(
-        "Errore modifica evento:",
+        "[EDIT EVENT] errore:",
         error,
       );
 
       toast.error(
         error instanceof Error
           ? error.message
-          : "Impossibile modificare l’evento",
+          : "Impossibile modificare l'evento",
       );
     } finally {
       setLoading(false);
@@ -249,7 +269,7 @@ export default function EditEventModal({
             </h2>
 
             <p className="mt-2 text-sm text-gray-400">
-              Aggiorna i dati dell&apos;evento.
+              Aggiorna i dati dell'evento.
             </p>
           </div>
 

@@ -11,8 +11,10 @@ type InvitationResponse = {
   valid?: boolean;
 };
 
-type LoginResponse = {
+ type LoginResponse = {
   access_token?: string;
+  accessToken?: string;
+  token?: string;
   message?: string;
 };
 
@@ -183,14 +185,19 @@ export default function AcceptInviteContent({ token }: { token: string | null })
 
       const loginData = await readResponse<LoginResponse>(loginResponse);
 
-      if (!loginResponse.ok || !loginData.access_token) {
-        throw new Error(
-          loginData.message ||
-            'Registrazione completata, ma login automatico fallito.',
-        );
-      }
+      const accessToken =
+  loginData.accessToken ??
+  loginData.access_token ??
+  loginData.token;
 
-      setAccessToken(loginData.access_token);
+if (!loginResponse.ok || !accessToken) {
+  throw new Error(
+    loginData.message ||
+      'Registrazione completata, ma login automatico fallito.',
+  );
+}
+
+setAccessToken(accessToken);
       localStorage.setItem('membershipUpdated', 'true');
 
       setMessage('Registrazione completata e invito accettato!');

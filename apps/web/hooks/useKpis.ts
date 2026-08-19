@@ -6,10 +6,7 @@ import {
   useState,
 } from "react";
 
-import {
-  API_URL,
-  getAccessToken,
-} from "@/lib/api";
+import { getAccessToken } from "@/lib/api";
 
 type DashboardKpiData = {
   membersCount: number;
@@ -30,8 +27,8 @@ type DashboardKpiResponse = {
 async function requestKpis(): Promise<DashboardKpiData> {
   const token = getAccessToken();
 
-  const response = await fetch(
-    `${API_URL}/dashboard/kpis`,
+       const response = await fetch(
+  "/api/dashboard/kpis",
     {
       headers: token
         ? {

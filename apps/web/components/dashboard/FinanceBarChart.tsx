@@ -12,43 +12,80 @@ import {
 } from "recharts";
 
 type FinancePoint = {
-  month: string;        // "2026-01"
-  income: number;       // in centesimi
-  expense: number;      // in centesimi
-  balance: number;      // in centesimi
+  month: string;
+  income: number;
+  expense: number;
+  balance: number;
 };
 
-export default function FinanceBarChart({ data }: { data: FinancePoint[] }) {
-  const formatted = data.map((d) => ({
-    ...d,
-    income: d.income / 100,
-    expense: d.expense / 100,
-    balance: d.balance / 100,
+function formatMonth(value: unknown) {
+  const month = String(value);
+
+  if (/^\d{4}-\d{2}$/.test(month)) {
+    const [year, monthNumber] = month.split("-");
+    return `${monthNumber}/${year}`;
+  }
+
+  return month;
+}
+
+function formatEuro(value: unknown) {
+  const number = Number(value);
+
+  if (!Number.isFinite(number)) {
+    return String(value);
+  }
+
+  return new Intl.NumberFormat("it-IT", {
+    style: "currency",
+    currency: "EUR",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(number);
+}
+
+export default function FinanceBarChart({
+  data,
+}: {
+  data: FinancePoint[];
+}) {
+  const formatted = data.map((item) => ({
+    ...item,
+    income: item.income / 100,
+    expense: item.expense / 100,
+    balance: item.balance / 100,
   }));
 
   return (
     <div className="rounded-xl border bg-white p-6 shadow-sm">
-      <h2 className="text-lg font-semibold mb-4">Entrate e Uscite Mensili</h2>
+      <h2 className="mb-4 text-lg font-semibold">
+        Entrate e Uscite Mensili
+      </h2>
 
-      <div className="h-[350px]">
+      <div className="h-[350px] min-w-0">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={formatted}>
-            <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+            <CartesianGrid
+              strokeDasharray="3 3"
+              opacity={0.3}
+            />
 
             <XAxis
               dataKey="month"
               tick={{ fontSize: 12 }}
-              tickFormatter={(m) => m.slice(5)} // mostra solo mese
+              tickFormatter={formatMonth}
             />
 
             <YAxis
               tick={{ fontSize: 12 }}
-              tickFormatter={(v) => `€${v}`}
+              tickFormatter={formatEuro}
             />
 
             <Tooltip
-              formatter={(v) => `€${v}`}
-              labelFormatter={(m) => `Mese: ${m}`}
+              formatter={(value) => formatEuro(value)}
+              labelFormatter={(value) =>
+                `Mese: ${formatMonth(value)}`
+              }
             />
 
             <Legend />

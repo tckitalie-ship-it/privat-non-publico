@@ -76,6 +76,21 @@ function ChartContainer({ children }: { children: ReactNode }) {
 }
 
 /* ============================================================
+   FORMATTER UNICO
+============================================================ */
+
+function formatMonth(value: unknown) {
+  const month = String(value);
+
+  if (/^\d{4}-\d{2}$/.test(month)) {
+    const [year, monthNumber] = month.split("-");
+    return `${monthNumber}/${year}`;
+  }
+
+  return month;
+}
+
+/* ============================================================
    REVENUE
 ============================================================ */
 
@@ -94,11 +109,16 @@ export function RevenueChart({
           <LineChart data={data}>
             <CartesianGrid strokeDasharray="3 3" />
 
-            <XAxis dataKey="month" />
+            <XAxis
+              dataKey="month"
+              tickFormatter={formatMonth}
+            />
 
             <YAxis />
 
-            <Tooltip />
+            <Tooltip
+              labelFormatter={(value) => `Mese: ${formatMonth(value)}`}
+            />
 
             <Line
               type="monotone"
@@ -133,14 +153,18 @@ export function FinanceChart({
           <BarChart data={data}>
             <CartesianGrid strokeDasharray="3 3" />
 
-            <XAxis dataKey="month" />
+            <XAxis
+              dataKey="month"
+              tickFormatter={formatMonth}
+            />
 
             <YAxis />
 
-            <Tooltip />
+            <Tooltip
+              labelFormatter={(value) => `Mese: ${formatMonth(value)}`}
+            />
 
             <Bar dataKey="income" radius={[6, 6, 0, 0]} fill="#22c55e" />
-
             <Bar dataKey="expense" radius={[6, 6, 0, 0]} fill="#ef4444" />
           </BarChart>
         </ResponsiveContainer>
@@ -168,11 +192,16 @@ export function MembersTrendChart({
           <LineChart data={data}>
             <CartesianGrid strokeDasharray="3 3" />
 
-            <XAxis dataKey="month" />
+            <XAxis
+              dataKey="month"
+              tickFormatter={formatMonth}
+            />
 
             <YAxis />
 
-            <Tooltip />
+            <Tooltip
+              labelFormatter={(value) => `Mese: ${formatMonth(value)}`}
+            />
 
             <Line
               type="monotone"

@@ -35,6 +35,7 @@ export class FilesService {
 
   /**
    * Verifica l'appartenenza all'associazione.
+   * Tutti i membri possono leggere i file.
    */
   private async ensureMembership(
     userId: string,
@@ -51,6 +52,40 @@ export class FilesService {
     if (!membership) {
       throw new ForbiddenException(
         "Non sei membro di questa associazione",
+      );
+    }
+
+    return membership;
+  }
+
+  /**
+   * Verifica i permessi di gestione dei file.
+   * Solo OWNER e ADMIN possono caricare/eliminare.
+   */
+  private async ensureCanManageFiles(
+    userId: string,
+    associationId: string,
+  ) {
+    const membership =
+      await this.prisma.membership.findFirst({
+        where: {
+          userId,
+          associationId,
+        },
+      });
+
+    if (!membership) {
+      throw new ForbiddenException(
+        "Non sei membro di questa associazione",
+      );
+    }
+
+    if (
+      membership.role !== Role.OWNER &&
+      membership.role !== Role.ADMIN
+    ) {
+      throw new ForbiddenException(
+        "Non hai i permessi per gestire i file",
       );
     }
 
@@ -86,7 +121,7 @@ export class FilesService {
   async uploadBinaryFile(
     input: UploadBinaryFileInput,
   ) {
-    await this.ensureMembership(
+    await this.ensureCanManageFiles(
       input.uploadedById,
       input.associationId,
     );
@@ -150,7 +185,7 @@ export class FilesService {
       dto.associationId &&
       dto.uploadedById
     ) {
-      await this.ensureMembership(
+      await this.ensureCanManageFiles(
         dto.uploadedById,
         dto.associationId,
       );
@@ -298,6 +333,8 @@ export class FilesService {
   /**
    * Elimina il record e, quando presente,
    * anche il file fisico.
+   * Solo OWNER e ADMIN possono eliminare
+   * file dell'associazione.
    */
   async deleteFile(
     id: string,
@@ -317,27 +354,10 @@ export class FilesService {
     }
 
     if (file.associationId) {
-      const membership =
-        await this.ensureMembership(
-          userId,
-          file.associationId,
-        );
-
-      const isUploader =
-        file.uploadedById === userId;
-
-      const canManage =
-        membership.role === Role.OWNER ||
-        membership.role === Role.ADMIN;
-
-      if (
-        !isUploader &&
-        !canManage
-      ) {
-        throw new ForbiddenException(
-          "Non hai i permessi per eliminare questo file",
-        );
-      }
+      await this.ensureCanManageFiles(
+        userId,
+        file.associationId,
+      );
     } else if (
       file.uploadedById !== userId
     ) {

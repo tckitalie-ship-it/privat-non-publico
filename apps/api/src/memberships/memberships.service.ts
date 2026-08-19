@@ -173,55 +173,93 @@ export class MembershipsService {
   /**
    * Aggiorna il ruolo di un membro.
    */
-  async updateRole(
-    membershipId: string,
-    role: string,
-    currentUserId: string,
-  ) {
-    if (!Object.values(Role).includes(role as Role)) {
-      throw new BadRequestException(
-        "Ruolo non valido",
-      );
-    }
+   async updateRole(
+  membershipId: string,
+  role: string,
+  currentUserId: string,
+) {
+  if (!Object.values(Role).includes(role as Role)) {
+    throw new BadRequestException(
+      "Ruolo non valido",
+    );
+  }
 
-    const target =
-      await this.prisma.membership.findUnique({
-        where: {
-          id: membershipId,
-        },
-      });
+  const target =
+    await this.prisma.membership.findUnique({
+      where: {
+        id: membershipId,
+      },
+    });
 
-    if (!target) {
-      throw new NotFoundException(
-        "Membro non trovato",
-      );
-    }
+  if (!target) {
+    throw new NotFoundException(
+      "Membro non trovato",
+    );
+  }
 
+  const requester =
     await this.ensureCanManageMembers(
       currentUserId,
       target.associationId,
     );
 
-    const updated =
-      await this.prisma.membership.update({
-        where: {
-          id: membershipId,
-        },
-        data: {
-          role: role as Role,
-        },
-        include: {
-          user: {
-            select: {
-              id: true,
-              email: true,
-            },
+  /*
+   * Un ADMIN può gestire i membri,
+   * ma non può assegnare il ruolo OWNER.
+   *
+   * Solo un OWNER può creare/promuovere
+   * un altro OWNER.
+   */
+  if (
+    role === Role.OWNER &&
+    requester.role !== Role.OWNER
+  ) {
+    throw new ForbiddenException(
+      "Solo il proprietario può assegnare il ruolo OWNER",
+    );
+  }
+
+  /*
+   * Nessuno può modificare la propria membership.
+   */
+  if (target.userId === currentUserId) {
+    throw new BadRequestException(
+      "Non puoi modificare il tuo ruolo",
+    );
+  }
+
+  /*
+   * Un ADMIN non può modificare un OWNER.
+   */
+  if (
+    requester.role === Role.ADMIN &&
+    target.role === Role.OWNER
+  ) {
+    throw new ForbiddenException(
+      "Un ADMIN non può modificare il ruolo del proprietario",
+    );
+  }
+
+  const updated =
+    await this.prisma.membership.update({
+      where: {
+        id: membershipId,
+      },
+      data: {
+        role: role as Role,
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
           },
         },
-      });
+      },
+    });
 
-    return toMembershipDto(updated);
-  }
+  return toMembershipDto(updated);
+}
 
   /**
    * Rimuove un membro.

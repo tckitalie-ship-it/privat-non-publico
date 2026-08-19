@@ -1,48 +1,72 @@
-import { NextResponse } from 'next/server';
+import { cookies } from "next/headers";
+import { NextResponse } from "next/server";
+
+const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_URL ??
+  "http://127.0.0.1:3001/api";
 
 export async function POST(request: Request) {
   try {
-    const authorization = request.headers.get('authorization');
+    const cookieStore = await cookies();
+    const cookieToken =
+      cookieStore.get("access_token")?.value;
+
+    const headerAuthorization =
+      request.headers.get("authorization");
+
+    const authorization =
+      headerAuthorization ??
+      (cookieToken ? `Bearer ${cookieToken}` : null);
+
+    if (!authorization) {
+      return NextResponse.json(
+        { message: "Sessione non disponibile" },
+        { status: 401 },
+      );
+    }
+
     const body = await request.json();
 
     const response = await fetch(
-      'http://127.0.0.1:3001/api/auth/switch-association',
+      `${API_BASE_URL}/auth/switch-association`,
       {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
-          ...(authorization
-            ? { Authorization: authorization }
-            : {}),
+          "Content-Type": "application/json",
+          Authorization: authorization,
         },
         body: JSON.stringify(body),
-        cache: 'no-store',
+        cache: "no-store",
       },
     );
 
-    const text = await response.text();
+    const data = await response.json().catch(() => null);
+    const nextResponse = NextResponse.json(data ?? {}, {
+  status: response.status,
+});
 
-    let data: unknown;
+const newToken =
+  data?.accessToken ??
+  data?.access_token ??
+  data?.token;
 
-    try {
-      data = text ? JSON.parse(text) : {};
-    } catch {
-      data = { message: text };
-    }
+if (response.ok && newToken) {
+  nextResponse.cookies.set("access_token", newToken, {
+    httpOnly: false,
+    sameSite: "lax",
+    path: "/",
+    maxAge: 60 * 60 * 24 * 7,
+  });
+}
 
-    return NextResponse.json(data, {
-      status: response.status,
-    });
+return nextResponse;
+    
   } catch (error) {
-    console.error('Switch association proxy error:', error);
+    console.error("Switch association proxy error:", error);
 
     return NextResponse.json(
-      {
-        message: 'Impossibile contattare il backend',
-      },
-      {
-        status: 500,
-      },
+      { message: "Errore interno" },
+      { status: 500 },
     );
   }
 }

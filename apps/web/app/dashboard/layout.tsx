@@ -1,12 +1,12 @@
 "use client";
-
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Bell, ChevronDown, Menu, User } from "lucide-react";
 
 import DashboardSidebar from "@/components/dashboard-sidebar";
 import { cn } from "@/lib/utils";
-import { clearAccessToken } from "@/lib/api";
+import { clearAccessToken, getAccessToken } from "@/lib/api";
 
 export default function DashboardLayout({
   children,
@@ -14,7 +14,23 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const router = useRouter();
+const [authChecked, setAuthChecked] = useState(false);
 
+useEffect(() => {
+  const token = getAccessToken();
+
+  if (!token) {
+    router.replace("/login");
+    return;
+  }
+
+  setAuthChecked(true);
+}, [router]);
+
+if (!authChecked) {
+  return null;
+}
   return (
     <div className="min-h-screen bg-[#0b1120] text-white">
       {/* SIDEBAR DESKTOP */}

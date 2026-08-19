@@ -25,9 +25,6 @@ interface AcceptAndRegisterDto {
 export class InvitationsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  /**
-   * Restituisce gli inviti dell'associazione attiva.
-   */
   async findAll(userId: string, associationId: string) {
     if (!userId) {
       throw new BadRequestException("Utente non valido.");
@@ -68,20 +65,15 @@ export class InvitationsService {
     });
   }
 
-  /**
-   * Crea un nuovo invito.
-   */
-  async createInvitation(userId: string, dto: CreateInvitationDto) {
+  async createInvitation(
+    userId: string,
+    dto: CreateInvitationDto,
+  ) {
     const email = dto.email?.trim().toLowerCase();
-    const associationId = dto.associationId?.trim();
-    const role = dto.role?.trim();
+    const role = dto.role?.trim().toUpperCase();
 
     if (!userId) {
       throw new BadRequestException("Utente non valido.");
-    }
-
-    if (!associationId) {
-      throw new BadRequestException("Associazione mancante.");
     }
 
     if (!email) {
@@ -92,39 +84,96 @@ export class InvitationsService {
       throw new BadRequestException("Ruolo mancante.");
     }
 
-    const allowedRoles = ["OWNER", "ADMIN", "MEMBER"];
+    const allowedRoles = [
+      "OWNER",
+      "ADMIN",
+      "MEMBER",
+    ];
 
     if (!allowedRoles.includes(role)) {
       throw new BadRequestException("Ruolo non valido.");
     }
 
-    const requesterMembership = await this.prisma.membership.findFirst({
-      where: { userId, associationId },
-    });
+    const associationId =
+      dto.associationId?.trim();
 
-    if (!requesterMembership) {
-      throw new ForbiddenException("Non appartieni a questa associazione.");
+    if (!associationId) {
+      throw new BadRequestException(
+        "Associazione mancante.",
+      );
     }
 
-    if (
-      requesterMembership.role !== "OWNER" &&
-      requesterMembership.role !== "ADMIN"
-    ) {
-      throw new ForbiddenException("Non hai il permesso di creare inviti.");
-    }
-
-    const existingUser = await this.prisma.user.findUnique({
-      where: { email },
-      select: { id: true },
-    });
-
-    if (existingUser) {
-      const existingMembership = await this.prisma.membership.findFirst({
+    const requesterMembership =
+      await this.prisma.membership.findFirst({
         where: {
-          userId: existingUser.id,
+          userId,
           associationId,
         },
       });
+
+    if (!requesterMembership) {
+      throw new ForbiddenException(
+        "Non appartieni a questa associazione.",
+      );
+    }
+
+    const requesterRole = String(
+      requesterMembership.role,
+    )
+      .trim()
+      .toUpperCase();
+
+    console.log(
+      "=== INVITATION PERMISSION DEBUG ===",
+    );
+    console.log("userId:", userId);
+    console.log(
+      "associationId:",
+      associationId,
+    );
+    console.log(
+      "membershipId:",
+      requesterMembership.id,
+    );
+    console.log(
+      "membershipRole:",
+      requesterMembership.role,
+    );
+    console.log(
+      "normalizedRole:",
+      requesterRole,
+    );
+    console.log(
+      "===================================",
+    );
+
+    if (
+      requesterRole !== "OWNER" &&
+      requesterRole !== "ADMIN"
+    ) {
+      throw new ForbiddenException(
+        "Non hai il permesso di creare inviti.",
+      );
+    }
+
+    const existingUser =
+      await this.prisma.user.findUnique({
+        where: {
+          email,
+        },
+        select: {
+          id: true,
+        },
+      });
+
+    if (existingUser) {
+      const existingMembership =
+        await this.prisma.membership.findFirst({
+          where: {
+            userId: existingUser.id,
+            associationId,
+          },
+        });
 
       if (existingMembership) {
         throw new ConflictException(
@@ -134,7 +183,10 @@ export class InvitationsService {
     }
 
     await this.prisma.invitation.deleteMany({
-      where: { associationId, email },
+      where: {
+        associationId,
+        email,
+      },
     });
 
     const token = randomUUID();
@@ -146,7 +198,10 @@ export class InvitationsService {
         role: role as any,
         token,
         invitedById: userId,
-        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        expiresAt: new Date(
+          Date.now() +
+            7 * 24 * 60 * 60 * 1000,
+        ),
       },
       include: {
         association: {
@@ -159,38 +214,45 @@ export class InvitationsService {
     });
   }
 
-  /**
-   * Verifica pubblicamente un token.
-   */
   async checkToken(token: string) {
     const normalizedToken = token?.trim();
 
     if (!normalizedToken) {
-      throw new BadRequestException("Token dell'invito mancante.");
+      throw new BadRequestException(
+        "Token dell'invito mancante.",
+      );
     }
 
-    const invitation = await this.prisma.invitation.findUnique({
-      where: { token: normalizedToken },
-      include: {
-        association: {
-          select: {
-            id: true,
-            name: true,
+    const invitation =
+      await this.prisma.invitation.findUnique({
+        where: {
+          token: normalizedToken,
+        },
+        include: {
+          association: {
+            select: {
+              id: true,
+              name: true,
+            },
           },
         },
-      },
-    });
+      });
 
     if (!invitation) {
-      throw new NotFoundException("Invito non valido.");
+      throw new NotFoundException(
+        "Invito non valido.",
+      );
     }
 
     const expired =
       invitation.expiresAt !== null &&
-      invitation.expiresAt.getTime() < Date.now();
+      invitation.expiresAt.getTime() <
+        Date.now();
 
     if (expired) {
-      throw new BadRequestException("Invito scaduto.");
+      throw new BadRequestException(
+        "Invito scaduto.",
+      );
     }
 
     return {
@@ -198,114 +260,150 @@ export class InvitationsService {
       email: invitation.email,
       role: invitation.role,
       token: invitation.token,
-      associationId: invitation.associationId,
-      associationName: invitation.association?.name ?? null,
+      associationId:
+        invitation.associationId,
+      associationName:
+        invitation.association?.name ?? null,
       expiresAt: invitation.expiresAt,
       valid: true,
     };
   }
 
-  /**
-   * Accetta un invito per un utente già registrato e autenticato.
-   */
-  async acceptInvitation(token: string, userId: string) {
+  async acceptInvitation(
+    token: string,
+    userId: string,
+  ) {
     const normalizedToken = token?.trim();
 
     if (!normalizedToken) {
-      throw new BadRequestException("Token dell'invito mancante.");
+      throw new BadRequestException(
+        "Token dell'invito mancante.",
+      );
     }
 
     if (!userId) {
-      throw new BadRequestException("Utente non valido.");
+      throw new BadRequestException(
+        "Utente non valido.",
+      );
     }
 
-    const invitation = await this.prisma.invitation.findUnique({
-      where: { token: normalizedToken },
-    });
+    const invitation =
+      await this.prisma.invitation.findUnique({
+        where: {
+          token: normalizedToken,
+        },
+      });
 
     if (!invitation) {
-      throw new NotFoundException("Invito non valido.");
+      throw new NotFoundException(
+        "Invito non valido.",
+      );
     }
 
     if (
       invitation.expiresAt &&
-      invitation.expiresAt.getTime() < Date.now()
+      invitation.expiresAt.getTime() <
+        Date.now()
     ) {
-      throw new BadRequestException("Invito scaduto.");
+      throw new BadRequestException(
+        "Invito scaduto.",
+      );
     }
 
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-    });
+    const user =
+      await this.prisma.user.findUnique({
+        where: {
+          id: userId,
+        },
+      });
 
     if (!user) {
-      throw new NotFoundException("Utente non trovato.");
+      throw new NotFoundException(
+        "Utente non trovato.",
+      );
     }
 
-    if (user.email.trim().toLowerCase() !== invitation.email.trim().toLowerCase()) {
+    if (
+      user.email.trim().toLowerCase() !==
+      invitation.email.trim().toLowerCase()
+    ) {
       throw new ForbiddenException(
         "L'invito appartiene a un altro indirizzo email.",
       );
     }
 
-    const existingMembership = await this.prisma.membership.findFirst({
-      where: {
-        associationId: invitation.associationId,
-        userId,
-      },
-    });
+    const existingMembership =
+      await this.prisma.membership.findFirst({
+        where: {
+          associationId:
+            invitation.associationId,
+          userId,
+        },
+      });
 
     if (existingMembership) {
       await this.prisma.invitation.delete({
-        where: { id: invitation.id },
+        where: {
+          id: invitation.id,
+        },
       });
 
       return {
         success: true,
         alreadyMember: true,
-        associationId: invitation.associationId,
+        associationId:
+          invitation.associationId,
       };
     }
 
     await this.prisma.$transaction([
       this.prisma.membership.create({
         data: {
-          associationId: invitation.associationId,
+          associationId:
+            invitation.associationId,
           userId,
           role: invitation.role as any,
         },
       }),
 
       this.prisma.invitation.delete({
-        where: { id: invitation.id },
+        where: {
+          id: invitation.id,
+        },
       }),
     ]);
 
     return {
       success: true,
       alreadyMember: false,
-      associationId: invitation.associationId,
+      associationId:
+        invitation.associationId,
     };
   }
 
-  /**
-   * Registra un nuovo utente e accetta automaticamente l'invito.
-   */
-  async acceptAndRegister(dto: AcceptAndRegisterDto) {
+  async acceptAndRegister(
+    dto: AcceptAndRegisterDto,
+  ) {
     const token = dto.token?.trim();
     const email = dto.email?.trim().toLowerCase();
     const password = dto.password;
 
     if (!token) {
-      throw new BadRequestException("Token dell'invito mancante.");
+      throw new BadRequestException(
+        "Token dell'invito mancante.",
+      );
     }
 
     if (!email) {
-      throw new BadRequestException("Email mancante.");
+      throw new BadRequestException(
+        "Email mancante.",
+      );
     }
 
     if (!password) {
-      throw new BadRequestException("Password mancante.");
+      throw new BadRequestException(
+        "Password mancante.",
+      );
     }
 
     if (password.length < 8) {
@@ -314,28 +412,44 @@ export class InvitationsService {
       );
     }
 
-    const invitation = await this.prisma.invitation.findUnique({
-      where: { token },
-    });
+    const invitation =
+      await this.prisma.invitation.findUnique({
+        where: {
+          token,
+        },
+      });
 
     if (!invitation) {
-      throw new NotFoundException("Invito non valido.");
+      throw new NotFoundException(
+        "Invito non valido.",
+      );
     }
 
     if (
       invitation.expiresAt &&
-      invitation.expiresAt.getTime() < Date.now()
+      invitation.expiresAt.getTime() <
+        Date.now()
     ) {
-      throw new BadRequestException("Invito scaduto.");
+      throw new BadRequestException(
+        "Invito scaduto.",
+      );
     }
 
-    if (invitation.email.trim().toLowerCase() !== email) {
-      throw new BadRequestException("L'email non corrisponde all'invito.");
+    if (
+      invitation.email.trim().toLowerCase() !==
+      email
+    ) {
+      throw new BadRequestException(
+        "L'email non corrisponde all'invito.",
+      );
     }
 
-    const existingUser = await this.prisma.user.findUnique({
-      where: { email },
-    });
+    const existingUser =
+      await this.prisma.user.findUnique({
+        where: {
+          email,
+        },
+      });
 
     if (existingUser) {
       throw new ConflictException(
@@ -343,75 +457,104 @@ export class InvitationsService {
       );
     }
 
-    const passwordHash = await bcrypt.hash(password, 12);
+    const passwordHash =
+      await bcrypt.hash(password, 12);
 
-    const result = await this.prisma.$transaction(async (transaction) => {
-      const user = await transaction.user.create({
-        data: {
-          email,
-          passwordHash,
+    const result =
+      await this.prisma.$transaction(
+        async (transaction) => {
+          const user =
+            await transaction.user.create({
+              data: {
+                email,
+                passwordHash,
+              },
+            });
+
+          await transaction.membership.create({
+            data: {
+              associationId:
+                invitation.associationId,
+              userId: user.id,
+              role: invitation.role as any,
+            },
+          });
+
+          await transaction.invitation.delete({
+            where: {
+              id: invitation.id,
+            },
+          });
+
+          return {
+            userId: user.id,
+            associationId:
+              invitation.associationId,
+          };
         },
-      });
-
-      await transaction.membership.create({
-        data: {
-          associationId: invitation.associationId,
-          userId: user.id,
-          role: invitation.role as any,
-        },
-      });
-
-      await transaction.invitation.delete({
-        where: { id: invitation.id },
-      });
-
-      return {
-        userId: user.id,
-        associationId: invitation.associationId,
-      };
-    });
+      );
 
     return {
       success: true,
       userId: result.userId,
-      associationId: result.associationId,
+      associationId:
+        result.associationId,
     };
   }
 
-  /**
-   * Elimina un invito verificando che l'utente abbia accesso all'associazione.
-   */
-  async removeInvitation(invitationId: string, userId: string) {
+  async removeInvitation(
+    invitationId: string,
+    userId: string,
+  ) {
     if (!invitationId) {
-      throw new BadRequestException("ID invito mancante.");
+      throw new BadRequestException(
+        "ID invito mancante.",
+      );
     }
 
     if (!userId) {
-      throw new BadRequestException("Utente non valido.");
+      throw new BadRequestException(
+        "Utente non valido.",
+      );
     }
 
-    const invitation = await this.prisma.invitation.findUnique({
-      where: { id: invitationId },
-    });
+    const invitation =
+      await this.prisma.invitation.findUnique({
+        where: {
+          id: invitationId,
+        },
+      });
 
     if (!invitation) {
-      throw new NotFoundException("Invito non trovato.");
+      throw new NotFoundException(
+        "Invito non trovato.",
+      );
     }
 
-    const requesterMembership = await this.prisma.membership.findFirst({
-      where: {
-        userId,
-        associationId: invitation.associationId,
-      },
-    });
+    const requesterMembership =
+      await this.prisma.membership.findFirst({
+        where: {
+          userId,
+          associationId:
+            invitation.associationId,
+        },
+      });
 
     if (!requesterMembership) {
-      throw new ForbiddenException("Non appartieni a questa associazione.");
+      throw new ForbiddenException(
+        "Non appartieni a questa associazione.",
+      );
     }
 
+    const requesterRole = String(
+      requesterMembership.role,
+    )
+      .trim()
+      .toUpperCase();
+
     if (
-      requesterMembership.role !== "OWNER" &&
-      requesterMembership.role !== "ADMIN"
+      requesterRole !== "OWNER" &&
+      requesterRole !== "ADMIN"
     ) {
       throw new ForbiddenException(
         "Non hai il permesso di eliminare questo invito.",
@@ -419,7 +562,9 @@ export class InvitationsService {
     }
 
     await this.prisma.invitation.delete({
-      where: { id: invitationId },
+      where: {
+        id: invitationId,
+      },
     });
 
     return {

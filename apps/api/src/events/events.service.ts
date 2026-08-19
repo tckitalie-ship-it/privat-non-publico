@@ -15,41 +15,50 @@ export class EventsService {
   ) {}
 
   async createEvent(
-    userId: string,
-    dto: {
-      associationId: string;
-      title: string;
-      description?: string | null;
-      startsAt: Date;
-      endsAt?: Date | null;
-      location?: string | null;
-    },
-  ) {
-    const membership =
-      await this.prisma.membership.findFirst({
-        where: {
-          userId,
-          associationId: dto.associationId,
-        },
-      });
-
-    if (!membership) {
-      throw new ForbiddenException(
-        "Non sei membro di questa associazione",
-      );
-    }
-
-    return this.prisma.event.create({
-      data: {
+  userId: string,
+  dto: {
+    associationId: string;
+    title: string;
+    description?: string | null;
+    startsAt: Date;
+    endsAt?: Date | null;
+    location?: string | null;
+  },
+) {
+  const membership =
+    await this.prisma.membership.findFirst({
+      where: {
+        userId,
         associationId: dto.associationId,
-        title: dto.title,
-        description: dto.description ?? null,
-        location: dto.location ?? null,
-        startsAt: dto.startsAt,
-        endsAt: dto.endsAt ?? null,
       },
     });
+
+  if (!membership) {
+    throw new ForbiddenException(
+      "Non sei membro di questa associazione",
+    );
   }
+
+  if (
+    membership.role !== Role.OWNER &&
+    membership.role !== Role.ADMIN
+  ) {
+    throw new ForbiddenException(
+      "Non hai i permessi per creare eventi",
+    );
+  }
+
+  return this.prisma.event.create({
+    data: {
+      associationId: dto.associationId,
+      title: dto.title,
+      description: dto.description ?? null,
+      location: dto.location ?? null,
+      startsAt: dto.startsAt,
+      endsAt: dto.endsAt ?? null,
+    },
+  });
+}
 
   async findAll(
     associationId: string,
@@ -119,61 +128,87 @@ export class EventsService {
 
     return event;
   }
-
-  async updateEvent(
-    eventId: string,
-    userId: string,
-    dto: {
-      title?: string;
-      description?: string | null;
-      startsAt?: Date;
-      endsAt?: Date | null;
-      location?: string | null;
-    },
-  ) {
-    const event =
-      await this.prisma.event.findUnique({
-        where: {
-          id: eventId,
-        },
-      });
-
-    if (!event) {
-      throw new NotFoundException(
-        "Evento non trovato",
-      );
-    }
-
-    const membership =
-      await this.prisma.membership.findFirst({
-        where: {
-          userId,
-          associationId: event.associationId,
-        },
-      });
-
-    if (
-      !membership ||
-      membership.role === Role.MEMBER
-    ) {
-      throw new ForbiddenException(
-        "Non hai i permessi per modificare l’evento",
-      );
-    }
-
-    return this.prisma.event.update({
+   async updateEvent(
+  eventId: string,
+  userId: string,
+  dto: {
+    title?: string;
+    description?: string | null;
+    startsAt?: Date;
+    endsAt?: Date | null;
+    location?: string | null;
+  },
+) {
+  const event =
+    await this.prisma.event.findUnique({
       where: {
         id: eventId,
       },
-      data: {
-        title: dto.title,
-        description: dto.description,
-        location: dto.location,
-        startsAt: dto.startsAt,
-        endsAt: dto.endsAt,
+    });
+
+  if (!event) {
+    throw new NotFoundException(
+      "Evento non trovato",
+    );
+  }
+
+  const membership =
+    await this.prisma.membership.findFirst({
+      where: {
+        userId,
+        associationId: event.associationId,
       },
     });
+
+  console.log("[UPDATE EVENT DEBUG]", {
+    eventId,
+    userId,
+    eventAssociationId: event.associationId,
+    membershipId: membership?.id,
+    membershipUserId: membership?.userId,
+    membershipAssociationId:
+      membership?.associationId,
+    membershipRole: membership?.role,
+  });
+
+  if (!membership) {
+    throw new ForbiddenException(
+      "Non sei membro di questa associazione",
+    );
   }
+
+  if (
+    membership.role !== Role.OWNER &&
+    membership.role !== Role.ADMIN
+  ) {
+    throw new ForbiddenException(
+      "Non hai i permessi per modificare l'evento",
+    );
+  }
+
+  return this.prisma.event.update({
+    where: {
+      id: eventId,
+    },
+    data: {
+      ...(dto.title !== undefined
+        ? { title: dto.title }
+        : {}),
+      ...(dto.description !== undefined
+        ? { description: dto.description }
+        : {}),
+      ...(dto.location !== undefined
+        ? { location: dto.location }
+        : {}),
+      ...(dto.startsAt !== undefined
+        ? { startsAt: dto.startsAt }
+        : {}),
+      ...(dto.endsAt !== undefined
+        ? { endsAt: dto.endsAt }
+        : {}),
+    },
+  });
+}
 
   async deleteEvent(
     eventId: string,
@@ -202,10 +237,13 @@ export class EventsService {
 
     if (
       !membership ||
-      membership.role === Role.MEMBER
+      (
+        membership.role !== Role.OWNER &&
+        membership.role !== Role.ADMIN
+      )
     ) {
       throw new ForbiddenException(
-        "Non hai i permessi per eliminare l’evento",
+        "Non hai i permessi per eliminare l'evento",
       );
     }
 
@@ -219,8 +257,7 @@ export class EventsService {
       message: "Evento eliminato",
     };
   }
-
-  async registerToEvent(
+    async registerToEvent(
     eventId: string,
     userId: string,
   ) {
@@ -323,8 +360,7 @@ export class EventsService {
       },
     });
   }
-
-  async unregisterFromEvent(
+    async unregisterFromEvent(
     eventId: string,
     userId: string,
   ) {

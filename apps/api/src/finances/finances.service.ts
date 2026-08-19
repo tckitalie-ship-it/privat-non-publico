@@ -4,6 +4,8 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 
+import { Role } from "@prisma/client";
+
 import { PrismaService } from "../prisma/prisma.service";
 
 type TransactionType = "INCOME" | "EXPENSE";
@@ -35,7 +37,36 @@ export class FinancesService {
     return membership;
   }
 
-  async createTransaction(
+  private async ensureCanManageFinance(
+    userId: string,
+    associationId: string,
+  ) {
+    const membership =
+      await this.prisma.membership.findFirst({
+        where: {
+          userId,
+          associationId,
+        },
+      });
+
+    if (!membership) {
+      throw new ForbiddenException(
+        "Non sei membro di questa associazione",
+      );
+    }
+
+    if (
+      membership.role !== Role.OWNER &&
+      membership.role !== Role.ADMIN
+    ) {
+      throw new ForbiddenException(
+        "Non hai i permessi per gestire le finanze",
+      );
+    }
+
+    return membership;
+  }
+    async createTransaction(
     userId: string,
     dto: {
       associationId: string;
@@ -47,7 +78,7 @@ export class FinancesService {
       date: Date;
     },
   ) {
-    await this.ensureMembership(
+    await this.ensureCanManageFinance(
       userId,
       dto.associationId,
     );
@@ -108,8 +139,7 @@ export class FinancesService {
 
     return transaction;
   }
-
-  async updateTransaction(
+    async updateTransaction(
     id: string,
     userId: string,
     dto: {
@@ -134,7 +164,7 @@ export class FinancesService {
       );
     }
 
-    await this.ensureMembership(
+    await this.ensureCanManageFinance(
       userId,
       transaction.associationId,
     );
@@ -171,7 +201,7 @@ export class FinancesService {
       );
     }
 
-    await this.ensureMembership(
+    await this.ensureCanManageFinance(
       userId,
       transaction.associationId,
     );
@@ -186,8 +216,7 @@ export class FinancesService {
       message: "Transazione eliminata",
     };
   }
-
-  async getSummary(
+    async getSummary(
     associationId: string,
     userId: string,
   ) {
@@ -274,4 +303,4 @@ export class FinancesService {
       },
     });
   }
-}
+  }

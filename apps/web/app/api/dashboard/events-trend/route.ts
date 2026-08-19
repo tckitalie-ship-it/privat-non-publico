@@ -1,4 +1,4 @@
-import { cookies } from "next/headers";
+﻿import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
 const API_BASE_URL =
@@ -27,7 +27,7 @@ export async function GET(request: Request) {
     }
 
     const response = await fetch(
-      `${API_BASE_URL}/memberships`,
+      `${API_BASE_URL}/dashboard/events-trend`,
       {
         method: "GET",
         headers: {
@@ -40,11 +40,11 @@ export async function GET(request: Request) {
 
     const data = await response.json().catch(() => null);
 
-    return NextResponse.json(data ?? [], {
+    return NextResponse.json(data ?? {}, {
       status: response.status,
     });
   } catch (error) {
-    console.error("Memberships proxy error:", error);
+    console.error("Dashboard events trend proxy error:", error);
 
     return NextResponse.json(
       { message: "API NestJS non raggiungibile" },

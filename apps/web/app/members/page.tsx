@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import {
   type FormEvent,
@@ -342,7 +342,7 @@ export default function MembersPage() {
         href="/dashboard"
         className="inline-flex items-center text-sm font-medium text-slate-600 hover:text-slate-900"
       >
-        ← Dashboard
+        ÔåÉ Dashboard
       </Link>
 
       <h2 className="text-lg font-semibold text-white">Membri</h2>

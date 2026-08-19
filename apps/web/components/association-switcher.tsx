@@ -81,42 +81,85 @@ export default function AssociationSwitcher() {
 
         const payload = readJwtPayload(token);
 
-        const response = await fetch(`${API_URL}/associations`, {
+        const url = `${API_URL}/associations`;
+
+        const response = await fetch(url, {
           headers: {
             Authorization: `Bearer ${token}`,
           },
           cache: "no-store",
         });
 
-        if (!response.ok) {
-          const data = await response.json().catch(() => null);
+        const data = await response.json().catch(() => null);
 
+        if (!response.ok) {
           throw new Error(
             data?.message ||
               `Errore caricamento associazioni (${response.status})`,
           );
         }
 
-        const data = await response.json();
-
-        const associationList: Association[] = Array.isArray(data)
-          ? data
-          : [];
+        // ✅ CORRETTO: il backend restituisce direttamente un array
+        const associationList: Association[] =
+          Array.isArray(data) ? data : [];
 
         setAssociations(associationList);
 
+        // ✅ CORRETTO: decodifica JWT con atob
         const tokenAssociationId =
           payload?.associationId ?? null;
 
-        const tokenAssociationExists = associationList.some(
-          (association) =>
-            association.id === tokenAssociationId,
-        );
+        // ✅ CORRETTO: verifica se l’associazione del token esiste davvero
+        const tokenAssociationExists =
+          associationList.some(
+            (association) =>
+              association.id === tokenAssociationId,
+          );
 
+        // 🔥 LOGICA CORRETTA
         if (tokenAssociationExists) {
           setCurrentAssociation(tokenAssociationId);
         } else if (associationList.length === 1) {
-          setCurrentAssociation(associationList[0].id);
+          const associationId = associationList[0].id;
+
+          const switchResponse = await fetch(
+            "/api/auth/switch-association",
+            {
+              method: "POST",
+              headers: {
+                Authorization: `Bearer ${token}`,
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({ associationId }),
+            },
+          );
+
+          const switchData = await switchResponse
+            .json()
+            .catch(() => null);
+
+          if (!switchResponse.ok) {
+            throw new Error(
+              switchData?.message ||
+                `Errore associazione (${switchResponse.status})`,
+            );
+          }
+
+          const newToken =
+            switchData?.accessToken ??
+            switchData?.access_token ??
+            switchData?.token;
+
+          if (!newToken) {
+            throw new Error(
+              "Il backend non ha restituito il nuovo token",
+            );
+          }
+
+          setAccessToken(newToken);
+          setCurrentAssociation(associationId);
+
+          window.location.reload();
         } else {
           setCurrentAssociation(null);
         }
@@ -148,7 +191,7 @@ export default function AssociationSwitcher() {
 
     try {
       const response = await fetch(
-        `${API_URL}/auth/switch-association`,
+        "/api/auth/switch-association",
         {
           method: "POST",
           headers: {
@@ -168,11 +211,16 @@ export default function AssociationSwitcher() {
         );
       }
 
-      // 🔥 FIX CORRETTA
-      const newToken = data?.accessToken;
+      // 🔥 FIX: rimosse righe duplicate
+      const newToken =
+        data?.accessToken ??
+        data?.access_token ??
+        data?.token;
 
       if (!newToken) {
-        throw new Error("Il backend non ha restituito accessToken");
+        throw new Error(
+          "Il backend non ha restituito il nuovo token",
+        );
       }
 
       setAccessToken(newToken);

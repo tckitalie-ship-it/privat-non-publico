@@ -38,7 +38,7 @@ async function authenticatedGet(path: string) {
     );
   }
 
-  const response = await fetch(`${API_URL}${path}`, {
+  const response = await fetch(`/api${path}`, {
     method: "GET",
     headers: {
       Accept: "application/json",

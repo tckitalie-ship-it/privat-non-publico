@@ -74,6 +74,51 @@ function formatDate(value: string) {
   }).format(new Date(value));
 }
 
+function getAssociationIdFromToken(): string | null {
+  const token = getAccessToken();
+
+  if (!token) {
+    return null;
+  }
+
+  try {
+    const payload = token.split(".")[1];
+
+    if (!payload) {
+      return null;
+    }
+
+    const normalized = payload
+      .replace(/-/g, "+")
+      .replace(/_/g, "/");
+
+    const decoded = JSON.parse(
+      decodeURIComponent(
+        window
+          .atob(normalized)
+          .split("")
+          .map(
+            (character) =>
+              `%${character
+                .charCodeAt(0)
+                .toString(16)
+                .padStart(2, "0")}`,
+          )
+          .join(""),
+      ),
+    );
+
+    return decoded.associationId ?? null;
+  } catch (error) {
+    console.error(
+      "Errore lettura associationId dal JWT:",
+      error,
+    );
+
+    return null;
+  }
+}
+
 function Toast({
   toast,
 }: {
@@ -96,15 +141,9 @@ export default function NotificationsPage() {
   const [notifications, setNotifications] =
     useState<Notification[]>([]);
 
-  const [loading, setLoading] =
-    useState(true);
-
-  const [creating, setCreating] =
-    useState(false);
-
-  const [markingAll, setMarkingAll] =
-    useState(false);
-
+  const [loading, setLoading] = useState(true);
+  const [creating, setCreating] = useState(false);
+  const [markingAll, setMarkingAll] = useState(false);
   const [actionId, setActionId] =
     useState<string | null>(null);
 
@@ -127,8 +166,7 @@ export default function NotificationsPage() {
       setToast(null);
     }, 3000);
   }
-
-  const loadNotifications = useCallback(
+    const loadNotifications = useCallback(
     async (showLoading = true) => {
       if (showLoading) {
         setLoading(true);
@@ -137,9 +175,18 @@ export default function NotificationsPage() {
       setError(null);
 
       try {
+        const associationId =
+          getAssociationIdFromToken();
+
+        if (!associationId) {
+          throw new Error(
+            "Associazione attiva non disponibile.",
+          );
+        }
+
         const response =
           await authenticatedFetch(
-            "/notifications/me",
+            `/notifications/association/${associationId}`,
           );
 
         if (!response.ok) {
@@ -186,6 +233,15 @@ export default function NotificationsPage() {
     setError(null);
 
     try {
+      const associationId =
+        getAssociationIdFromToken();
+
+      if (!associationId) {
+        throw new Error(
+          "Associazione attiva non disponibile.",
+        );
+      }
+
       const response =
         await authenticatedFetch(
           "/notifications",
@@ -195,6 +251,7 @@ export default function NotificationsPage() {
               title: "Notifica di prova",
               message:
                 "Il sistema delle notifiche funziona correttamente.",
+              associationId,
             }),
           },
         );
@@ -279,23 +336,29 @@ export default function NotificationsPage() {
       setActionId(null);
     }
   }
-
-  async function markAllAsRead() {
+    async function markAllAsRead() {
     setMarkingAll(true);
 
     try {
-      const response =
-        await authenticatedFetch(
-          "/notifications/read-all",
-          {
-            method: "PATCH",
-          },
+      const unreadNotifications =
+        notifications.filter(
+          (notification) => !notification.read,
         );
 
-      if (!response.ok) {
-        throw new Error(
-          await readErrorMessage(response),
-        );
+      for (const notification of unreadNotifications) {
+        const response =
+          await authenticatedFetch(
+            `/notifications/${notification.id}/read`,
+            {
+              method: "PATCH",
+            },
+          );
+
+        if (!response.ok) {
+          throw new Error(
+            await readErrorMessage(response),
+          );
+        }
       }
 
       setNotifications((current) =>
@@ -447,8 +510,7 @@ export default function NotificationsPage() {
 
             Segna tutte come lette
           </button>
-
-          <button
+                    <button
             type="button"
             onClick={() =>
               void createTestNotification()
