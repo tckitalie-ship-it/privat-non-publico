@@ -1,13 +1,12 @@
 "use client";
 
-import Link from 'next/link';
-
+import Link from "next/link";
 import {
   FormEvent,
   useEffect,
   useMemo,
   useState,
-} from 'react';
+} from "react";
 
 import {
   CalendarDays,
@@ -16,12 +15,14 @@ import {
   Plus,
   Search,
   Trash2,
-} from 'lucide-react';
+} from "lucide-react";
 
-import { toast } from 'sonner';
+import { toast } from "sonner";
 
-import DashboardSidebar from '@/components/dashboard-sidebar';
-import { API_URL } from '@/lib/api';
+import DashboardSidebar from "@/components/dashboard-sidebar";
+import { API_URL, getAccessToken } from "@/lib/api";
+
+type Role = "OWNER" | "ADMIN" | "MEMBER";
 
 type EventRegistration = {
   id: string;
@@ -41,32 +42,21 @@ type EventItem = {
   registrations?: EventRegistration[];
 };
 
-function getAccessToken() {
-  if (typeof window === 'undefined') return null;
-
-  const localToken = localStorage.getItem('access_token');
-
-  if (localToken) return localToken;
-
-  const cookies = document.cookie.split(';');
-
-  for (const cookie of cookies) {
-    const [key, value] = cookie.trim().split('=');
-
-    if (key === 'access_token') {
-      return decodeURIComponent(value);
-    }
+function getUserIdFromToken(
+  token: string | null,
+): string | null {
+  if (!token) {
+    return null;
   }
 
-  return null;
-}
-
-function getUserIdFromToken(token: string | null) {
-  if (!token) return null;
-
   try {
-    const payload = JSON.parse(atob(token.split('.')[1]));
-    return payload.sub || null;
+    const payload = JSON.parse(
+      atob(token.split(".")[1]),
+    ) as {
+      sub?: string;
+    };
+
+    return payload.sub ?? null;
   } catch {
     return null;
   }
@@ -75,23 +65,96 @@ function getUserIdFromToken(token: string | null) {
 export default function EventsPage() {
   const [events, setEvents] = useState<EventItem[]>([]);
   const [showForm, setShowForm] = useState(false);
+
   const [, setLoading] = useState(false);
   const [, setLoadingEvents] = useState(true);
-  const [search] = useState('');
-  const [filter] = useState<'ALL' | 'UPCOMING'>('ALL');
+
+  const [search] = useState("");
+  const [filter] =
+    useState<"ALL" | "UPCOMING">("ALL");
+
   const [confirmDeleteEvent, setConfirmDeleteEvent] =
     useState<EventItem | null>(null);
-  const [deletingEvent, setDeletingEvent] = useState(false);
 
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [location, setLocation] = useState('');
-  const [startsAt, setStartsAt] = useState('');
-  const [endsAt, setEndsAt] = useState('');
+  const [deletingEvent, setDeletingEvent] =
+    useState(false);
+
+  const [title, setTitle] = useState("");
+  const [description, setDescription] =
+    useState("");
+  const [location, setLocation] = useState("");
+  const [startsAt, setStartsAt] = useState("");
+  const [endsAt, setEndsAt] = useState("");
+
+  const [currentUserId, setCurrentUserId] =
+    useState<string | null>(null);
+
+  const [currentUserRole, setCurrentUserRole] =
+    useState<Role | null>(null);
 
   useEffect(() => {
+    const token = getAccessToken();
+
+    setCurrentUserId(
+      getUserIdFromToken(token),
+    );
+
     loadEvents();
   }, []);
+
+  useEffect(() => {
+    const loadCurrentMembership = async () => {
+      const token = getAccessToken();
+
+      if (!token) {
+        setCurrentUserRole(null);
+        return;
+      }
+
+      try {
+        const response = await fetch(
+          `${API_URL}/memberships/me`,
+          {
+            method: "GET",
+            headers: {
+              Accept: "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            cache: "no-store",
+          },
+        );
+
+        if (!response.ok) {
+          setCurrentUserRole(null);
+          return;
+        }
+
+        const data =
+          await response.json().catch(
+            () => null,
+          );
+
+        setCurrentUserRole(
+          data?.role ??
+            data?.membership?.role ??
+            null,
+        );
+      } catch (error) {
+        console.error(
+          "Errore caricamento ruolo:",
+          error,
+        );
+
+        setCurrentUserRole(null);
+      }
+    };
+
+    void loadCurrentMembership();
+  }, []);
+
+  const canManageEvents =
+    currentUserRole === "OWNER" ||
+    currentUserRole === "ADMIN";
 
   async function loadEvents() {
     try {
@@ -99,24 +162,45 @@ export default function EventsPage() {
 
       const token = getAccessToken();
 
-      const res = await fetch(`${API_URL}/events`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      const res = await fetch(
+        `${API_URL}/events`,
+        {
+          method: "GET",
+          headers: {
+            Accept: "application/json",
+            ...(token
+              ? {
+                  Authorization: `Bearer ${token}`,
+                }
+              : {}),
+          },
+          cache: "no-store",
         },
-      });
+      );
 
       if (!res.ok) {
-        throw new Error('Errore caricamento eventi');
+        const data =
+          await res.json().catch(
+            () => null,
+          );
+
+        throw new Error(
+          data?.message ||
+            "Errore caricamento eventi",
+        );
       }
 
       const data = await res.json();
 
-      setEvents(Array.isArray(data) ? data : []);
+      setEvents(
+        Array.isArray(data) ? data : [],
+      );
     } catch (error: unknown) {
       const message =
-        error instanceof Error ? error.message : 'Errore caricamento eventi';
+        error instanceof Error
+          ? error.message
+          : "Errore caricamento eventi";
+
       console.error(error);
       toast.error(message);
       setEvents([]);
@@ -125,8 +209,17 @@ export default function EventsPage() {
     }
   }
 
-  async function handleCreateEvent(e: FormEvent<HTMLFormElement>) {
+  async function handleCreateEvent(
+    e: FormEvent<HTMLFormElement>,
+  ) {
     e.preventDefault();
+
+    if (!canManageEvents) {
+      toast.error(
+        "Non hai i permessi per creare eventi",
+      );
+      return;
+    }
 
     try {
       setLoading(true);
@@ -134,51 +227,79 @@ export default function EventsPage() {
       const token = getAccessToken();
 
       if (!token) {
-        throw new Error('Login richiesto');
+        throw new Error("Login richiesto");
       }
 
       if (!title.trim()) {
-        throw new Error('Titolo obbligatorio');
+        throw new Error(
+          "Titolo obbligatorio",
+        );
       }
 
       if (!startsAt) {
-        throw new Error('Data inizio obbligatoria');
+        throw new Error(
+          "Data inizio obbligatoria",
+        );
       }
 
-      const res = await fetch(`${API_URL}/events`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
+      const res = await fetch(
+        `${API_URL}/events`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type":
+              "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            title: title.trim(),
+            description:
+              description.trim(),
+            location:
+              location.trim(),
+            startsAt:
+              new Date(
+                startsAt,
+              ).toISOString(),
+            endsAt: endsAt
+              ? new Date(
+                  endsAt,
+                ).toISOString()
+              : undefined,
+          }),
         },
-        body: JSON.stringify({
-          title: title.trim(),
-          description: description.trim(),
-          location: location.trim(),
-          startsAt: new Date(startsAt).toISOString(),
-          endsAt: endsAt ? new Date(endsAt).toISOString() : undefined,
-        }),
-      });
+      );
 
-      const data = await res.json().catch(() => null);
+      const data =
+        await res.json().catch(
+          () => null,
+        );
 
       if (!res.ok) {
-        throw new Error(data?.message || 'Errore creazione evento');
+        throw new Error(
+          data?.message ||
+            "Errore creazione evento",
+        );
       }
 
-      setTitle('');
-      setDescription('');
-      setLocation('');
-      setStartsAt('');
-      setEndsAt('');
+      setTitle("");
+      setDescription("");
+      setLocation("");
+      setStartsAt("");
+      setEndsAt("");
       setShowForm(false);
 
       await loadEvents();
 
-      toast.success('Evento creato');
+      toast.success(
+        "Evento creato",
+      );
     } catch (error: unknown) {
       const message =
-        error instanceof Error ? error.message : 'Errore creazione evento';
+        error instanceof Error
+          ? error.message
+          : "Errore creazione evento";
+
       console.error(error);
       toast.error(message);
     } finally {
@@ -186,36 +307,62 @@ export default function EventsPage() {
     }
   }
 
-  async function deleteEvent(id: string) {
+  async function deleteEvent(
+    id: string,
+  ) {
+    if (!canManageEvents) {
+      toast.error(
+        "Non hai i permessi per eliminare eventi",
+      );
+
+      setConfirmDeleteEvent(null);
+      return;
+    }
+
     try {
       setDeletingEvent(true);
 
       const token = getAccessToken();
 
       if (!token) {
-        throw new Error('Login richiesto');
+        throw new Error("Login richiesto");
       }
 
-      const res = await fetch(`${API_URL}/events/${id}`, {
-        method: 'DELETE',
-        headers: {
-          Authorization: `Bearer ${token}`,
+      const res = await fetch(
+        `${API_URL}/events/${id}`,
+        {
+          method: "DELETE",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
         },
-      });
+      );
 
-      const data = await res.json().catch(() => null);
+      const data =
+        await res.json().catch(
+          () => null,
+        );
 
       if (!res.ok) {
-        throw new Error(data?.message || 'Errore eliminazione evento');
+        throw new Error(
+          data?.message ||
+            "Errore eliminazione evento",
+        );
       }
 
       await loadEvents();
+
       setConfirmDeleteEvent(null);
 
-      toast.success('Evento eliminato');
+      toast.success(
+        "Evento eliminato",
+      );
     } catch (error: unknown) {
       const message =
-        error instanceof Error ? error.message : 'Errore eliminazione evento';
+        error instanceof Error
+          ? error.message
+          : "Errore eliminazione evento";
+
       console.error(error);
       toast.error(message);
     } finally {
@@ -223,34 +370,53 @@ export default function EventsPage() {
     }
   }
 
-  async function registerToEvent(eventId: string) {
+  async function registerToEvent(
+    eventId: string,
+  ) {
     try {
       const token = getAccessToken();
-      const userId = getUserIdFromToken(token);
+      const userId =
+        getUserIdFromToken(token);
 
       if (!token || !userId) {
-        throw new Error('Login richiesto');
+        throw new Error(
+          "Login richiesto",
+        );
       }
 
-      const res = await fetch(`${API_URL}/events/${eventId}/register`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
+      const res = await fetch(
+        `${API_URL}/events/${eventId}/register`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
         },
-      });
+      );
 
-      const data = await res.json().catch(() => null);
+      const data =
+        await res.json().catch(
+          () => null,
+        );
 
       if (!res.ok) {
-        throw new Error(data?.message || 'Errore registrazione evento');
+        throw new Error(
+          data?.message ||
+            "Errore registrazione evento",
+        );
       }
 
       await loadEvents();
 
-      toast.success('Registrazione completata');
+      toast.success(
+        "Registrazione completata",
+      );
     } catch (error: unknown) {
       const message =
-        error instanceof Error ? error.message : 'Errore registrazione evento';
+        error instanceof Error
+          ? error.message
+          : "Errore registrazione evento";
+
       console.error(error);
       toast.error(message);
     }
@@ -258,16 +424,30 @@ export default function EventsPage() {
 
   const filteredEvents = useMemo(() => {
     return events.filter((ev) => {
+      const normalizedSearch =
+        search.toLowerCase();
+
       const matchesSearch =
-        ev.title.toLowerCase().includes(search.toLowerCase()) ||
-        ev.description?.toLowerCase().includes(search.toLowerCase());
+        ev.title
+          .toLowerCase()
+          .includes(normalizedSearch) ||
+        ev.description
+          ?.toLowerCase()
+          .includes(normalizedSearch);
 
       const isUpcoming =
-        filter === 'UPCOMING'
-          ? ev.startsAt && new Date(ev.startsAt) > new Date()
+        filter === "UPCOMING"
+          ? Boolean(
+              ev.startsAt &&
+                new Date(ev.startsAt) >
+                  new Date(),
+            )
           : true;
 
-      return matchesSearch && isUpcoming;
+      return (
+        matchesSearch &&
+        isUpcoming
+      );
     });
   }, [events, search, filter]);
 
@@ -297,199 +477,288 @@ export default function EventsPage() {
               </h1>
 
               <p className="mt-3 max-w-2xl text-gray-400">
-                Gestisci gli eventi, le registrazioni e le attività principali
+                Gestisci gli eventi,
+                le registrazioni e le
+                attività principali
                 della piattaforma.
               </p>
             </div>
 
-            <button
-              type="button"
-              onClick={() => setShowForm((value) => !value)}
-              className="inline-flex items-center gap-2 rounded-2xl bg-indigo-600 px-5 py-3 font-semibold transition hover:bg-indigo-500"
-            >
-              <Plus size={18} />
-              {showForm ? 'Chiudi' : 'Nuovo evento'}
-            </button>
+            {canManageEvents && (
+              <button
+                type="button"
+                onClick={() =>
+                  setShowForm(
+                    (value) => !value,
+                  )
+                }
+                className="inline-flex items-center gap-2 rounded-2xl bg-indigo-600 px-5 py-3 font-semibold transition hover:bg-indigo-500"
+              >
+                <Plus size={18} />
+
+                {showForm
+                  ? "Chiudi"
+                  : "Nuovo evento"}
+              </button>
+            )}
           </div>
 
-          {showForm && (
-            <form
-              onSubmit={handleCreateEvent}
-              className="rounded-3xl border border-white/10 bg-[#1a1f2e] p-6 shadow-2xl"
-            >
-              <h2 className="text-2xl font-bold">
-                Crea evento
-              </h2>
-
-              <div className="mt-6 grid gap-5 md:grid-cols-2">
-                <input
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  placeholder="Titolo evento"
-                  required
-                  className="rounded-2xl border border-white/10 bg-[#111827] px-4 py-4 text-white outline-none focus:border-indigo-500"
-                />
-
-                <input
-                  value={location}
-                  onChange={(e) => setLocation(e.target.value)}
-                  placeholder="Luogo"
-                  className="rounded-2xl border border-white/10 bg-[#111827] px-4 py-4 text-white outline-none focus:border-indigo-500"
-                />
-              </div>
-
-              <div className="mt-6 grid gap-5 md:grid-cols-2">
-                <input
-                  type="datetime-local"
-                  value={startsAt}
-                  onChange={(e) => setStartsAt(e.target.value)}
-                  required
-                  className="rounded-2xl border border-white/10 bg-[#111827] px-4 py-4 text-white outline-none focus:border-indigo-500"
-                />
-
-                <input
-                  type="datetime-local"
-                  value={endsAt}
-                  onChange={(e) => setEndsAt(e.target.value)}
-                  className="rounded-2xl border border-white/10 bg-[#111827] px-4 py-4 text-white outline-none focus:border-indigo-500"
-                />
-              </div>
-
-              <textarea
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="Descrizione"
-                className="mt-6 w-full rounded-2xl border border-white/10 bg-[#111827] px-4 py-4 text-white outline-none focus:border-indigo-500"
-              />
-
-              <button
-                type="submit"
-                className="mt-5 rounded-2xl bg-white px-5 py-3 font-semibold text-zinc-950 transition hover:bg-zinc-200"
+          {showForm &&
+            canManageEvents && (
+              <form
+                onSubmit={
+                  handleCreateEvent
+                }
+                className="rounded-3xl border border-white/10 bg-[#1a1f2e] p-6 shadow-2xl"
               >
-                Salva evento
-              </button>
-            </form>
-          )}
+                <h2 className="text-2xl font-bold">
+                  Crea evento
+                </h2>
+
+                <div className="mt-6 grid gap-5 md:grid-cols-2">
+                  <input
+                    value={title}
+                    onChange={(e) =>
+                      setTitle(
+                        e.target.value,
+                      )
+                    }
+                    placeholder="Titolo evento"
+                    required
+                    className="rounded-2xl border border-white/10 bg-[#111827] px-4 py-4 text-white outline-none focus:border-indigo-500"
+                  />
+
+                  <input
+                    value={location}
+                    onChange={(e) =>
+                      setLocation(
+                        e.target.value,
+                      )
+                    }
+                    placeholder="Luogo"
+                    className="rounded-2xl border border-white/10 bg-[#111827] px-4 py-4 text-white outline-none focus:border-indigo-500"
+                  />
+                </div>
+
+                <div className="mt-6 grid gap-5 md:grid-cols-2">
+                  <input
+                    type="datetime-local"
+                    value={startsAt}
+                    onChange={(e) =>
+                      setStartsAt(
+                        e.target.value,
+                      )
+                    }
+                    required
+                    className="rounded-2xl border border-white/10 bg-[#111827] px-4 py-4 text-white outline-none focus:border-indigo-500"
+                  />
+
+                  <input
+                    type="datetime-local"
+                    value={endsAt}
+                    onChange={(e) =>
+                      setEndsAt(
+                        e.target.value,
+                      )
+                    }
+                    className="rounded-2xl border border-white/10 bg-[#111827] px-4 py-4 text-white outline-none focus:border-indigo-500"
+                  />
+                </div>
+
+                <textarea
+                  value={description}
+                  onChange={(e) =>
+                    setDescription(
+                      e.target.value,
+                    )
+                  }
+                  placeholder="Descrizione"
+                  className="mt-6 w-full rounded-2xl border border-white/10 bg-[#111827] px-4 py-4 text-white outline-none focus:border-indigo-500"
+                />
+
+                <button
+                  type="submit"
+                  className="mt-5 rounded-2xl bg-white px-5 py-3 font-semibold text-zinc-950 transition hover:bg-zinc-200"
+                >
+                  Salva evento
+                </button>
+              </form>
+            )}
 
           <section className="grid gap-5">
-            {filteredEvents.length === 0 ? (
+            {filteredEvents.length ===
+            0 ? (
               <div className="rounded-3xl border border-dashed border-white/10 bg-[#1a1f2e] p-12 text-center text-gray-400">
-                Nessun evento trovato.
+                Nessun evento
+                trovato.
               </div>
             ) : (
-              filteredEvents.map((ev) => (
-                <div
-                  key={ev.id}
-                  className="rounded-3xl border border-white/5 bg-[#1a1f2e] p-6 shadow-xl"
-                >
-                  <div className="flex items-start justify-between gap-4">
-                    <div>
-                      <h2 className="text-2xl font-bold">
-                        {ev.title}
-                      </h2>
+              filteredEvents.map(
+                (ev) => (
+                  <div
+                    key={ev.id}
+                    className="rounded-3xl border border-white/5 bg-[#1a1f2e] p-6 shadow-xl"
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <h2 className="text-2xl font-bold">
+                          {ev.title}
+                        </h2>
 
-                      <p className="mt-2 text-gray-400">
-                        {ev.description}
-                      </p>
+                        <p className="mt-2 text-gray-400">
+                          {ev.description}
+                        </p>
 
-                      <div className="mt-4 flex items-center gap-3 text-sm text-gray-400">
-                        <CalendarDays size={16} />
-                        {ev.startsAt
-                          ? new Date(ev.startsAt).toLocaleString('it-IT')
-                          : 'Data non disponibile'}
+                        <div className="mt-4 flex items-center gap-3 text-sm text-gray-400">
+                          <CalendarDays
+                            size={16}
+                          />
+
+                          {ev.startsAt
+                            ? new Date(
+                                ev.startsAt,
+                              ).toLocaleString(
+                                "it-IT",
+                              )
+                            : "Data non disponibile"}
+                        </div>
+
+                        {ev.location && (
+                          <div className="mt-2 flex items-center gap-3 text-sm text-gray-400">
+                            <MapPin
+                              size={16}
+                            />
+
+                            {ev.location}
+                          </div>
+                        )}
                       </div>
 
-                      {ev.location && (
-                        <div className="mt-2 flex items-center gap-3 text-sm text-gray-400">
-                          <MapPin size={16} />
-                          {ev.location}
-                        </div>
+                      {canManageEvents && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setConfirmDeleteEvent(
+                              ev,
+                            )
+                          }
+                          className="inline-flex items-center gap-2 rounded-xl border border-red-500/30 px-4 py-2 text-sm text-red-300 transition hover:bg-red-500/10"
+                        >
+                          <Trash2
+                            size={16}
+                          />
+
+                          Elimina
+                        </button>
                       )}
                     </div>
 
-                    <button
-                      type="button"
-                      onClick={() => setConfirmDeleteEvent(ev)}
-                      className="inline-flex items-center gap-2 rounded-xl border border-red-500/30 px-4 py-2 text-sm text-red-300 transition hover:bg-red-500/10"
-                    >
-                      <Trash2 size={16} />
-                      Elimina
-                    </button>
-                  </div>
+                    <div className="mt-6 flex flex-wrap gap-3">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          registerToEvent(
+                            ev.id,
+                          )
+                        }
+                        className="inline-flex items-center gap-2 rounded-xl border border-indigo-500/30 px-4 py-2 text-sm text-indigo-300 transition hover:bg-indigo-500/10"
+                      >
+                        <Plus
+                          size={16}
+                        />
 
-                  <div className="mt-6 flex flex-wrap gap-3">
-                    <button
-                      type="button"
-                      onClick={() => registerToEvent(ev.id)}
-                      className="inline-flex items-center gap-2 rounded-xl border border-indigo-500/30 px-4 py-2 text-sm text-indigo-300 transition hover:bg-indigo-500/10"
-                    >
-                      <Plus size={16} />
-                      Registrati
-                    </button>
+                        Registrati
+                      </button>
 
-                    <Link
-                      href={`/events/${ev.id}`}
-                      className="inline-flex items-center gap-2 rounded-xl border border-white/10 px-4 py-2 text-sm transition hover:bg-white/5"
-                    >
-                      <Search size={16} />
-                      Dettagli
-                    </Link>
+                      <Link
+                        href={`/events/${ev.id}`}
+                        className="inline-flex items-center gap-2 rounded-xl border border-white/10 px-4 py-2 text-sm transition hover:bg-white/5"
+                      >
+                        <Search
+                          size={16}
+                        />
+
+                        Dettagli
+                      </Link>
+                    </div>
                   </div>
-                </div>
-              ))
+                ),
+              )
             )}
           </section>
         </div>
       </main>
 
-      {confirmDeleteEvent && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="delete-event-title"
-        >
-          <div className="w-full max-w-md rounded-2xl border border-white/10 bg-[#111827] p-6 shadow-2xl">
-            <h2
-              id="delete-event-title"
-              className="text-lg font-semibold text-white"
-            >
-              Eliminare l&apos;evento?
-            </h2>
-
-            <p className="mt-3 text-sm leading-6 text-gray-400">
-              Stai per eliminare l&apos;evento{' '}
-              <span className="font-medium text-white">
-                {confirmDeleteEvent.title}
-              </span>
-              . Questa operazione non può essere annullata.
-            </p>
-
-            <div className="mt-6 flex justify-end gap-3">
-              <button
-                type="button"
-                onClick={() => setConfirmDeleteEvent(null)}
-                disabled={deletingEvent}
-                className="rounded-lg border border-white/10 px-4 py-2 text-sm font-medium text-gray-300 transition hover:bg-white/10 disabled:opacity-50"
+      {confirmDeleteEvent &&
+        canManageEvents && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="delete-event-title"
+          >
+            <div className="w-full max-w-md rounded-2xl border border-white/10 bg-[#111827] p-6 shadow-2xl">
+              <h2
+                id="delete-event-title"
+                className="text-lg font-semibold text-white"
               >
-                Annulla
-              </button>
+                Eliminare l&apos;evento?
+              </h2>
 
-              <button
-                type="button"
-                onClick={() => void deleteEvent(confirmDeleteEvent.id)}
-                disabled={deletingEvent}
-                className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-red-500 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {deletingEvent && (
-                  <Loader2 size={16} className="animate-spin" />
-                )}
-                Conferma eliminazione
-              </button>
+              <p className="mt-3 text-sm leading-6 text-gray-400">
+                Stai per eliminare
+                l&apos;evento{" "}
+                <span className="font-medium text-white">
+                  {
+                    confirmDeleteEvent.title
+                  }
+                </span>
+                . Questa operazione
+                non può essere
+                annullata.
+              </p>
+
+              <div className="mt-6 flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setConfirmDeleteEvent(
+                      null,
+                    )
+                  }
+                  disabled={
+                    deletingEvent
+                  }
+                  className="rounded-lg border border-white/10 px-4 py-2 text-sm font-medium text-gray-300 transition hover:bg-white/10 disabled:opacity-50"
+                >
+                  Annulla
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    void deleteEvent(
+                      confirmDeleteEvent.id,
+                    )
+                  }
+                  disabled={
+                    deletingEvent
+                  }
+                  className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-red-500 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {deletingEvent && (
+                    <Loader2
+                      size={16}
+                      className="animate-spin"
+                    />
+                  )}
+
+                  Conferma eliminazione
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
     </div>
   );
 }
