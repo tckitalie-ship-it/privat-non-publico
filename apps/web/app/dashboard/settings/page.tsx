@@ -1,4 +1,5 @@
 "use client";
+
 import Image from "next/image";
 import ChangePasswordModal from "@/components/settings/ChangePasswordModal";
 import {
@@ -20,16 +21,22 @@ import {
   User,
 } from "lucide-react";
 import { toast } from "sonner";
+
 import {
   API_URL,
   getAccessToken,
 } from "@/lib/api";
 
+type Role =
+  | "OWNER"
+  | "ADMIN"
+  | "MEMBER";
+
 type JwtPayload = {
   sub?: string;
   email?: string;
   associationId?: string | null;
-  role?: "OWNER" | "ADMIN" | "MEMBER" | null;
+  role?: Role | null;
 };
 
 type Association = {
@@ -48,7 +55,7 @@ type CurrentUser = {
   sub?: string;
   email?: string;
   associationId?: string | null;
-  role?: "OWNER" | "ADMIN" | "MEMBER" | null;
+  role?: Role | null;
 };
 
 function decodeToken(
@@ -62,15 +69,19 @@ function decodeToken(
       return null;
     }
 
-    const normalized = payloadPart
-      .replace(/-/g, "+")
-      .replace(/_/g, "/");
+    const normalized =
+      payloadPart
+        .replace(/-/g, "+")
+        .replace(/_/g, "/");
 
-    const padded = normalized.padEnd(
-      normalized.length +
-        ((4 - (normalized.length % 4)) % 4),
-      "=",
-    );
+    const padded =
+      normalized.padEnd(
+        normalized.length +
+          ((4 -
+            (normalized.length % 4)) %
+            4),
+        "=",
+      );
 
     return JSON.parse(
       window.atob(padded),
@@ -117,9 +128,7 @@ export default function SettingsPage() {
     useState<string | null>(null);
 
   const [currentRole, setCurrentRole] =
-    useState<
-      "OWNER" | "ADMIN" | "MEMBER" | null
-    >(null);
+    useState<Role | null>(null);
 
   const [association, setAssociation] =
     useState<Association | null>(null);
@@ -149,8 +158,12 @@ export default function SettingsPage() {
 
   const [saving, setSaving] =
     useState(false);
-   const [passwordModalOpen, setPasswordModalOpen] =
-  useState(false);
+
+  const [
+    passwordModalOpen,
+    setPasswordModalOpen,
+  ] = useState(false);
+
   const [
     savingNotifications,
     setSavingNotifications,
@@ -227,7 +240,9 @@ export default function SettingsPage() {
         }
 
         const responses =
-          await Promise.all(requests);
+          await Promise.all(
+            requests,
+          );
 
         const userResponse =
           responses[0];
@@ -323,16 +338,18 @@ export default function SettingsPage() {
         setLoading(false);
       }
     }, []);
-
   useEffect(() => {
-  const timeoutId = window.setTimeout(() => {
-    void loadSettings();
-  }, 0);
+    const timeoutId =
+      window.setTimeout(() => {
+        void loadSettings();
+      }, 0);
 
-  return () => {
-    window.clearTimeout(timeoutId);
-  };
-}, [loadSettings]);
+    return () => {
+      window.clearTimeout(
+        timeoutId,
+      );
+    };
+  }, [loadSettings]);
 
   async function saveAssociation(
     event: FormEvent<HTMLFormElement>,
@@ -348,26 +365,21 @@ export default function SettingsPage() {
 
     if (!canEditAssociation) {
       toast.error(
-        "Non hai i permessi per modificare l’associazione",
+        "Non hai i permessi per modificare l'associazione",
       );
       return;
     }
 
-    const cleanName =
-      name.trim();
-
+    const cleanName = name.trim();
     const cleanDescription =
       description.trim();
-
-    const cleanSlug =
-      slug.trim();
-
+    const cleanSlug = slug.trim();
     const cleanLogoUrl =
       logoUrl.trim();
 
     if (!cleanName) {
       toast.error(
-        "Il nome dell’associazione è obbligatorio",
+        "Il nome dell'associazione è obbligatorio",
       );
       return;
     }
@@ -425,17 +437,13 @@ export default function SettingsPage() {
 
       if (data) {
         setAssociation(data);
-
         setName(data.name ?? "");
-
         setDescription(
           data.description ?? "",
         );
-
         setSlug(
           data.slug ?? "",
         );
-
         setLogoUrl(
           data.logoUrl ?? "",
         );
@@ -467,7 +475,9 @@ export default function SettingsPage() {
 
   async function saveNotificationPreference() {
     try {
-      setSavingNotifications(true);
+      setSavingNotifications(
+        true,
+      );
 
       localStorage.setItem(
         "notificationsEnabled",
@@ -488,7 +498,9 @@ export default function SettingsPage() {
         "Preferenze notifiche salvate",
       );
     } finally {
-      setSavingNotifications(false);
+      setSavingNotifications(
+        false,
+      );
     }
   }
 
@@ -521,8 +533,8 @@ export default function SettingsPage() {
         <p className="mt-2 text-gray-400">
           Gestisci i dati
           dell&apos;associazione, il
-          profilo e le preferenze della
-          piattaforma.
+          profilo e le preferenze
+          della piattaforma.
         </p>
       </header>
 
@@ -542,7 +554,8 @@ export default function SettingsPage() {
               </h2>
 
               <p className="mt-1 text-sm text-gray-400">
-                Aggiorna i dati principali
+                Aggiorna i dati
+                principali
                 dell&apos;associazione.
               </p>
             </div>
@@ -550,9 +563,9 @@ export default function SettingsPage() {
 
           {!canEditAssociation && (
             <div className="mb-5 rounded-xl border border-amber-500/20 bg-amber-500/10 p-4 text-sm text-amber-300">
-              Il tuo ruolo non consente di
-              modificare queste
-              informazioni.
+              Il tuo ruolo non
+              consente di modificare
+              queste informazioni.
             </div>
           )}
 
@@ -605,7 +618,7 @@ export default function SettingsPage() {
                 }
                 rows={5}
                 className="mt-2 w-full resize-none rounded-xl border border-white/10 bg-[#111827] px-4 py-3 text-white outline-none transition placeholder:text-gray-500 focus:border-blue-500"
-                placeholder="Descrivi lo scopo e le attività dell’associazione..."
+                placeholder="Descrivi lo scopo e le attività dell'associazione..."
               />
             </div>
 
@@ -668,7 +681,6 @@ export default function SettingsPage() {
                 </div>
               </div>
             </div>
-
             {logoUrl && (
               <div className="rounded-2xl border border-white/10 bg-[#111827] p-4">
                 <p className="mb-3 text-sm font-medium text-gray-300">
@@ -677,15 +689,16 @@ export default function SettingsPage() {
 
                 <div className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-2xl border border-white/10 bg-white/5">
                   <Image
-  src={logoUrl}
-  alt="Logo associazione"
-  width={96}
-  height={96}
-  className="h-full w-full object-contain"
-  onError={(event) => {
-    event.currentTarget.style.display = "none";
-  }}
-/>
+                    src={logoUrl}
+                    alt="Logo associazione"
+                    width={96}
+                    height={96}
+                    className="h-full w-full object-contain"
+                    onError={(event) => {
+                      event.currentTarget.style.display =
+                        "none";
+                    }}
+                  />
                 </div>
               </div>
             )}
@@ -758,7 +771,9 @@ export default function SettingsPage() {
                 </p>
 
                 <div className="mt-2 inline-flex items-center gap-2 rounded-full border border-blue-400/20 bg-blue-500/10 px-4 py-2 text-sm font-semibold text-blue-300">
-                  <ShieldCheck size={16} />
+                  <ShieldCheck
+                    size={16}
+                  />
 
                   {currentRole ??
                     "Non disponibile"}
@@ -781,7 +796,8 @@ export default function SettingsPage() {
                 </h2>
 
                 <p className="mt-1 text-sm text-gray-400">
-                  Stato operativo corrente.
+                  Stato operativo
+                  corrente.
                 </p>
               </div>
             </div>
@@ -802,13 +818,12 @@ export default function SettingsPage() {
               <p className="mt-1 text-sm opacity-80">
                 {association?.isActive
                   ? "La piattaforma è disponibile per i membri."
-                  : "L’associazione risulta disattivata."}
+                  : "L'associazione risulta disattivata."}
               </p>
             </div>
           </article>
         </div>
       </section>
-
       <section className="grid gap-6 xl:grid-cols-2">
         <article className="rounded-3xl border border-white/10 bg-[#0f172a] p-6 shadow-xl">
           <div className="mb-6 flex items-start gap-3">
@@ -822,8 +837,9 @@ export default function SettingsPage() {
               </h2>
 
               <p className="mt-1 text-sm text-gray-400">
-                Configura le preferenze
-                locali degli avvisi.
+                Configura le
+                preferenze locali
+                degli avvisi.
               </p>
             </div>
           </div>
@@ -835,9 +851,9 @@ export default function SettingsPage() {
               </p>
 
               <p className="mt-1 text-sm text-gray-400">
-                Ricevi aggiornamenti su
-                membri, eventi, finanze e
-                documenti.
+                Ricevi aggiornamenti
+                su membri, eventi,
+                finanze e documenti.
               </p>
             </div>
 
@@ -890,37 +906,79 @@ export default function SettingsPage() {
               </h2>
 
               <p className="mt-1 text-sm text-gray-400">
-                Gestione della password
-                dell&apos;account.
+                Gestione della
+                password dell&apos;account.
               </p>
             </div>
           </div>
 
           <div className="space-y-4">
-  <div className="rounded-xl border border-white/10 bg-[#111827] p-4">
-    <p className="font-medium text-white">
-      Password account
-    </p>
+            <div className="rounded-xl border border-white/10 bg-[#111827] p-4">
+              <p className="font-medium text-white">
+                Password account
+              </p>
 
-    <p className="mt-1 text-sm text-gray-400">
-      Modifica la password del tuo account.
-    </p>
-  </div>
+              <p className="mt-1 text-sm text-gray-400">
+                Modifica la password
+                del tuo account.
+              </p>
+            </div>
 
-  <button
-    type="button"
-    onClick={() => setPasswordModalOpen(true)}
-    className="w-full rounded-xl bg-red-600 py-3 font-semibold text-white transition hover:bg-red-500"
-  >
-    Cambia password
-  </button>
-</div>
+            <button
+              type="button"
+              onClick={() =>
+                setPasswordModalOpen(
+                  true,
+                )
+              }
+              className="w-full rounded-xl bg-red-600 py-3 font-semibold text-white transition hover:bg-red-500"
+            >
+              Cambia password
+            </button>
+          </div>
         </article>
       </section>
+      <section className="rounded-3xl border border-white/10 bg-[#0f172a] p-6 shadow-xl">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-gray-500">
+              Permessi
+            </p>
+
+            <h2 className="mt-1 text-lg font-semibold text-white">
+              Gestione impostazioni
+            </h2>
+
+            <p className="mt-1 text-sm text-gray-400">
+              Le modifiche ai dati
+              dell&apos;associazione sono
+              disponibili solo a
+              OWNER e ADMIN.
+            </p>
+          </div>
+
+          <div
+            className={`inline-flex w-fit items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold ${
+              canEditAssociation
+                ? "border-emerald-400/20 bg-emerald-500/10 text-emerald-300"
+                : "border-amber-400/20 bg-amber-500/10 text-amber-300"
+            }`}
+          >
+            <ShieldCheck size={16} />
+
+            {canEditAssociation
+              ? "Modifica consentita"
+              : "Sola lettura"}
+          </div>
+        </div>
+      </section>
+
       <ChangePasswordModal
-  open={passwordModalOpen}
-  onClose={() => setPasswordModalOpen(false)}
-/>
+        open={passwordModalOpen}
+        onClose={() =>
+          setPasswordModalOpen(false)
+        }
+      />
     </div>
   );
 }

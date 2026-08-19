@@ -1,36 +1,106 @@
-import { Controller, Get, Post, Patch, Delete, Param, Body, UseGuards, Req } from '@nestjs/common';
-import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { AssociationsService } from './associations.service';
-import { CreateAssociationDto } from './dto/create-association.dto';
-import { UpdateAssociationDto } from './dto/update-association.dto';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  UseGuards,
+} from "@nestjs/common";
 
-@Controller('associations')
+import { CurrentUser } from "../auth/current-user.decorator";
+import { JwtAuthGuard } from "../auth/jwt-auth.guard";
+import type { JwtUser } from "../auth/jwt-user.interface";
+
+import { AssociationsService } from "./associations.service";
+import { CreateAssociationDto } from "./dto/create-association.dto";
+import { UpdateAssociationDto } from "./dto/update-association.dto";
+
+@Controller("associations")
 @UseGuards(JwtAuthGuard)
 export class AssociationsController {
-  constructor(private readonly associationsService: AssociationsService) {}
+  constructor(
+    private readonly associationsService: AssociationsService,
+  ) {}
 
+  /**
+   * Associazioni dell'utente autenticato.
+   */
   @Get()
-  async findAll(@Req() req) {
-    return this.associationsService.findAllForUser(req.user.id);
+  async findAll(
+    @CurrentUser() user: JwtUser,
+  ) {
+    return this.associationsService.findAllForUser(
+      user.id,
+    );
   }
 
-  @Get(':id')
-  async findOne(@Param('id') id: string, @Req() req) {
-    return this.associationsService.findOneForUser(id, req.user.id);
+  /**
+   * Dettaglio associazione.
+   *
+   * Accessibile a tutti i membri.
+   */
+  @Get(":id")
+  async findOne(
+    @Param("id") id: string,
+    @CurrentUser() user: JwtUser,
+  ) {
+    return this.associationsService.findOneForUser(
+      id,
+      user.id,
+    );
   }
 
+  /**
+   * Crea associazione.
+   *
+   * Il creatore diventa OWNER.
+   */
   @Post()
-  async create(@Body() dto: CreateAssociationDto, @Req() req) {
-    return this.associationsService.create(dto, req.user.id);
+  async create(
+    @Body() dto: CreateAssociationDto,
+    @CurrentUser() user: JwtUser,
+  ) {
+    return this.associationsService.create(
+      dto,
+      user.id,
+    );
   }
 
-  @Patch(':id')
-  async update(@Param('id') id: string, @Body() dto: UpdateAssociationDto, @Req() req) {
-    return this.associationsService.update(id, dto, req.user.id);
+  /**
+   * Modifica associazione.
+   *
+   * Il controllo OWNER viene effettuato
+   * nel service/backend.
+   */
+  @Patch(":id")
+  async update(
+    @Param("id") id: string,
+    @Body() dto: UpdateAssociationDto,
+    @CurrentUser() user: JwtUser,
+  ) {
+    return this.associationsService.update(
+      id,
+      dto,
+      user.id,
+    );
   }
 
-  @Delete(':id')
-  async remove(@Param('id') id: string, @Req() req) {
-    return this.associationsService.remove(id, req.user.id);
+  /**
+   * Elimina associazione.
+   *
+   * Il controllo OWNER viene effettuato
+   * nel service/backend.
+   */
+  @Delete(":id")
+  async remove(
+    @Param("id") id: string,
+    @CurrentUser() user: JwtUser,
+  ) {
+    return this.associationsService.remove(
+      id,
+      user.id,
+    );
   }
 }
