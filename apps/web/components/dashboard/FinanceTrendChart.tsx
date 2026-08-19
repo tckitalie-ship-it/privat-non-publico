@@ -50,78 +50,126 @@ export default function FinanceTrendChart({
 }: FinanceTrendChartProps) {
   const formattedData = data.map((item) => ({
     ...item,
-    income: item.income / 100,
-    expense: item.expense / 100,
+    income: Number(item.income) / 100,
+    expense: Number(item.expense) / 100,
   }));
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-      <h2 className="mb-4 text-lg font-semibold text-slate-900">
-        Andamento finanziario
-      </h2>
+    <section className="min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+      <div className="mb-5">
+        <h2 className="text-lg font-semibold text-slate-900">
+          Andamento finanziario
+        </h2>
 
-      <ResponsiveChartContainer minHeight={300}>
-        {({ width, height }) => (
-          <BarChart
-            width={width}
-            height={height}
-            data={formattedData}
-          >
-            <CartesianGrid
-              strokeDasharray="3 3"
-              stroke="#e5e7eb"
-            />
+        <p className="mt-1 text-sm text-slate-500">
+          Confronto mensile tra entrate e uscite.
+        </p>
+      </div>
 
-            <XAxis
-              dataKey="month"
-              stroke="#9ca3af"
-              tick={{
-                fill: "#9ca3af",
-                fontSize: 12,
+      {formattedData.length === 0 ? (
+        <div className="flex min-h-[300px] items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50">
+          <p className="text-sm text-slate-500">
+            Nessun dato finanziario disponibile.
+          </p>
+        </div>
+      ) : (
+        <ResponsiveChartContainer minHeight={300}>
+          {({ width, height }) => (
+            <BarChart
+              width={width}
+              height={height}
+              data={formattedData}
+              margin={{
+                top: 8,
+                right: 12,
+                left: 8,
+                bottom: 8,
               }}
-              tickFormatter={formatMonth}
-            />
+            >
+              <CartesianGrid
+                strokeDasharray="3 3"
+                stroke="#e5e7eb"
+                vertical={false}
+              />
 
-            <YAxis
-              stroke="#9ca3af"
-              tick={{
-                fill: "#9ca3af",
-                fontSize: 12,
-              }}
-              tickFormatter={formatEuro}
-            />
+              <XAxis
+                dataKey="month"
+                stroke="#9ca3af"
+                tick={{
+                  fill: "#64748b",
+                  fontSize: 12,
+                }}
+                tickFormatter={formatMonth}
+                axisLine={{
+                  stroke: "#e2e8f0",
+                }}
+                tickLine={false}
+              />
 
-            <Tooltip
-              contentStyle={{
-                backgroundColor: "#1f2937",
-                borderRadius: "8px",
-                border: "1px solid #374151",
-                color: "white",
-              }}
-              labelFormatter={(value) =>
-                `Mese: ${formatMonth(value)}`
-              }
-              formatter={(value) => formatEuro(value)}
-            />
+              <YAxis
+                stroke="#9ca3af"
+                tick={{
+                  fill: "#64748b",
+                  fontSize: 12,
+                }}
+                tickFormatter={formatEuro}
+                axisLine={false}
+                tickLine={false}
+                width={80}
+              />
 
-            <Legend />
+              <Tooltip
+                cursor={{
+                  fill: "#f8fafc",
+                }}
+                contentStyle={{
+                  backgroundColor: "#ffffff",
+                  borderRadius: "12px",
+                  border: "1px solid #e2e8f0",
+                  boxShadow:
+                    "0 10px 25px rgba(15, 23, 42, 0.10)",
+                }}
+                labelStyle={{
+                  color: "#0f172a",
+                  fontWeight: 600,
+                  marginBottom: "4px",
+                }}
+                itemStyle={{
+                  color: "#334155",
+                }}
+                labelFormatter={(value) =>
+                  `Mese: ${formatMonth(value)}`
+                }
+                formatter={(value) =>
+                  formatEuro(value)
+                }
+              />
 
-            <Bar
-              dataKey="income"
-              name="Entrate"
-              fill="#3b82f6"
-              radius={[6, 6, 0, 0]}
-            />
+              <Legend
+                wrapperStyle={{
+                  paddingTop: "16px",
+                }}
+              />
 
-            <Bar
-              dataKey="expense"
-              name="Uscite"
-              fill="#ef4444"
-              radius={[6, 6, 0, 0]}
-            />
-          </BarChart>
-        )}
-      </ResponsiveChartContainer>
-    </div>
+              <Bar
+                dataKey="income"
+                name="Entrate"
+                fill="#16a34a"
+                radius={[6, 6, 0, 0]}
+                maxBarSize={42}
+              />
+
+              <Bar
+                dataKey="expense"
+                name="Uscite"
+                fill="#dc2626"
+                radius={[6, 6, 0, 0]}
+                maxBarSize={42}
+              />
+            </BarChart>
+          )}
+        </ResponsiveChartContainer>
+      )}
+    </section>
   );
 }
