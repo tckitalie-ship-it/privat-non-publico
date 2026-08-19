@@ -8,6 +8,7 @@ import {
   useRef,
   useState,
 } from "react";
+
 import {
   AlertCircle,
   Download,
@@ -22,6 +23,7 @@ import {
   Upload,
   X,
 } from "lucide-react";
+
 import { toast } from "sonner";
 
 import { PageHeader } from "@/components/ui";
@@ -29,6 +31,11 @@ import {
   API_URL,
   getAccessToken,
 } from "@/lib/api";
+
+type Role =
+  | "OWNER"
+  | "ADMIN"
+  | "MEMBER";
 
 type FileItem = {
   id: string;
@@ -63,6 +70,30 @@ function getErrorMessage(
   }
 
   return fallback;
+}
+
+function getCurrentUserRole(): Role | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  const token = getAccessToken();
+
+  if (!token) {
+    return null;
+  }
+
+  try {
+    const payload = JSON.parse(
+      atob(token.split(".")[1]),
+    ) as {
+      role?: Role;
+    };
+
+    return payload.role ?? null;
+  } catch {
+    return null;
+  }
 }
 
 async function requestFiles(): Promise<FileItem[]> {
@@ -103,7 +134,9 @@ async function requestFiles(): Promise<FileItem[]> {
     );
   }
 
-  return Array.isArray(data) ? data : [];
+  return Array.isArray(data)
+    ? data
+    : [];
 }
 
 const ACCEPTED_FILE_TYPES = [
@@ -135,9 +168,9 @@ function formatFileSize(
   }
 
   if (bytes < 1024 * 1024) {
-    return `${(bytes / 1024).toFixed(
-      1,
-    )} KB`;
+    return `${(
+      bytes / 1024
+    ).toFixed(1)} KB`;
   }
 
   return `${(
@@ -159,10 +192,13 @@ function formatDate(
     return "Data non disponibile";
   }
 
-  return date.toLocaleString("it-IT", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  });
+  return date.toLocaleString(
+    "it-IT",
+    {
+      dateStyle: "medium",
+      timeStyle: "short",
+    },
+  );
 }
 
 function getFileIcon(
@@ -197,7 +233,10 @@ function getFileTypeLabel(
     return "Tipo sconosciuto";
   }
 
-  if (mimetype === "application/pdf") {
+  if (
+    mimetype ===
+    "application/pdf"
+  ) {
     return "PDF";
   }
 
@@ -239,14 +278,15 @@ function getDownloadFilename(
     "documento"
   );
 }
-
 export default function DashboardFilesPage() {
   const fileInputRef =
     useRef<HTMLInputElement | null>(null);
 
-  const [files, setFiles] = useState<
-    FileItem[]
-  >([]);
+  const [role, setRole] =
+    useState<Role | null>(null);
+
+  const [files, setFiles] =
+    useState<FileItem[]>([]);
 
   const [loading, setLoading] =
     useState(true);
@@ -274,6 +314,14 @@ export default function DashboardFilesPage() {
     confirmDeleteFile,
     setConfirmDeleteFile,
   ] = useState<FileItem | null>(null);
+
+  const canManageFiles =
+    role === "OWNER" ||
+    role === "ADMIN";
+
+  useEffect(() => {
+    setRole(getCurrentUserRole());
+  }, []);
 
   const loadFiles =
     useCallback(async () => {
@@ -389,8 +437,7 @@ export default function DashboardFilesPage() {
       ),
     [files],
   );
-
-  async function uploadFile(
+    async function uploadFile(
     event: ChangeEvent<HTMLInputElement>,
   ) {
     const selectedFile =
@@ -399,6 +446,13 @@ export default function DashboardFilesPage() {
     event.target.value = "";
 
     if (!selectedFile) {
+      return;
+    }
+
+    if (!canManageFiles) {
+      toast.error(
+        "Non hai i permessi per caricare file.",
+      );
       return;
     }
 
@@ -422,6 +476,7 @@ export default function DashboardFilesPage() {
     }
 
     const formData = new FormData();
+
     formData.append(
       "file",
       selectedFile,
@@ -446,11 +501,12 @@ export default function DashboardFilesPage() {
         .catch(() => null);
 
       if (!response.ok) {
-        const message = Array.isArray(
-          data?.message,
-        )
-          ? data.message.join(", ")
-          : data?.message;
+        const message =
+          Array.isArray(
+            data?.message,
+          )
+            ? data.message.join(", ")
+            : data?.message;
 
         throw new Error(
           message ||
@@ -509,11 +565,12 @@ export default function DashboardFilesPage() {
           .json()
           .catch(() => null);
 
-        const message = Array.isArray(
-          data?.message,
-        )
-          ? data.message.join(", ")
-          : data?.message;
+        const message =
+          Array.isArray(
+            data?.message,
+          )
+            ? data.message.join(", ")
+            : data?.message;
 
         throw new Error(
           message ||
@@ -531,14 +588,19 @@ export default function DashboardFilesPage() {
         document.createElement("a");
 
       anchor.href = objectUrl;
+
       anchor.download =
         getDownloadFilename(file);
 
       document.body.appendChild(anchor);
+
       anchor.click();
+
       anchor.remove();
 
-      URL.revokeObjectURL(objectUrl);
+      URL.revokeObjectURL(
+        objectUrl,
+      );
 
       toast.success(
         "Download avviato",
@@ -558,9 +620,16 @@ export default function DashboardFilesPage() {
       setDownloadingId(null);
     }
   }
-
-  async function deleteFile() {
+    async function deleteFile() {
     if (!confirmDeleteFile) {
+      return;
+    }
+
+    if (!canManageFiles) {
+      toast.error(
+        "Non hai i permessi per eliminare file.",
+      );
+      setConfirmDeleteFile(null);
       return;
     }
 
@@ -595,11 +664,12 @@ export default function DashboardFilesPage() {
         .catch(() => null);
 
       if (!response.ok) {
-        const message = Array.isArray(
-          data?.message,
-        )
-          ? data.message.join(", ")
-          : data?.message;
+        const message =
+          Array.isArray(
+            data?.message,
+          )
+            ? data.message.join(", ")
+            : data?.message;
 
         throw new Error(
           message ||
@@ -607,12 +677,13 @@ export default function DashboardFilesPage() {
         );
       }
 
-      setFiles((currentFiles) =>
-        currentFiles.filter(
-          (file) =>
-            file.id !==
-            confirmDeleteFile.id,
-        ),
+      setFiles(
+        (currentFiles) =>
+          currentFiles.filter(
+            (file) =>
+              file.id !==
+              confirmDeleteFile.id,
+          ),
       );
 
       toast.success(
@@ -674,8 +745,7 @@ export default function DashboardFilesPage() {
           </p>
         </div>
       </section>
-
-      <section className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <section className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="relative w-full lg:max-w-md">
           <Search
             size={18}
@@ -696,37 +766,41 @@ export default function DashboardFilesPage() {
         </div>
 
         <div className="flex flex-col gap-3 sm:flex-row">
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept={ACCEPTED_FILE_TYPES}
-            onChange={(event) =>
-              void uploadFile(event)
-            }
-            className="hidden"
-          />
-
-          <button
-            type="button"
-            onClick={() =>
-              fileInputRef.current?.click()
-            }
-            disabled={uploading}
-            className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-3 font-semibold text-white transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {uploading ? (
-              <Loader2
-                size={18}
-                className="animate-spin"
+          {canManageFiles && (
+            <>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept={ACCEPTED_FILE_TYPES}
+                onChange={(event) =>
+                  void uploadFile(event)
+                }
+                className="hidden"
               />
-            ) : (
-              <Upload size={18} />
-            )}
 
-            {uploading
-              ? "Caricamento..."
-              : "Carica file"}
-          </button>
+              <button
+                type="button"
+                onClick={() =>
+                  fileInputRef.current?.click()
+                }
+                disabled={uploading}
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-3 font-semibold text-white transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {uploading ? (
+                  <Loader2
+                    size={18}
+                    className="animate-spin"
+                  />
+                ) : (
+                  <Upload size={18} />
+                )}
+
+                {uploading
+                  ? "Caricamento..."
+                  : "Carica file"}
+              </button>
+            </>
+          )}
 
           <button
             type="button"
@@ -770,6 +844,7 @@ export default function DashboardFilesPage() {
               className="animate-spin"
               size={22}
             />
+
             Caricamento file...
           </div>
         ) : error ? (
@@ -799,8 +874,7 @@ export default function DashboardFilesPage() {
               Riprova
             </button>
           </div>
-        ) : filteredFiles.length ===
-          0 ? (
+        ) : filteredFiles.length === 0 ? (
           <div className="flex min-h-48 flex-col items-center justify-center text-center">
             <FileText
               className="mb-4 text-gray-500"
@@ -815,7 +889,7 @@ export default function DashboardFilesPage() {
 
             <p className="mt-2 text-sm text-gray-400">
               {files.length === 0
-                ? "Carica il primo documento dell’associazione."
+                ? "Carica il primo documento dell'associazione."
                 : "Prova a modificare il testo della ricerca."}
             </p>
           </div>
@@ -903,32 +977,34 @@ export default function DashboardFilesPage() {
                         Scarica
                       </button>
 
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setConfirmDeleteFile(
-                            file,
-                          )
-                        }
-                        disabled={
-                          isDownloading ||
-                          isDeleting
-                        }
-                        className="inline-flex items-center gap-2 rounded-xl border border-red-400/20 bg-red-500/10 px-4 py-2 text-sm font-medium text-red-300 transition hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        {isDeleting ? (
-                          <Loader2
-                            size={16}
-                            className="animate-spin"
-                          />
-                        ) : (
-                          <Trash2
-                            size={16}
-                          />
-                        )}
+                      {canManageFiles && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setConfirmDeleteFile(
+                              file,
+                            )
+                          }
+                          disabled={
+                            isDownloading ||
+                            isDeleting
+                          }
+                          className="inline-flex items-center gap-2 rounded-xl border border-red-400/20 bg-red-500/10 px-4 py-2 text-sm font-medium text-red-300 transition hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          {isDeleting ? (
+                            <Loader2
+                              size={16}
+                              className="animate-spin"
+                            />
+                          ) : (
+                            <Trash2
+                              size={16}
+                            />
+                          )}
 
-                        Elimina
-                      </button>
+                          Elimina
+                        </button>
+                      )}
                     </div>
                   </li>
                 );
@@ -937,8 +1013,7 @@ export default function DashboardFilesPage() {
           </ul>
         )}
       </section>
-
-      {confirmDeleteFile && (
+            {confirmDeleteFile && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
           <div className="w-full max-w-md rounded-3xl border border-white/10 bg-[#0f172a] p-6 shadow-2xl">
             <div className="flex items-start justify-between gap-4">
@@ -948,8 +1023,7 @@ export default function DashboardFilesPage() {
                 </h3>
 
                 <p className="mt-2 text-sm text-gray-400">
-                  Vuoi eliminare
-                  definitivamente:
+                  Vuoi eliminare definitivamente:
                 </p>
 
                 <p className="mt-2 break-words font-semibold text-white">
@@ -961,9 +1035,7 @@ export default function DashboardFilesPage() {
               <button
                 type="button"
                 onClick={() =>
-                  setConfirmDeleteFile(
-                    null,
-                  )
+                  setConfirmDeleteFile(null)
                 }
                 disabled={
                   deletingId !== null
@@ -976,17 +1048,14 @@ export default function DashboardFilesPage() {
             </div>
 
             <p className="mt-4 text-sm text-red-300">
-              Questa operazione non può
-              essere annullata.
+              Questa operazione non può essere annullata.
             </p>
 
             <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
               <button
                 type="button"
                 onClick={() =>
-                  setConfirmDeleteFile(
-                    null,
-                  )
+                  setConfirmDeleteFile(null)
                 }
                 disabled={
                   deletingId !== null
