@@ -1,14 +1,14 @@
 "use client";
 
+import ResponsiveChartContainer from "@/components/dashboard/ResponsiveChartContainer";
 import {
-  LineChart,
+  CartesianGrid,
+  Legend,
   Line,
+  LineChart,
+  Tooltip,
   XAxis,
   YAxis,
-  Tooltip,
-  CartesianGrid,
-  ResponsiveContainer,
-  Legend,
 } from "recharts";
 
 type Transaction = {
@@ -16,94 +16,239 @@ type Transaction = {
   type: "INCOME" | "EXPENSE";
   category: string;
   amountCents: number;
-  date: string; // ISO date
+  date: string;
 };
+
+type DonationsPoint = {
+  month: string;
+  donations: number;
+  membership: number;
+};
+
+function formatMonth(value: unknown) {
+  const month = String(value);
+
+  if (/^\d{4}-\d{2}$/.test(month)) {
+    const [year, monthNumber] = month.split("-");
+    return `${monthNumber}/${year}`;
+  }
+
+  return month;
+}
+
+function formatEuro(value: unknown) {
+  const number = Number(value);
+
+  if (!Number.isFinite(number)) {
+    return String(value);
+  }
+
+  return new Intl.NumberFormat("it-IT", {
+    style: "currency",
+    currency: "EUR",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(number);
+}
+
+function buildData(
+  transactions: Transaction[],
+): DonationsPoint[] {
+  const monthlyMap = new Map<
+    string,
+    {
+      donations: number;
+      membership: number;
+    }
+  >();
+
+  for (const transaction of transactions) {
+    if (transaction.type !== "INCOME") {
+      continue;
+    }
+
+    const parsedDate = new Date(transaction.date);
+
+    if (Number.isNaN(parsedDate.getTime())) {
+      continue;
+    }
+
+    const month = parsedDate.toISOString().slice(0, 7);
+
+    const amount = Number(transaction.amountCents);
+
+    if (!Number.isFinite(amount)) {
+      continue;
+    }
+
+    const current = monthlyMap.get(month) ?? {
+      donations: 0,
+      membership: 0,
+    };
+
+    const category = String(
+      transaction.category ?? "",
+    ).trim().toLowerCase();
+
+    const value = amount / 100;
+
+    if (
+      category.includes("donazione") ||
+      category.includes("donazioni")
+    ) {
+      current.donations += value;
+    }
+
+    if (
+      category.includes("quota") ||
+      category.includes("quote") ||
+      category.includes("associativa") ||
+      category.includes("associative")
+    ) {
+      current.membership += value;
+    }
+
+    monthlyMap.set(month, current);
+  }
+
+  return Array.from(monthlyMap.entries())
+    .sort(([first], [second]) =>
+      first.localeCompare(second),
+    )
+    .map(([month, values]) => ({
+      month,
+      donations: values.donations,
+      membership: values.membership,
+    }));
+}
 
 export default function FinanceDonationsChart({
   transactions,
 }: {
   transactions: Transaction[];
 }) {
-  // Raggruppa per mese
-  const monthlyMap: Record<
-    string,
-    { donations: number; membership: number }
-  > = {};
-
-  transactions.forEach((t) => {
-    if (t.type !== "INCOME") return;
-
-    const month = t.date.slice(0, 7); // "2026-07"
-
-    if (!monthlyMap[month]) {
-      monthlyMap[month] = { donations: 0, membership: 0 };
-    }
-
-    const amount = t.amountCents / 100;
-
-    if (t.category.toLowerCase().includes("donazione")) {
-      monthlyMap[month].donations += amount;
-    }
-
-    if (
-      t.category.toLowerCase().includes("quota") ||
-      t.category.toLowerCase().includes("associativa")
-    ) {
-      monthlyMap[month].membership += amount;
-    }
-  });
-
-  const data = Object.entries(monthlyMap).map(([month, values]) => ({
-    month,
-    donations: values.donations,
-    membership: values.membership,
-  }));
+  const data = buildData(transactions);
 
   return (
-    <div className="rounded-xl border bg-white p-6 shadow-sm">
-      <h2 className="text-lg font-semibold mb-4">
-        Donazioni vs Quote Associative
-      </h2>
+    <section className="min-w-0 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+      <div className="mb-5">
+        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-blue-600">
+          Finanze
+        </p>
 
-      <div className="h-[350px]">
-        <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={data}>
-            <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+        <h2 className="mt-1 text-lg font-semibold text-slate-900">
+          Donazioni vs quote associative
+        </h2>
 
-            <XAxis
-              dataKey="month"
-              tick={{ fontSize: 12 }}
-              tickFormatter={(m) => m.slice(5)} // mostra solo mese
-            />
-
-            <YAxis
-              tick={{ fontSize: 12 }}
-              tickFormatter={(v) => `€${v}`}
-            />
-
-            <Tooltip formatter={(v) => `€${v}`} />
-            <Legend />
-
-            <Line
-              type="monotone"
-              dataKey="donations"
-              name="Donazioni"
-              stroke="#16a34a"
-              strokeWidth={2}
-              dot={false}
-            />
-
-            <Line
-              type="monotone"
-              dataKey="membership"
-              name="Quote Associative"
-              stroke="#2563eb"
-              strokeWidth={2}
-              dot={false}
-            />
-          </LineChart>
-        </ResponsiveContainer>
+        <p className="mt-1 text-sm text-slate-500">
+          Confronto mensile tra donazioni e quote associative.
+        </p>
       </div>
-    </div>
+
+      {data.length === 0 ? (
+        <div className="flex min-h-[300px] items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50 px-6 text-center">
+          <div>
+            <p className="font-medium text-slate-700">
+              Nessun dato disponibile
+            </p>
+
+            <p className="mt-1 text-sm text-slate-500">
+              Registra donazioni o quote associative per visualizzare
+              l&apos;andamento.
+            </p>
+          </div>
+        </div>
+      ) : (
+        <ResponsiveChartContainer minHeight={320}>
+          {({ width, height }) => (
+            <LineChart
+              width={width}
+              height={height}
+              data={data}
+              margin={{
+                top: 8,
+                right: 12,
+                left: 8,
+                bottom: 8,
+              }}
+            >
+              <CartesianGrid
+                strokeDasharray="3 3"
+                stroke="#e5e7eb"
+              />
+
+              <XAxis
+                dataKey="month"
+                stroke="#94a3b8"
+                tick={{
+                  fill: "#64748b",
+                  fontSize: 12,
+                }}
+                tickFormatter={formatMonth}
+                minTickGap={24}
+              />
+
+              <YAxis
+                stroke="#94a3b8"
+                tick={{
+                  fill: "#64748b",
+                  fontSize: 12,
+                }}
+                tickFormatter={formatEuro}
+                width={76}
+              />
+
+              <Tooltip
+                contentStyle={{
+                  backgroundColor: "#ffffff",
+                  border: "1px solid #e2e8f0",
+                  borderRadius: "12px",
+                  boxShadow:
+                    "0 10px 25px rgba(15, 23, 42, 0.10)",
+                }}
+                labelStyle={{
+                  color: "#0f172a",
+                  fontWeight: 600,
+                  marginBottom: 6,
+                }}
+                labelFormatter={(value) =>
+                  `Mese: ${formatMonth(value)}`
+                }
+                formatter={(value, name) => [
+                  formatEuro(value),
+                  name,
+                ]}
+              />
+
+              <Legend
+                wrapperStyle={{
+                  paddingTop: 12,
+                }}
+              />
+
+              <Line
+                type="monotone"
+                dataKey="donations"
+                name="Donazioni"
+                stroke="#16a34a"
+                strokeWidth={2.5}
+                dot={false}
+                activeDot={{ r: 5 }}
+              />
+
+              <Line
+                type="monotone"
+                dataKey="membership"
+                name="Quote associative"
+                stroke="#2563eb"
+                strokeWidth={2.5}
+                dot={false}
+                activeDot={{ r: 5 }}
+              />
+            </LineChart>
+          )}
+        </ResponsiveChartContainer>
+      )}
+    </section>
   );
 }
