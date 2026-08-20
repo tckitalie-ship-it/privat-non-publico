@@ -68,7 +68,7 @@ function formatEuro(value: unknown) {
   const number = Number(value);
 
   if (!Number.isFinite(number)) {
-    return String(value);
+    return "€ 0,00";
   }
 
   return new Intl.NumberFormat("it-IT", {
@@ -79,7 +79,9 @@ function formatEuro(value: unknown) {
   }).format(number);
 }
 
-function buildDailyData(transactions: Transaction[]): DailyPoint[] {
+function buildDailyData(
+  transactions: Transaction[],
+): DailyPoint[] {
   const dailyMap = new Map<
     string,
     {
@@ -95,18 +97,18 @@ function buildDailyData(transactions: Transaction[]): DailyPoint[] {
       continue;
     }
 
+    const amount = Number(transaction.amountCents);
+
+    if (!Number.isFinite(amount)) {
+      continue;
+    }
+
     const day = parsedDate.toISOString().slice(0, 10);
 
     const current = dailyMap.get(day) ?? {
       income: 0,
       expense: 0,
     };
-
-    const amount = Number(transaction.amountCents);
-
-    if (!Number.isFinite(amount)) {
-      continue;
-    }
 
     if (transaction.type === "INCOME") {
       current.income += amount / 100;
@@ -118,8 +120,8 @@ function buildDailyData(transactions: Transaction[]): DailyPoint[] {
   }
 
   return Array.from(dailyMap.entries())
-    .sort(([firstDay], [secondDay]) =>
-      firstDay.localeCompare(secondDay),
+    .sort(([first], [second]) =>
+      first.localeCompare(second),
     )
     .map(([day, values]) => ({
       day,
@@ -136,10 +138,8 @@ export default function FinanceDailyChart({
 }) {
   const data = buildDailyData(transactions);
 
-  const hasData = data.length > 0;
-
   return (
-    <section className="min-w-0 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+    <section className="min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
       <div className="mb-5">
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-blue-600">
           Finanze
@@ -154,7 +154,7 @@ export default function FinanceDailyChart({
         </p>
       </div>
 
-      {!hasData ? (
+      {data.length === 0 ? (
         <div className="flex min-h-[300px] items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50 px-6 text-center">
           <div>
             <p className="font-medium text-slate-700">
@@ -183,6 +183,7 @@ export default function FinanceDailyChart({
               <CartesianGrid
                 strokeDasharray="3 3"
                 stroke="#e5e7eb"
+                vertical={false}
               />
 
               <XAxis
@@ -194,6 +195,10 @@ export default function FinanceDailyChart({
                 }}
                 tickFormatter={formatDate}
                 minTickGap={24}
+                axisLine={{
+                  stroke: "#e2e8f0",
+                }}
+                tickLine={false}
               />
 
               <YAxis
@@ -203,10 +208,16 @@ export default function FinanceDailyChart({
                   fontSize: 12,
                 }}
                 tickFormatter={formatEuro}
-                width={76}
+                width={80}
+                axisLine={false}
+                tickLine={false}
               />
 
               <Tooltip
+                cursor={{
+                  stroke: "#94a3b8",
+                  strokeDasharray: "4 4",
+                }}
                 contentStyle={{
                   backgroundColor: "#ffffff",
                   border: "1px solid #e2e8f0",
@@ -218,6 +229,9 @@ export default function FinanceDailyChart({
                   color: "#0f172a",
                   fontWeight: 600,
                   marginBottom: 6,
+                }}
+                itemStyle={{
+                  color: "#334155",
                 }}
                 labelFormatter={(value) =>
                   formatDateLong(value)
