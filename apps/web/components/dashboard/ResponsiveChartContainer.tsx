@@ -6,11 +6,13 @@ import React, {
   useState,
 } from "react";
 
+type ChartSize = {
+  width: number;
+  height: number;
+};
+
 type ResponsiveChartContainerProps = {
-  children: (size: {
-    width: number;
-    height: number;
-  }) => React.ReactNode;
+  children: (size: ChartSize) => React.ReactNode;
   minHeight?: number;
 };
 
@@ -19,7 +21,11 @@ export default function ResponsiveChartContainer({
   minHeight = 280,
 }: ResponsiveChartContainerProps) {
   const ref = useRef<HTMLDivElement>(null);
-  const [width, setWidth] = useState(0);
+
+  const [size, setSize] = useState<ChartSize>({
+    width: 0,
+    height: minHeight,
+  });
 
   useEffect(() => {
     const element = ref.current;
@@ -28,20 +34,34 @@ export default function ResponsiveChartContainer({
       return;
     }
 
-    const updateWidth = () => {
-      const nextWidth = element.getBoundingClientRect().width;
+    const updateSize = () => {
+      const rect = element.getBoundingClientRect();
 
-      if (nextWidth > 0) {
-        setWidth(nextWidth);
+      const nextWidth = Math.round(rect.width);
+      const nextHeight = Math.round(rect.height);
+
+      if (nextWidth <= 0 || nextHeight <= 0) {
+        return;
       }
+
+      setSize((current) => {
+        if (
+          current.width === nextWidth &&
+          current.height === nextHeight
+        ) {
+          return current;
+        }
+
+        return {
+          width: nextWidth,
+          height: nextHeight,
+        };
+      });
     };
 
-    updateWidth();
+    updateSize();
 
-    const observer = new ResizeObserver(() => {
-      updateWidth();
-    });
-
+    const observer = new ResizeObserver(updateSize);
     observer.observe(element);
 
     return () => {
@@ -52,14 +72,12 @@ export default function ResponsiveChartContainer({
   return (
     <div
       ref={ref}
-      className="w-full overflow-hidden"
-      style={{ height: minHeight }}
+      className="w-full min-w-0 overflow-hidden"
+      style={{ minHeight }}
     >
-      {width > 0 &&
-        children({
-          width,
-          height: minHeight,
-        })}
+      {size.width > 0 &&
+        size.height > 0 &&
+        children(size)}
     </div>
   );
 }
