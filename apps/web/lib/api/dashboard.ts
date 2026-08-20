@@ -77,3 +77,22 @@ export async function fetchEventsTrend(): Promise<MembersTrendItem[]> {
 export async function fetchMembersTrend(): Promise<MembersTrendItem[]> {
   return authenticatedGet("/dashboard/events-trend");
 }
+export interface LatestTransaction {
+  id: string;
+  title: string | null;
+  description: string | null;
+  category: string | null;
+  type: "INCOME" | "EXPENSE";
+  amountCents: number;
+  date: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export async function fetchLatestTransactions(): Promise<LatestTransaction[]> {
+  const data = await authenticatedGet(
+    "/dashboard/latest-transactions",
+  );
+
+  return Array.isArray(data) ? data : [];
+}

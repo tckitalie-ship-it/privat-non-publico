@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
@@ -10,11 +10,7 @@ import {
   CreditCard,
 } from "lucide-react";
 
-import {
-  API_URL,
-  getAccessToken,
-} from "@/lib/api";
-
+import { fetchLatestTransactions } from "@/lib/api/dashboard";
 type ApiTransaction = {
   id: string;
   title: string | null;
@@ -71,56 +67,14 @@ export default function LatestTransactions() {
     let cancelled = false;
 
     async function loadTransactions() {
-      const token = getAccessToken();
-
-      if (!token) {
-        if (!cancelled) {
-          setTransactions([]);
-          setError("Sessione non disponibile");
-          setLoading(false);
-        }
-
-        return;
-      }
-
       try {
         setLoading(true);
         setError(null);
 
-        const response = await fetch(
-          `${API_URL}/dashboard/latest-transactions`,
-          {
-            headers: {
-              Accept: "application/json",
-              Authorization: `Bearer ${token}`,
-            },
-            cache: "no-store",
-          },
-        );
-
-        const data = await response
-          .json()
-          .catch(() => null);
-
-        if (!response.ok) {
-          const message = Array.isArray(
-            data?.message,
-          )
-            ? data.message.join(", ")
-            : data?.message;
-
-          throw new Error(
-            message ||
-              `Errore caricamento transazioni (${response.status})`,
-          );
-        }
+        const data = await fetchLatestTransactions();
 
         if (!cancelled) {
-          setTransactions(
-            Array.isArray(data)
-              ? data.slice(0, 8)
-              : [],
-          );
+          setTransactions(data.slice(0, 8));
         }
       } catch (error) {
         console.error(
@@ -150,7 +104,6 @@ export default function LatestTransactions() {
       cancelled = true;
     };
   }, []);
-
   return (
     <section className="overflow-hidden rounded-3xl border border-white/10 bg-[#0f172a] shadow-xl">
       <div className="flex items-center justify-between gap-4 border-b border-white/10 px-8 py-6">
@@ -403,7 +356,7 @@ export default function LatestTransactions() {
                         </span>
 
                         <span className="text-gray-700">
-                          •
+                          â€¢
                         </span>
 
                         <span>
