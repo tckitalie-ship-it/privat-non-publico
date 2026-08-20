@@ -15,30 +15,16 @@ type RevenuePoint = {
   income: number;
 };
 
-type ChartPoint = {
-  month: string;
-  income: number;
-};
-
 function formatMonth(value: unknown) {
   const month = String(value);
 
   if (/^\d{4}-\d{2}$/.test(month)) {
     const [year, monthNumber] = month.split("-");
+
     return `${monthNumber}/${year}`;
   }
 
   return month;
-}
-
-function centsToEuro(value: unknown) {
-  const number = Number(value);
-
-  if (!Number.isFinite(number)) {
-    return 0;
-  }
-
-  return number / 100;
 }
 
 function formatEuro(value: unknown) {
@@ -56,15 +42,28 @@ function formatEuro(value: unknown) {
   }).format(number);
 }
 
+function normalizeData(data: RevenuePoint[]) {
+  return data
+    .map((item) => ({
+      month: String(item.month),
+      income: Number(item.income) / 100,
+    }))
+    .filter(
+      (item) =>
+        item.month.trim().length > 0 &&
+        Number.isFinite(item.income),
+    )
+    .sort((first, second) =>
+      first.month.localeCompare(second.month),
+    );
+}
+
 export default function RevenueChart({
   data,
 }: {
   data: RevenuePoint[];
 }) {
-  const formattedData: ChartPoint[] = data.map((item) => ({
-    month: item.month,
-    income: centsToEuro(item.income),
-  }));
+  const formattedData = normalizeData(data);
 
   return (
     <section className="min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
