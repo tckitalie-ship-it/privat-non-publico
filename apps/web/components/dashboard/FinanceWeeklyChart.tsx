@@ -40,7 +40,6 @@ function getISOWeek(dateString: string) {
   );
 
   const weekYear = target.getFullYear();
-
   const firstThursday = new Date(weekYear, 0, 4);
 
   firstThursday.setHours(0, 0, 0, 0);
@@ -57,7 +56,6 @@ function getISOWeek(dateString: string) {
 
 function formatWeek(value: unknown) {
   const week = String(value);
-
   const match = week.match(/^(\d{4})-W(\d{2})$/);
 
   if (!match) {
@@ -71,7 +69,7 @@ function formatEuro(value: unknown) {
   const number = Number(value);
 
   if (!Number.isFinite(number)) {
-    return String(value);
+    return "€ 0,00";
   }
 
   return new Intl.NumberFormat("it-IT", {
@@ -140,7 +138,7 @@ export default function FinanceWeeklyChart({
   const data = buildWeeklyData(transactions);
 
   return (
-    <section className="min-w-0 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+    <section className="min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
       <div className="mb-5">
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-blue-600">
           Finanze
@@ -184,6 +182,7 @@ export default function FinanceWeeklyChart({
               <CartesianGrid
                 strokeDasharray="3 3"
                 stroke="#e5e7eb"
+                vertical={false}
               />
 
               <XAxis
@@ -195,6 +194,10 @@ export default function FinanceWeeklyChart({
                 }}
                 tickFormatter={formatWeek}
                 minTickGap={24}
+                axisLine={{
+                  stroke: "#e2e8f0",
+                }}
+                tickLine={false}
               />
 
               <YAxis
@@ -204,10 +207,16 @@ export default function FinanceWeeklyChart({
                   fontSize: 12,
                 }}
                 tickFormatter={formatEuro}
-                width={76}
+                width={80}
+                axisLine={false}
+                tickLine={false}
               />
 
               <Tooltip
+                cursor={{
+                  stroke: "#94a3b8",
+                  strokeDasharray: "4 4",
+                }}
                 contentStyle={{
                   backgroundColor: "#ffffff",
                   border: "1px solid #e2e8f0",
@@ -219,6 +228,9 @@ export default function FinanceWeeklyChart({
                   color: "#0f172a",
                   fontWeight: 600,
                   marginBottom: 6,
+                }}
+                itemStyle={{
+                  color: "#334155",
                 }}
                 labelFormatter={(value) =>
                   `Settimana ${formatWeek(value)}`
