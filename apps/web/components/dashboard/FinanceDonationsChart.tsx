@@ -64,57 +64,59 @@ function buildData(
   >();
 
   for (const transaction of transactions) {
-    if (transaction.type !== "INCOME") {
-      continue;
-    }
-
-    const parsedDate = new Date(transaction.date);
-
-    if (Number.isNaN(parsedDate.getTime())) {
-      continue;
-    }
-
-    const amount = Number(transaction.amountCents);
-
-    if (!Number.isFinite(amount)) {
-      continue;
-    }
-
-    const month = parsedDate.toISOString().slice(0, 7);
-
-    const current = monthlyMap.get(month) ?? {
-      donations: 0,
-      membership: 0,
-    };
-
-    const category = String(
-      transaction.category ?? "",
-    )
-      .trim()
-      .toLowerCase();
-
-    const value = amount / 100;
-
-    const isDonation =
-      category.includes("donazione") ||
-      category.includes("donazioni");
-
-    const isMembership =
-      category.includes("quota") ||
-      category.includes("quote") ||
-      category.includes("associativa") ||
-      category.includes("associative");
-
-    if (isDonation) {
-      current.donations += value;
-    }
-
-    if (isMembership) {
-      current.membership += value;
-    }
-
-    monthlyMap.set(month, current);
+  if (transaction.type !== "INCOME") {
+    continue;
   }
+
+  const parsedDate = new Date(transaction.date);
+
+  if (Number.isNaN(parsedDate.getTime())) {
+    continue;
+  }
+
+  const amount = Number(transaction.amountCents);
+
+  if (!Number.isFinite(amount)) {
+    continue;
+  }
+
+  const category = String(transaction.category ?? "")
+    .trim()
+    .toLowerCase();
+
+  const value = amount / 100;
+
+  const isDonation =
+    category.includes("donazione") ||
+    category.includes("donazioni");
+
+  const isMembership =
+    category.includes("quota") ||
+    category.includes("quote") ||
+    category.includes("associativa") ||
+    category.includes("associative");
+
+  if (!isDonation && !isMembership) {
+    continue;
+  }
+
+  const month = parsedDate.toISOString().slice(0, 7);
+
+  const current = monthlyMap.get(month) ?? {
+    donations: 0,
+    membership: 0,
+  };
+
+  if (isDonation) {
+    current.donations += value;
+  }
+
+  if (isMembership) {
+    current.membership += value;
+  }
+
+  monthlyMap.set(month, current);
+}
 
   return Array.from(monthlyMap.entries())
     .sort(([first], [second]) =>
