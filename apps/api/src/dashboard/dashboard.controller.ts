@@ -179,7 +179,18 @@ export class DashboardController {
       userId,
     );
   }
+   @Get("members-trend")
+async membersTrend(
+  @CurrentUser() user: JwtUser,
+) {
+  const { userId, associationId } =
+    await this.resolveContext(user);
 
+  return this.dashboard.getMembersTrend(
+    associationId,
+    userId,
+  );
+}
   @Get("events-trend")
   async eventsTrend(
     @CurrentUser() user: JwtUser,
