@@ -20,9 +20,13 @@ type Transaction = {
 
 type HeatmapPoint = {
   day: string;
-  value: number;
+  income: number;
+  expense: number;
+  balance: number;
+  absolute: number;
   month: number;
   dayOfMonth: number;
+  size: number;
 };
 
 function formatEuro(value: unknown) {
@@ -54,10 +58,28 @@ function formatDay(value: string) {
   }).format(date);
 }
 
+function formatMonth(value: unknown) {
+  const month = Number(value);
+
+  if (!Number.isInteger(month) || month < 1 || month > 12) {
+    return String(value);
+  }
+
+  return new Intl.DateTimeFormat("it-IT", {
+    month: "short",
+  }).format(new Date(2026, month - 1, 1));
+}
+
 function buildHeatmapData(
   transactions: Transaction[],
 ): HeatmapPoint[] {
-  const dailyMap = new Map<string, number>();
+  const dailyMap = new Map<
+    string,
+    {
+      income: number;
+      expense: number;
+    }
+  >();
 
   for (const transaction of transactions) {
     const parsedDate = new Date(transaction.date);
@@ -73,43 +95,61 @@ function buildHeatmapData(
       continue;
     }
 
-    const current = dailyMap.get(day) ?? 0;
+    const current = dailyMap.get(day) ?? {
+      income: 0,
+      expense: 0,
+    };
 
-    dailyMap.set(day, current + amount / 100);
+    if (transaction.type === "INCOME") {
+      current.income += amount / 100;
+    } else {
+      current.expense += amount / 100;
+    }
+
+    dailyMap.set(day, current);
   }
 
   return Array.from(dailyMap.entries())
     .sort(([first], [second]) =>
       first.localeCompare(second),
     )
-    .map(([day, value]) => {
+    .map(([day, values]) => {
       const date = new Date(`${day}T00:00:00`);
+      const balance =
+        values.income - values.expense;
 
       return {
         day,
-        value,
+        income: values.income,
+        expense: values.expense,
+        balance,
+        absolute:
+          values.income + values.expense,
         month: date.getMonth() + 1,
         dayOfMonth: date.getDate(),
+        size: 0,
       };
-    });
+    })
+    .map((point) => ({
+      ...point,
+      size: getPointSize(point.absolute),
+    }));
 }
 
 function getPointSize(value: number) {
-  const absoluteValue = Math.abs(value);
-
-  if (absoluteValue >= 1000) {
+  if (value >= 1000) {
     return 600;
   }
 
-  if (absoluteValue >= 500) {
+  if (value >= 500) {
     return 450;
   }
 
-  if (absoluteValue >= 250) {
+  if (value >= 250) {
     return 320;
   }
 
-  if (absoluteValue >= 100) {
+  if (value >= 100) {
     return 220;
   }
 
@@ -123,13 +163,8 @@ export default function FinanceHeatmapChart({
 }) {
   const data = buildHeatmapData(transactions);
 
-  const formattedData = data.map((point) => ({
-    ...point,
-    size: getPointSize(point.value),
-  }));
-
   return (
-    <section className="min-w-0 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+    <section className="min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
       <div className="mb-5">
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-blue-600">
           Finanze
@@ -140,11 +175,12 @@ export default function FinanceHeatmapChart({
         </h2>
 
         <p className="mt-1 text-sm text-slate-500">
-          Intensità dei movimenti finanziari registrati per giorno.
+          Intensità dei movimenti finanziari registrati
+          per giorno.
         </p>
       </div>
 
-      {formattedData.length === 0 ? (
+      {data.length === 0 ? (
         <div className="flex min-h-[300px] items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50 px-6 text-center">
           <div>
             <p className="font-medium text-slate-700">
@@ -179,15 +215,27 @@ export default function FinanceHeatmapChart({
                 dataKey="month"
                 name="Mese"
                 domain={[1, 12]}
-                ticks={[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]}
+                ticks={[
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6,
+                  7,
+                  8,
+                  9,
+                  10,
+                  11,
+                  12,
+                ]}
                 tick={{
                   fill: "#64748b",
                   fontSize: 12,
                 }}
-                tickFormatter={(value) =>
-                  `M${value}`
-                }
+                tickFormatter={formatMonth}
                 stroke="#94a3b8"
+                tickLine={false}
               />
 
               <YAxis
@@ -195,13 +243,23 @@ export default function FinanceHeatmapChart({
                 dataKey="dayOfMonth"
                 name="Giorno"
                 domain={[1, 31]}
-                ticks={[1, 5, 10, 15, 20, 25, 30, 31]}
+                ticks={[
+                  1,
+                  5,
+                  10,
+                  15,
+                  20,
+                  25,
+                  30,
+                  31,
+                ]}
                 tick={{
                   fill: "#64748b",
                   fontSize: 12,
                 }}
                 stroke="#94a3b8"
                 width={44}
+                tickLine={false}
               />
 
               <ZAxis
@@ -212,22 +270,9 @@ export default function FinanceHeatmapChart({
 
               <Tooltip
                 cursor={{
-                  strokeDasharray: "3 3",
+                  stroke: "#94a3b8",
+                  strokeDasharray: "4 4",
                 }}
-                contentStyle={{
-                  backgroundColor: "#ffffff",
-                  border: "1px solid #e2e8f0",
-                  borderRadius: "12px",
-                  boxShadow:
-                    "0 10px 25px rgba(15, 23, 42, 0.10)",
-                }}
-                labelStyle={{
-                  color: "#0f172a",
-                  fontWeight: 600,
-                }}
-                formatter={(value) =>
-                  formatEuro(value)
-                }
                 content={({ active, payload }) => {
                   if (
                     !active ||
@@ -238,7 +283,9 @@ export default function FinanceHeatmapChart({
                   }
 
                   const point = payload[0]
-                    ?.payload as HeatmapPoint | undefined;
+                    ?.payload as
+                    | HeatmapPoint
+                    | undefined;
 
                   if (!point) {
                     return null;
@@ -250,12 +297,35 @@ export default function FinanceHeatmapChart({
                         {formatDay(point.day)}
                       </p>
 
-                      <p className="mt-1 text-sm text-slate-600">
-                        Movimento:{" "}
-                        <span className="font-semibold text-slate-900">
-                          {formatEuro(point.value)}
-                        </span>
-                      </p>
+                      <div className="mt-2 space-y-1 text-sm">
+                        <p className="text-slate-600">
+                          Entrate:{" "}
+                          <span className="font-semibold text-slate-900">
+                            {formatEuro(point.income)}
+                          </span>
+                        </p>
+
+                        <p className="text-slate-600">
+                          Uscite:{" "}
+                          <span className="font-semibold text-slate-900">
+                            {formatEuro(point.expense)}
+                          </span>
+                        </p>
+
+                        <p className="text-slate-600">
+                          Bilancio:{" "}
+                          <span className="font-semibold text-slate-900">
+                            {formatEuro(point.balance)}
+                          </span>
+                        </p>
+
+                        <p className="border-t border-slate-100 pt-1 text-slate-500">
+                          Movimento totale:{" "}
+                          <span className="font-semibold text-slate-700">
+                            {formatEuro(point.absolute)}
+                          </span>
+                        </p>
+                      </div>
                     </div>
                   );
                 }}
@@ -263,7 +333,7 @@ export default function FinanceHeatmapChart({
 
               <Scatter
                 name="Movimenti"
-                data={formattedData}
+                data={data}
                 fill="#2563eb"
                 fillOpacity={0.75}
                 line={false}
@@ -273,7 +343,7 @@ export default function FinanceHeatmapChart({
         </ResponsiveChartContainer>
       )}
 
-      {formattedData.length > 0 && (
+      {data.length > 0 && (
         <div className="mt-4 flex flex-wrap items-center gap-3 text-xs text-slate-500">
           <span className="font-medium text-slate-600">
             Dimensione del punto:
