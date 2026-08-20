@@ -1,129 +1,273 @@
 "use client";
 
+import ResponsiveChartContainer from "@/components/dashboard/ResponsiveChartContainer";
 import {
-  LineChart,
+  CartesianGrid,
+  Legend,
   Line,
+  LineChart,
+  Tooltip,
   XAxis,
   YAxis,
-  Tooltip,
-  CartesianGrid,
-  ResponsiveContainer,
-  Legend,
 } from "recharts";
-
-// Funzione per ottenere la settimana ISO (es: 2026-W27)
-function getISOWeek(dateString: string) {
-  const date = new Date(dateString);
-  const year = date.getFullYear();
-
-  // Calcolo settimana ISO
-  const tempDate = new Date(date.getTime());
-  tempDate.setHours(0, 0, 0, 0);
-  tempDate.setDate(tempDate.getDate() + 4 - (tempDate.getDay() || 7));
-
-  const weekNumber = Math.ceil(
-    ((tempDate.getTime() - new Date(tempDate.getFullYear(), 0, 1).getTime()) /
-      86400000 +
-      1) /
-      7
-  );
-
-  return `${year}-W${weekNumber}`;
-}
 
 type Transaction = {
   id: string;
   type: "INCOME" | "EXPENSE";
   amountCents: number;
-  date: string; // ISO date
+  date: string;
 };
+
+type WeeklyPoint = {
+  week: string;
+  income: number;
+  expense: number;
+  balance: number;
+};
+
+function getISOWeek(dateString: string) {
+  const date = new Date(dateString);
+
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+
+  const target = new Date(date.getTime());
+
+  target.setHours(0, 0, 0, 0);
+  target.setDate(
+    target.getDate() + 3 - ((target.getDay() + 6) % 7),
+  );
+
+  const weekYear = target.getFullYear();
+
+  const firstThursday = new Date(weekYear, 0, 4);
+
+  firstThursday.setHours(0, 0, 0, 0);
+
+  const weekNumber =
+    1 +
+    Math.round(
+      (target.getTime() - firstThursday.getTime()) /
+        604800000,
+    );
+
+  return `${weekYear}-W${String(weekNumber).padStart(2, "0")}`;
+}
+
+function formatWeek(value: unknown) {
+  const week = String(value);
+
+  const match = week.match(/^(\d{4})-W(\d{2})$/);
+
+  if (!match) {
+    return week;
+  }
+
+  return `S${match[2]}/${match[1]}`;
+}
+
+function formatEuro(value: unknown) {
+  const number = Number(value);
+
+  if (!Number.isFinite(number)) {
+    return String(value);
+  }
+
+  return new Intl.NumberFormat("it-IT", {
+    style: "currency",
+    currency: "EUR",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(number);
+}
+
+function buildWeeklyData(
+  transactions: Transaction[],
+): WeeklyPoint[] {
+  const weeklyMap = new Map<
+    string,
+    {
+      income: number;
+      expense: number;
+    }
+  >();
+
+  for (const transaction of transactions) {
+    const week = getISOWeek(transaction.date);
+
+    if (!week) {
+      continue;
+    }
+
+    const amount = Number(transaction.amountCents);
+
+    if (!Number.isFinite(amount)) {
+      continue;
+    }
+
+    const current = weeklyMap.get(week) ?? {
+      income: 0,
+      expense: 0,
+    };
+
+    if (transaction.type === "INCOME") {
+      current.income += amount / 100;
+    } else {
+      current.expense += amount / 100;
+    }
+
+    weeklyMap.set(week, current);
+  }
+
+  return Array.from(weeklyMap.entries())
+    .sort(([first], [second]) =>
+      first.localeCompare(second),
+    )
+    .map(([week, values]) => ({
+      week,
+      income: values.income,
+      expense: values.expense,
+      balance: values.income - values.expense,
+    }));
+}
 
 export default function FinanceWeeklyChart({
   transactions,
 }: {
   transactions: Transaction[];
 }) {
-  // Raggruppa per settimana
-  const weeklyMap: Record<
-    string,
-    { income: number; expense: number; balance: number }
-  > = {};
-
-  transactions.forEach((t) => {
-    const week = getISOWeek(t.date);
-
-    if (!weeklyMap[week]) {
-      weeklyMap[week] = { income: 0, expense: 0, balance: 0 };
-    }
-
-    if (t.type === "INCOME") {
-      weeklyMap[week].income += t.amountCents / 100;
-    } else {
-      weeklyMap[week].expense += t.amountCents / 100;
-    }
-
-    weeklyMap[week].balance =
-      weeklyMap[week].income - weeklyMap[week].expense;
-  });
-
-  const data = Object.entries(weeklyMap).map(([week, values]) => ({
-    week,
-    income: values.income,
-    expense: values.expense,
-    balance: values.balance,
-  }));
+  const data = buildWeeklyData(transactions);
 
   return (
-    <div className="rounded-xl border bg-white p-6 shadow-sm">
-      <h2 className="text-lg font-semibold mb-4">Trend Settimanale</h2>
+    <section className="min-w-0 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+      <div className="mb-5">
+        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-blue-600">
+          Finanze
+        </p>
 
-      <div className="h-[350px]">
-        <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={data}>
-            <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+        <h2 className="mt-1 text-lg font-semibold text-slate-900">
+          Trend settimanale
+        </h2>
 
-            <XAxis
-              dataKey="week"
-              tick={{ fontSize: 12 }}
-            />
-
-            <YAxis
-              tick={{ fontSize: 12 }}
-              tickFormatter={(v) => `€${v}`}
-            />
-
-            <Tooltip formatter={(v) => `€${v}`} />
-            <Legend />
-
-            <Line
-              type="monotone"
-              dataKey="income"
-              name="Entrate"
-              stroke="#16a34a"
-              strokeWidth={2}
-              dot={false}
-            />
-
-            <Line
-              type="monotone"
-              dataKey="expense"
-              name="Uscite"
-              stroke="#dc2626"
-              strokeWidth={2}
-              dot={false}
-            />
-
-            <Line
-              type="monotone"
-              dataKey="balance"
-              name="Bilancio"
-              stroke="#2563eb"
-              strokeWidth={2}
-              dot={false}
-            />
-          </LineChart>
-        </ResponsiveContainer>
+        <p className="mt-1 text-sm text-slate-500">
+          Confronto settimanale tra entrate, uscite e bilancio.
+        </p>
       </div>
-    </div>
+
+      {data.length === 0 ? (
+        <div className="flex min-h-[300px] items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50 px-6 text-center">
+          <div>
+            <p className="font-medium text-slate-700">
+              Nessun dato finanziario disponibile
+            </p>
+
+            <p className="mt-1 text-sm text-slate-500">
+              Le transazioni appariranno qui quando saranno registrate.
+            </p>
+          </div>
+        </div>
+      ) : (
+        <ResponsiveChartContainer minHeight={320}>
+          {({ width, height }) => (
+            <LineChart
+              width={width}
+              height={height}
+              data={data}
+              margin={{
+                top: 8,
+                right: 12,
+                left: 8,
+                bottom: 8,
+              }}
+            >
+              <CartesianGrid
+                strokeDasharray="3 3"
+                stroke="#e5e7eb"
+              />
+
+              <XAxis
+                dataKey="week"
+                stroke="#94a3b8"
+                tick={{
+                  fill: "#64748b",
+                  fontSize: 12,
+                }}
+                tickFormatter={formatWeek}
+                minTickGap={24}
+              />
+
+              <YAxis
+                stroke="#94a3b8"
+                tick={{
+                  fill: "#64748b",
+                  fontSize: 12,
+                }}
+                tickFormatter={formatEuro}
+                width={76}
+              />
+
+              <Tooltip
+                contentStyle={{
+                  backgroundColor: "#ffffff",
+                  border: "1px solid #e2e8f0",
+                  borderRadius: "12px",
+                  boxShadow:
+                    "0 10px 25px rgba(15, 23, 42, 0.10)",
+                }}
+                labelStyle={{
+                  color: "#0f172a",
+                  fontWeight: 600,
+                  marginBottom: 6,
+                }}
+                labelFormatter={(value) =>
+                  `Settimana ${formatWeek(value)}`
+                }
+                formatter={(value, name) => [
+                  formatEuro(value),
+                  name,
+                ]}
+              />
+
+              <Legend
+                wrapperStyle={{
+                  paddingTop: 12,
+                }}
+              />
+
+              <Line
+                type="monotone"
+                dataKey="income"
+                name="Entrate"
+                stroke="#16a34a"
+                strokeWidth={2.5}
+                dot={false}
+                activeDot={{ r: 5 }}
+              />
+
+              <Line
+                type="monotone"
+                dataKey="expense"
+                name="Uscite"
+                stroke="#dc2626"
+                strokeWidth={2.5}
+                dot={false}
+                activeDot={{ r: 5 }}
+              />
+
+              <Line
+                type="monotone"
+                dataKey="balance"
+                name="Bilancio"
+                stroke="#2563eb"
+                strokeWidth={3}
+                dot={false}
+                activeDot={{ r: 5 }}
+              />
+            </LineChart>
+          )}
+        </ResponsiveChartContainer>
+      )}
+    </section>
   );
 }
