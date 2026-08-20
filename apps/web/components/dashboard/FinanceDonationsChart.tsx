@@ -14,7 +14,7 @@ import {
 type Transaction = {
   id: string;
   type: "INCOME" | "EXPENSE";
-  category: string;
+  category: string | null;
   amountCents: number;
   date: string;
 };
@@ -30,6 +30,7 @@ function formatMonth(value: unknown) {
 
   if (/^\d{4}-\d{2}$/.test(month)) {
     const [year, monthNumber] = month.split("-");
+
     return `${monthNumber}/${year}`;
   }
 
@@ -73,13 +74,13 @@ function buildData(
       continue;
     }
 
-    const month = parsedDate.toISOString().slice(0, 7);
-
     const amount = Number(transaction.amountCents);
 
     if (!Number.isFinite(amount)) {
       continue;
     }
+
+    const month = parsedDate.toISOString().slice(0, 7);
 
     const current = monthlyMap.get(month) ?? {
       donations: 0,
@@ -88,23 +89,27 @@ function buildData(
 
     const category = String(
       transaction.category ?? "",
-    ).trim().toLowerCase();
+    )
+      .trim()
+      .toLowerCase();
 
     const value = amount / 100;
 
-    if (
+    const isDonation =
       category.includes("donazione") ||
-      category.includes("donazioni")
-    ) {
-      current.donations += value;
-    }
+      category.includes("donazioni");
 
-    if (
+    const isMembership =
       category.includes("quota") ||
       category.includes("quote") ||
       category.includes("associativa") ||
-      category.includes("associative")
-    ) {
+      category.includes("associative");
+
+    if (isDonation) {
+      current.donations += value;
+    }
+
+    if (isMembership) {
       current.membership += value;
     }
 
@@ -130,7 +135,7 @@ export default function FinanceDonationsChart({
   const data = buildData(transactions);
 
   return (
-    <section className="min-w-0 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+    <section className="min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
       <div className="mb-5">
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-blue-600">
           Finanze
@@ -153,8 +158,8 @@ export default function FinanceDonationsChart({
             </p>
 
             <p className="mt-1 text-sm text-slate-500">
-              Registra donazioni o quote associative per visualizzare
-              l&apos;andamento.
+              Registra donazioni o quote associative per
+              visualizzare l&apos;andamento.
             </p>
           </div>
         </div>
@@ -175,6 +180,7 @@ export default function FinanceDonationsChart({
               <CartesianGrid
                 strokeDasharray="3 3"
                 stroke="#e5e7eb"
+                vertical={false}
               />
 
               <XAxis
@@ -185,6 +191,10 @@ export default function FinanceDonationsChart({
                   fontSize: 12,
                 }}
                 tickFormatter={formatMonth}
+                tickLine={false}
+                axisLine={{
+                  stroke: "#e2e8f0",
+                }}
                 minTickGap={24}
               />
 
@@ -195,21 +205,26 @@ export default function FinanceDonationsChart({
                   fontSize: 12,
                 }}
                 tickFormatter={formatEuro}
-                width={76}
+                tickLine={false}
+                axisLine={false}
+                width={80}
               />
 
               <Tooltip
                 contentStyle={{
                   backgroundColor: "#ffffff",
-                  border: "1px solid #e2e8f0",
                   borderRadius: "12px",
+                  border: "1px solid #e2e8f0",
                   boxShadow:
                     "0 10px 25px rgba(15, 23, 42, 0.10)",
                 }}
                 labelStyle={{
                   color: "#0f172a",
                   fontWeight: 600,
-                  marginBottom: 6,
+                  marginBottom: "4px",
+                }}
+                itemStyle={{
+                  color: "#334155",
                 }}
                 labelFormatter={(value) =>
                   `Mese: ${formatMonth(value)}`
@@ -222,7 +237,7 @@ export default function FinanceDonationsChart({
 
               <Legend
                 wrapperStyle={{
-                  paddingTop: 12,
+                  paddingTop: "16px",
                 }}
               />
 
