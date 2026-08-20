@@ -1,13 +1,13 @@
 "use client";
 
+import ResponsiveChartContainer from "@/components/dashboard/ResponsiveChartContainer";
 import {
-  BarChart,
   Bar,
+  BarChart,
+  CartesianGrid,
+  Tooltip,
   XAxis,
   YAxis,
-  Tooltip,
-  ResponsiveContainer,
-  CartesianGrid,
 } from "recharts";
 
 type RevenuePoint = {
@@ -25,7 +25,6 @@ function formatMonth(value: unknown) {
 
   if (/^\d{4}-\d{2}$/.test(month)) {
     const [year, monthNumber] = month.split("-");
-
     return `${monthNumber}/${year}`;
   }
 
@@ -62,39 +61,46 @@ export default function RevenueChart({
 }: {
   data: RevenuePoint[];
 }) {
-  const formattedData: ChartPoint[] = data.map(
-    (item) => ({
-      month: item.month,
-      income: centsToEuro(item.income),
-    }),
-  );
+  const formattedData: ChartPoint[] = data.map((item) => ({
+    month: item.month,
+    income: centsToEuro(item.income),
+  }));
 
   return (
-    <section className="min-w-0 overflow-hidden rounded-2xl border border-white/10 bg-[#1a1f2e] p-6 shadow-xl">
+    <section className="min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
       <div className="mb-5">
-        <h2 className="text-lg font-semibold text-white">
+        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-blue-600">
+          Finanze
+        </p>
+
+        <h2 className="mt-1 text-lg font-semibold text-slate-900">
           Entrate mensili
         </h2>
 
-        <p className="mt-1 text-sm text-gray-400">
+        <p className="mt-1 text-sm text-slate-500">
           Andamento delle entrate registrate mese per mese.
         </p>
       </div>
 
       {formattedData.length === 0 ? (
-        <div className="flex h-[350px] items-center justify-center rounded-xl border border-dashed border-white/10 bg-white/[0.02]">
-          <p className="text-sm text-gray-400">
-            Nessun dato sulle entrate disponibile.
-          </p>
+        <div className="flex min-h-[300px] items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50 px-6 text-center">
+          <div>
+            <p className="font-medium text-slate-700">
+              Nessun dato sulle entrate disponibile
+            </p>
+
+            <p className="mt-1 text-sm text-slate-500">
+              Le entrate registrate appariranno qui quando saranno
+              disponibili.
+            </p>
+          </div>
         </div>
       ) : (
-        <div className="h-[350px] min-w-0">
-          <ResponsiveContainer
-            width="100%"
-            height="100%"
-            minWidth={0}
-          >
+        <ResponsiveChartContainer minHeight={320}>
+          {({ width, height }) => (
             <BarChart
+              width={width}
+              height={height}
               data={formattedData}
               margin={{
                 top: 8,
@@ -102,76 +108,76 @@ export default function RevenueChart({
                 left: 8,
                 bottom: 8,
               }}
-              barSize={40}
             >
               <CartesianGrid
                 strokeDasharray="3 3"
-                stroke="rgba(255,255,255,0.08)"
+                stroke="#e5e7eb"
                 vertical={false}
               />
 
               <XAxis
                 dataKey="month"
+                stroke="#94a3b8"
                 tick={{
-                  fill: "#9ca3af",
+                  fill: "#64748b",
                   fontSize: 12,
                 }}
                 axisLine={{
-                  stroke: "rgba(255,255,255,0.12)",
+                  stroke: "#e2e8f0",
                 }}
                 tickLine={false}
                 tickFormatter={formatMonth}
+                minTickGap={24}
               />
 
               <YAxis
+                stroke="#94a3b8"
                 tick={{
-                  fill: "#9ca3af",
+                  fill: "#64748b",
                   fontSize: 12,
                 }}
                 axisLine={false}
                 tickLine={false}
-                width={75}
+                width={80}
                 tickFormatter={formatEuro}
               />
 
               <Tooltip
                 contentStyle={{
-                  backgroundColor: "#1f2433",
-                  border: "1px solid rgba(255,255,255,0.10)",
+                  backgroundColor: "#ffffff",
+                  border: "1px solid #e2e8f0",
                   borderRadius: "12px",
                   boxShadow:
-                    "0 10px 25px rgba(0,0,0,0.25)",
+                    "0 10px 25px rgba(15, 23, 42, 0.10)",
                 }}
                 labelStyle={{
-                  color: "#ffffff",
+                  color: "#0f172a",
                   fontWeight: 600,
                   marginBottom: "4px",
                 }}
                 itemStyle={{
-                  color: "#60a5fa",
+                  color: "#2563eb",
                 }}
                 cursor={{
-                  fill: "rgba(255,255,255,0.04)",
+                  fill: "#f8fafc",
                 }}
                 labelFormatter={(value) =>
                   `Mese: ${formatMonth(value)}`
                 }
-                formatter={(value) =>
-                  formatEuro(value)
-                }
+                formatter={(value) => formatEuro(value)}
               />
 
               <Bar
                 dataKey="income"
                 name="Entrate"
-                fill="#4ea1ff"
+                fill="#2563eb"
                 radius={[6, 6, 0, 0]}
                 animationDuration={800}
                 maxBarSize={44}
               />
             </BarChart>
-          </ResponsiveContainer>
-        </div>
+          )}
+        </ResponsiveChartContainer>
       )}
     </section>
   );
