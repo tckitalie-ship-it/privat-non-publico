@@ -1,21 +1,20 @@
 "use client";
 
-import { ReactNode, useEffect, useRef, useState } from "react";
+import { ReactNode } from "react";
 import {
-  LineChart,
-  Line,
-  BarChart,
   Bar,
+  BarChart,
+  CartesianGrid,
+  Legend,
+  Line,
+  LineChart,
+  Tooltip,
   XAxis,
   YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
 } from "recharts";
+import ResponsiveChartContainer from "@/components/dashboard/ResponsiveChartContainer";
 
-/* ============================================================
-   CARD GRAFICO
-============================================================ */
+type ChartData = Record<string, unknown>;
 
 function ChartCard({
   title,
@@ -27,57 +26,21 @@ function ChartCard({
   children: ReactNode;
 }) {
   return (
-    <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm transition-all duration-300 hover:shadow-lg">
+    <section className="min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
       <div className="mb-5">
-        <h3 className="text-lg font-semibold text-slate-900">{title}</h3>
+        <h2 className="text-lg font-semibold text-slate-900">
+          {title}
+        </h2>
 
-        <p className="mt-1 text-sm text-slate-500">{description}</p>
+        <p className="mt-1 text-sm text-slate-500">
+          {description}
+        </p>
       </div>
 
       {children}
-    </div>
+    </section>
   );
 }
-
-/* ============================================================
-   WRAPPER CHART
-============================================================ */
-
-function ChartContainer({ children }: { children: ReactNode }) {
-  const ref = useRef<HTMLDivElement>(null);
-  const [ready, setReady] = useState(false);
-
-  useEffect(() => {
-    if (!ref.current) return;
-
-    const check = () => {
-      if (!ref.current) return;
-
-      const { width, height } = ref.current.getBoundingClientRect();
-
-      if (width > 0 && height > 0) {
-        setReady(true);
-      }
-    };
-
-    check();
-
-    const observer = new ResizeObserver(check);
-    observer.observe(ref.current);
-
-    return () => observer.disconnect();
-  }, []);
-
-  return (
-    <div ref={ref} className="h-[340px] w-full min-h-[300px] min-w-0">
-      {ready ? children : null}
-    </div>
-  );
-}
-
-/* ============================================================
-   FORMATTER UNICO
-============================================================ */
 
 function formatMonth(value: unknown) {
   const month = String(value);
@@ -90,129 +53,370 @@ function formatMonth(value: unknown) {
   return month;
 }
 
-/* ============================================================
-   REVENUE
-============================================================ */
+function formatEuro(value: unknown) {
+  const number = Number(value);
+
+  if (!Number.isFinite(number)) {
+    return "€ 0,00";
+  }
+
+  return new Intl.NumberFormat("it-IT", {
+    style: "currency",
+    currency: "EUR",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(number);
+}
+
+function formatNumber(value: unknown) {
+  const number = Number(value);
+
+  if (!Number.isFinite(number)) {
+    return "0";
+  }
+
+  return new Intl.NumberFormat("it-IT").format(number);
+}
+
+function EmptyChart({
+  message,
+}: {
+  message: string;
+}) {
+  return (
+    <div className="flex min-h-[300px] items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50 px-6 text-center">
+      <p className="text-sm text-slate-500">{message}</p>
+    </div>
+  );
+}
+
+function RevenueChartContent({
+  data,
+}: {
+  data: ChartData[];
+}) {
+  return (
+    <ResponsiveChartContainer minHeight={320}>
+      {({ width, height }) => (
+        <LineChart
+          width={width}
+          height={height}
+          data={data}
+          margin={{
+            top: 8,
+            right: 12,
+            left: 8,
+            bottom: 8,
+          }}
+        >
+          <CartesianGrid
+            strokeDasharray="3 3"
+            stroke="#e5e7eb"
+            vertical={false}
+          />
+
+          <XAxis
+            dataKey="month"
+            stroke="#94a3b8"
+            tick={{
+              fill: "#64748b",
+              fontSize: 12,
+            }}
+            tickFormatter={formatMonth}
+            axisLine={{
+              stroke: "#e2e8f0",
+            }}
+            tickLine={false}
+            minTickGap={24}
+          />
+
+          <YAxis
+            stroke="#94a3b8"
+            tick={{
+              fill: "#64748b",
+              fontSize: 12,
+            }}
+            tickFormatter={formatEuro}
+            axisLine={false}
+            tickLine={false}
+            width={80}
+          />
+
+          <Tooltip
+            contentStyle={{
+              backgroundColor: "#ffffff",
+              border: "1px solid #e2e8f0",
+              borderRadius: "12px",
+              boxShadow:
+                "0 10px 25px rgba(15, 23, 42, 0.10)",
+            }}
+            labelStyle={{
+              color: "#0f172a",
+              fontWeight: 600,
+              marginBottom: "4px",
+            }}
+            itemStyle={{
+              color: "#2563eb",
+            }}
+            cursor={{
+              stroke: "#94a3b8",
+              strokeDasharray: "4 4",
+            }}
+            labelFormatter={(value) =>
+              `Mese: ${formatMonth(value)}`
+            }
+            formatter={(value) => formatEuro(value)}
+          />
+
+          <Line
+            type="monotone"
+            dataKey="income"
+            name="Entrate"
+            stroke="#2563eb"
+            strokeWidth={3}
+            dot={false}
+            activeDot={{ r: 5 }}
+          />
+        </LineChart>
+      )}
+    </ResponsiveChartContainer>
+  );
+}
 
 export function RevenueChart({
   data = [],
 }: {
-  data?: Record<string, unknown>[];
+  data?: ChartData[];
 }) {
   return (
     <ChartCard
       title="Entrate mensili"
       description="Andamento delle entrate registrate."
     >
-      <ChartContainer>
-        <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={data}>
-            <CartesianGrid strokeDasharray="3 3" />
-
-            <XAxis
-              dataKey="month"
-              tickFormatter={formatMonth}
-            />
-
-            <YAxis />
-
-            <Tooltip
-              labelFormatter={(value) => `Mese: ${formatMonth(value)}`}
-            />
-
-            <Line
-              type="monotone"
-              dataKey="income"
-              stroke="#4f46e5"
-              strokeWidth={3}
-              dot={{ r: 4 }}
-            />
-          </LineChart>
-        </ResponsiveContainer>
-      </ChartContainer>
+      {data.length === 0 ? (
+        <EmptyChart message="Nessun dato sulle entrate disponibile." />
+      ) : (
+        <RevenueChartContent data={data} />
+      )}
     </ChartCard>
   );
 }
-
-/* ============================================================
-   FINANCE
-============================================================ */
 
 export function FinanceChart({
   data = [],
 }: {
-  data?: Record<string, unknown>[];
+  data?: ChartData[];
 }) {
   return (
     <ChartCard
       title="Entrate vs Uscite"
-      description="Confronto mensile delle operazioni."
+      description="Confronto mensile delle operazioni finanziarie."
     >
-      <ChartContainer>
-        <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={data}>
-            <CartesianGrid strokeDasharray="3 3" />
+      {data.length === 0 ? (
+        <EmptyChart message="Nessun dato finanziario disponibile." />
+      ) : (
+        <ResponsiveChartContainer minHeight={320}>
+          {({ width, height }) => (
+            <BarChart
+              width={width}
+              height={height}
+              data={data}
+              margin={{
+                top: 8,
+                right: 12,
+                left: 8,
+                bottom: 8,
+              }}
+            >
+              <CartesianGrid
+                strokeDasharray="3 3"
+                stroke="#e5e7eb"
+                vertical={false}
+              />
 
-            <XAxis
-              dataKey="month"
-              tickFormatter={formatMonth}
-            />
+              <XAxis
+                dataKey="month"
+                stroke="#94a3b8"
+                tick={{
+                  fill: "#64748b",
+                  fontSize: 12,
+                }}
+                tickFormatter={formatMonth}
+                axisLine={{
+                  stroke: "#e2e8f0",
+                }}
+                tickLine={false}
+                minTickGap={24}
+              />
 
-            <YAxis />
+              <YAxis
+                stroke="#94a3b8"
+                tick={{
+                  fill: "#64748b",
+                  fontSize: 12,
+                }}
+                tickFormatter={formatEuro}
+                axisLine={false}
+                tickLine={false}
+                width={80}
+              />
 
-            <Tooltip
-              labelFormatter={(value) => `Mese: ${formatMonth(value)}`}
-            />
+              <Tooltip
+                contentStyle={{
+                  backgroundColor: "#ffffff",
+                  border: "1px solid #e2e8f0",
+                  borderRadius: "12px",
+                  boxShadow:
+                    "0 10px 25px rgba(15, 23, 42, 0.10)",
+                }}
+                labelStyle={{
+                  color: "#0f172a",
+                  fontWeight: 600,
+                  marginBottom: "4px",
+                }}
+                itemStyle={{
+                  color: "#334155",
+                }}
+                cursor={{
+                  fill: "#f8fafc",
+                }}
+                labelFormatter={(value) =>
+                  `Mese: ${formatMonth(value)}`
+                }
+                formatter={(value) => formatEuro(value)}
+              />
 
-            <Bar dataKey="income" radius={[6, 6, 0, 0]} fill="#22c55e" />
-            <Bar dataKey="expense" radius={[6, 6, 0, 0]} fill="#ef4444" />
-          </BarChart>
-        </ResponsiveContainer>
-      </ChartContainer>
+              <Legend
+                wrapperStyle={{
+                  paddingTop: 12,
+                }}
+              />
+
+              <Bar
+                dataKey="income"
+                name="Entrate"
+                fill="#16a34a"
+                radius={[6, 6, 0, 0]}
+                maxBarSize={42}
+              />
+
+              <Bar
+                dataKey="expense"
+                name="Uscite"
+                fill="#dc2626"
+                radius={[6, 6, 0, 0]}
+                maxBarSize={42}
+              />
+            </BarChart>
+          )}
+        </ResponsiveChartContainer>
+      )}
     </ChartCard>
   );
 }
 
-/* ============================================================
-   MEMBERS
-============================================================ */
-
 export function MembersTrendChart({
   data = [],
 }: {
-  data?: Record<string, unknown>[];
+  data?: ChartData[];
 }) {
   return (
     <ChartCard
       title="Crescita membri"
-      description="Nuovi membri registrati ogni mese."
+      description="Andamento mensile del numero di membri."
     >
-      <ChartContainer>
-        <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={data}>
-            <CartesianGrid strokeDasharray="3 3" />
+      {data.length === 0 ? (
+        <EmptyChart message="Nessun dato membri disponibile." />
+      ) : (
+        <ResponsiveChartContainer minHeight={320}>
+          {({ width, height }) => (
+            <LineChart
+              width={width}
+              height={height}
+              data={data}
+              margin={{
+                top: 8,
+                right: 12,
+                left: 8,
+                bottom: 8,
+              }}
+            >
+              <CartesianGrid
+                strokeDasharray="3 3"
+                stroke="#e5e7eb"
+                vertical={false}
+              />
 
-            <XAxis
-              dataKey="month"
-              tickFormatter={formatMonth}
-            />
+              <XAxis
+                dataKey="month"
+                stroke="#94a3b8"
+                tick={{
+                  fill: "#64748b",
+                  fontSize: 12,
+                }}
+                tickFormatter={formatMonth}
+                axisLine={{
+                  stroke: "#e2e8f0",
+                }}
+                tickLine={false}
+                minTickGap={24}
+              />
 
-            <YAxis />
+              <YAxis
+                stroke="#94a3b8"
+                tick={{
+                  fill: "#64748b",
+                  fontSize: 12,
+                }}
+                tickFormatter={formatNumber}
+                allowDecimals={false}
+                axisLine={false}
+                tickLine={false}
+                width={60}
+              />
 
-            <Tooltip
-              labelFormatter={(value) => `Mese: ${formatMonth(value)}`}
-            />
+              <Tooltip
+                contentStyle={{
+                  backgroundColor: "#ffffff",
+                  border: "1px solid #e2e8f0",
+                  borderRadius: "12px",
+                  boxShadow:
+                    "0 10px 25px rgba(15, 23, 42, 0.10)",
+                }}
+                labelStyle={{
+                  color: "#0f172a",
+                  fontWeight: 600,
+                  marginBottom: "4px",
+                }}
+                itemStyle={{
+                  color: "#059669",
+                }}
+                cursor={{
+                  stroke: "#94a3b8",
+                  strokeDasharray: "4 4",
+                }}
+                labelFormatter={(value) =>
+                  `Mese: ${formatMonth(value)}`
+                }
+                formatter={(value) => [
+                  formatNumber(value),
+                  "Membri",
+                ]}
+              />
 
-            <Line
-              type="monotone"
-              dataKey="members"
-              stroke="#06b6d4"
-              strokeWidth={3}
-              dot={{ r: 4 }}
-            />
-          </LineChart>
-        </ResponsiveContainer>
-      </ChartContainer>
+              <Line
+                type="monotone"
+                dataKey="count"
+                name="Membri"
+                stroke="#059669"
+                strokeWidth={3}
+                dot={false}
+                activeDot={{ r: 5 }}
+              />
+            </LineChart>
+          )}
+        </ResponsiveChartContainer>
+      )}
     </ChartCard>
   );
 }
