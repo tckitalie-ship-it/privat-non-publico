@@ -2,12 +2,12 @@
 
 import ResponsiveChartContainer from "@/components/dashboard/ResponsiveChartContainer";
 import {
-  AreaChart,
   Area,
+  AreaChart,
+  CartesianGrid,
+  Tooltip,
   XAxis,
   YAxis,
-  Tooltip,
-  CartesianGrid,
 } from "recharts";
 
 interface MembersTrendChartProps {
@@ -32,37 +32,65 @@ function formatMembers(value: unknown) {
   const count = Number(value);
 
   if (!Number.isFinite(count)) {
-    return String(value);
+    return "0";
   }
 
-  return new Intl.NumberFormat("it-IT").format(count);
+  return new Intl.NumberFormat("it-IT", {
+    maximumFractionDigits: 0,
+  }).format(Math.max(0, Math.round(count)));
+}
+
+function normalizeData(
+  data: MembersTrendChartProps["data"],
+) {
+  return data
+    .map((item) => ({
+      month: String(item.month),
+      count: Number(item.count),
+    }))
+    .filter(
+      (item) =>
+        item.month.trim().length > 0 &&
+        Number.isFinite(item.count),
+    )
+    .sort((first, second) =>
+      first.month.localeCompare(second.month),
+    );
 }
 
 export default function MembersTrendChart({
   data,
 }: MembersTrendChartProps) {
-  const formattedData = data.map((item) => ({
-    ...item,
-    count: Number(item.count) || 0,
-  }));
+  const formattedData = normalizeData(data);
 
   return (
     <section className="min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
       <div className="mb-5">
-        <h2 className="text-lg font-semibold text-slate-900">
+        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-600">
+          Membri
+        </p>
+
+        <h2 className="mt-1 text-lg font-semibold text-slate-900">
           Crescita membri
         </h2>
 
         <p className="mt-1 text-sm text-slate-500">
-          Andamento mensile del numero di membri.
+          Andamento mensile del numero cumulativo di membri.
         </p>
       </div>
 
       {formattedData.length === 0 ? (
-        <div className="flex min-h-[300px] items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50">
-          <p className="text-sm text-slate-500">
-            Nessun dato membri disponibile.
-          </p>
+        <div className="flex min-h-[300px] items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50 px-6 text-center">
+          <div>
+            <p className="font-medium text-slate-700">
+              Nessun dato disponibile
+            </p>
+
+            <p className="mt-1 text-sm text-slate-500">
+              I dati saranno visualizzati quando saranno
+              disponibili membri associati.
+            </p>
+          </div>
         </div>
       ) : (
         <ResponsiveChartContainer minHeight={300}>
@@ -78,6 +106,27 @@ export default function MembersTrendChart({
                 bottom: 8,
               }}
             >
+              <defs>
+                <linearGradient
+                  id="membersTrendGradient"
+                  x1="0"
+                  y1="0"
+                  x2="0"
+                  y2="1"
+                >
+                  <stop
+                    offset="0%"
+                    stopColor="#10b981"
+                    stopOpacity={0.28}
+                  />
+                  <stop
+                    offset="100%"
+                    stopColor="#10b981"
+                    stopOpacity={0.03}
+                  />
+                </linearGradient>
+              </defs>
+
               <CartesianGrid
                 strokeDasharray="3 3"
                 stroke="#e5e7eb"
@@ -86,7 +135,7 @@ export default function MembersTrendChart({
 
               <XAxis
                 dataKey="month"
-                stroke="#9ca3af"
+                stroke="#94a3b8"
                 tick={{
                   fill: "#64748b",
                   fontSize: 12,
@@ -96,10 +145,11 @@ export default function MembersTrendChart({
                   stroke: "#e2e8f0",
                 }}
                 tickLine={false}
+                minTickGap={24}
               />
 
               <YAxis
-                stroke="#9ca3af"
+                stroke="#94a3b8"
                 tick={{
                   fill: "#64748b",
                   fontSize: 12,
@@ -118,25 +168,26 @@ export default function MembersTrendChart({
                 }}
                 contentStyle={{
                   backgroundColor: "#ffffff",
-                  borderRadius: "12px",
                   border: "1px solid #e2e8f0",
+                  borderRadius: "12px",
                   boxShadow:
                     "0 10px 25px rgba(15, 23, 42, 0.10)",
                 }}
                 labelStyle={{
                   color: "#0f172a",
                   fontWeight: 600,
-                  marginBottom: "4px",
+                  marginBottom: 6,
                 }}
                 itemStyle={{
-                  color: "#334155",
+                  color: "#047857",
                 }}
                 labelFormatter={(value) =>
                   `Mese: ${formatMonth(value)}`
                 }
-                formatter={(value) =>
-                  formatMembers(value)
-                }
+                formatter={(value) => [
+                  formatMembers(value),
+                  "Membri",
+                ]}
               />
 
               <Area
@@ -144,11 +195,12 @@ export default function MembersTrendChart({
                 dataKey="count"
                 name="Membri"
                 stroke="#059669"
-                fill="#10b981"
-                fillOpacity={0.14}
+                fill="url(#membersTrendGradient)"
                 strokeWidth={3}
+                dot={false}
                 activeDot={{
                   r: 5,
+                  strokeWidth: 2,
                 }}
               />
             </AreaChart>
