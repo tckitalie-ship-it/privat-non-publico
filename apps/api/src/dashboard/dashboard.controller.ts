@@ -140,7 +140,8 @@ export class DashboardController {
   }
 
   private async resolveContext(user: JwtUser) {
-    const userId = await this.resolveUserId(user);
+    const userId =
+      await this.resolveUserId(user);
 
     const associationId =
       await this.resolveAssociationId(
@@ -179,18 +180,20 @@ export class DashboardController {
       userId,
     );
   }
-   @Get("members-trend")
-async membersTrend(
-  @CurrentUser() user: JwtUser,
-) {
-  const { userId, associationId } =
-    await this.resolveContext(user);
 
-  return this.dashboard.getMembersTrend(
-    associationId,
-    userId,
-  );
-}
+  @Get("members-trend")
+  async membersTrend(
+    @CurrentUser() user: JwtUser,
+  ) {
+    const { userId, associationId } =
+      await this.resolveContext(user);
+
+    return this.dashboard.getMembersTrend(
+      associationId,
+      userId,
+    );
+  }
+
   @Get("events-trend")
   async eventsTrend(
     @CurrentUser() user: JwtUser,

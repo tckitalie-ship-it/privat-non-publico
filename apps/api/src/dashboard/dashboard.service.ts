@@ -1,4 +1,4 @@
-﻿import { Injectable, ForbiddenException } from "@nestjs/common";
+import { Injectable, ForbiddenException } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 
 @Injectable()
@@ -115,6 +115,52 @@ export class DashboardService {
   /**
    * Trend eventi mensile
    */
+  async getMembersTrend(
+    associationId: string,
+    userId: string,
+  ) {
+    await this.ensureMembership(
+      userId,
+      associationId,
+    );
+
+    const memberships =
+      await this.prisma.membership.findMany({
+        where: {
+          associationId,
+        },
+        orderBy: {
+          createdAt: "asc",
+        },
+        select: {
+          createdAt: true,
+        },
+      });
+
+    const trend: Record<string, number> = {};
+
+    for (const membership of memberships) {
+      const key = `${membership.createdAt.getFullYear()}-${String(
+        membership.createdAt.getMonth() + 1,
+      ).padStart(2, "0")}`;
+
+      trend[key] =
+        (trend[key] ?? 0) + 1;
+    }
+
+    let cumulative = 0;
+
+    return Object.entries(trend).map(
+      ([month, count]) => {
+        cumulative += count;
+
+        return {
+          month,
+          count: cumulative,
+        };
+      },
+    );
+  }
   async getEventsTrend(associationId: string, userId: string) {
     await this.ensureMembership(userId, associationId);
 
