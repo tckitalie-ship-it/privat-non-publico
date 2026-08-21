@@ -356,7 +356,7 @@ export default function LatestTransactions() {
                         </span>
 
                         <span className="text-gray-700">
-                          â€¢
+                          •
                         </span>
 
                         <span>
