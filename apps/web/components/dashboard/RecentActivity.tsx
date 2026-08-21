@@ -246,7 +246,7 @@ export default function RecentActivity() {
             </p>
 
             <p className="mt-2 text-sm text-gray-500">
-              Le operazioni dell'associazione
+              Le operazioni dell&apos;associazione
               appariranno qui.
             </p>
           </div>
