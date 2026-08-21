@@ -429,7 +429,7 @@ export default function ProfilePage() {
 
               <p className="text-sm text-gray-400">
                 Informazioni sulla tua
-                posizione nell'associazione.
+                posizione nell&apos;associazione.
               </p>
             </div>
           </div>
