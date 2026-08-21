@@ -25,6 +25,8 @@ useEffect(() => {
     return;
   }
 
+  // Il controllo auth avviene solo client-side: questo stato evita il render del dashboard prima della verifica.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   setAuthChecked(true);
 }, [router]);
 
