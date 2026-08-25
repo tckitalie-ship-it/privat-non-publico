@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { ChevronDown, Loader2 } from "lucide-react";
 
 import {
@@ -57,6 +58,7 @@ function readJwtPayload(token: string): JwtPayload | null {
 }
 
 export default function AssociationSwitcher() {
+  const router = useRouter();
   const [associations, setAssociations] = useState<Association[]>([]);
   const [currentAssociation, setCurrentAssociation] =
     useState<string | null>(null);
@@ -117,52 +119,11 @@ export default function AssociationSwitcher() {
           );
 
         // 🔥 LOGICA CORRETTA
-        if (tokenAssociationExists) {
-          setCurrentAssociation(tokenAssociationId);
-        } else if (associationList.length === 1) {
-          const associationId = associationList[0].id;
-
-          const switchResponse = await fetch(
-            "/api/auth/switch-association",
-            {
-              method: "POST",
-              headers: {
-                Authorization: `Bearer ${token}`,
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify({ associationId }),
-            },
-          );
-
-          const switchData = await switchResponse
-            .json()
-            .catch(() => null);
-
-          if (!switchResponse.ok) {
-            throw new Error(
-              switchData?.message ||
-                `Errore associazione (${switchResponse.status})`,
-            );
-          }
-
-          const newToken =
-            switchData?.accessToken ??
-            switchData?.access_token ??
-            switchData?.token;
-
-          if (!newToken) {
-            throw new Error(
-              "Il backend non ha restituito il nuovo token",
-            );
-          }
-
-          setAccessToken(newToken);
-          setCurrentAssociation(associationId);
-
-          window.location.reload();
-        } else {
-          setCurrentAssociation(null);
-        }
+         if (tokenAssociationExists) {
+  setCurrentAssociation(tokenAssociationId);
+} else {
+  setCurrentAssociation(null);
+}
       } catch (error) {
         console.error("Errore caricamento associazioni:", error);
 
@@ -223,11 +184,13 @@ export default function AssociationSwitcher() {
         );
       }
 
-      setAccessToken(newToken);
-      setCurrentAssociation(associationId);
-      setOpen(false);
+       setAccessToken(newToken);
+setCurrentAssociation(associationId);
+setOpen(false);
 
-      window.location.reload();
+// Forza Next.js a ricaricare i dati della pagina
+      router.push("/dashboard");
+router.refresh();
     } catch (error) {
       console.error("Errore cambio associazione:", error);
 

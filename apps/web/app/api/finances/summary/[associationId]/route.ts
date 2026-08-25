@@ -1,11 +1,25 @@
 ﻿import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { getBackendApiUrl } from "@/lib/server-api";
+
+const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_URL ??
+  "http://127.0.0.1:3001/api";
 
 export async function GET(
   request: Request,
+  context: {
+    params: Promise<{
+      associationId: string;
+    }>;
+  },
 ) {
   try {
+    const { associationId } =
+      await context.params;
+
+    const headerAuthorization =
+      request.headers.get("authorization");
+
     const cookieStore =
       await cookies();
 
@@ -14,16 +28,11 @@ export async function GET(
         .get("access_token")
         ?.value;
 
-    const headerAuthorization =
-      request.headers.get(
-        "authorization",
-      );
-
     const authorization =
-      headerAuthorization ||
+      headerAuthorization ??
       (cookieToken
         ? `Bearer ${cookieToken}`
-        : "");
+        : null);
 
     if (!authorization) {
       return NextResponse.json(
@@ -37,28 +46,14 @@ export async function GET(
       );
     }
 
-    const associationId =
-      request.headers.get(
-        "x-association-id",
-      );
-
-    const headers: HeadersInit = {
-      Accept: "application/json",
-      Authorization: authorization,
-    };
-
-    if (associationId) {
-      headers["x-association-id"] =
-        associationId;
-    }
-
     const response = await fetch(
-      getBackendApiUrl(
-        "memberships/me",
-      ),
+      `${API_BASE_URL}/finances/summary/${associationId}`,
       {
         method: "GET",
-        headers,
+        headers: {
+          Accept: "application/json",
+          Authorization: authorization,
+        },
         cache: "no-store",
       },
     );
@@ -76,14 +71,16 @@ export async function GET(
     );
   } catch (error) {
     console.error(
-      "Errore GET /memberships/me:",
+      "[FINANCE SUMMARY PROXY ERROR]",
       error,
     );
 
     return NextResponse.json(
       {
         message:
-          "Errore interno",
+          error instanceof Error
+            ? error.message
+            : "Errore caricamento riepilogo",
       },
       {
         status: 500,

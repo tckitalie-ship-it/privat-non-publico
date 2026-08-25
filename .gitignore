@@ -29,3 +29,7 @@ env.local
 apps/web/env.local
 # Local API configuration
 apps/api/env
+# Backup files
+*.bak
+*.backup
+*.before-*

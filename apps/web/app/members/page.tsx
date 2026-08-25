@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import {
   type FormEvent,
@@ -17,6 +17,7 @@ import MembersPendingInvitations from "@/components/members/MembersPendingInvita
 import MembersToolbar from "@/components/members/MembersToolbar";
 
 import { API_URL, getAccessToken } from "@/lib/api";
+import { getActiveAssociationId } from "@/lib/association";
 
 type Role = "OWNER" | "ADMIN" | "MEMBER";
 
@@ -60,6 +61,7 @@ export default function MembersPage() {
 
   const fetchCurrentMembership = useCallback(async () => {
     const token = getAccessToken();
+    const associationId = getActiveAssociationId();
 
     if (!token) {
       setCurrentUserRole(null);
@@ -68,19 +70,19 @@ export default function MembersPage() {
     }
 
     try {
-      const response = await fetch(
-        "/api/memberships/me",
-        {
-          headers: {
-            Accept: "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          cache: "no-store",
+      const response = await fetch("/api/memberships/me", {
+        headers: {
+          Accept: "application/json",
+          Authorization: `Bearer ${token}`,
+          "x-association-id": associationId ?? "",
         },
-      );
+        cache: "no-store",
+      });
 
       const data = await response.json().catch(() => null);
+
       console.log("MEMBERSHIP ME DEBUG:", data);
+
       if (!response.ok) {
         throw new Error(
           data?.message ||
@@ -110,6 +112,7 @@ export default function MembersPage() {
     setLoadingMembers(true);
 
     const token = getAccessToken();
+    const associationId = getActiveAssociationId();
 
     if (!token) {
       setMembers([]);
@@ -122,6 +125,7 @@ export default function MembersPage() {
         headers: {
           Accept: "application/json",
           Authorization: `Bearer ${token}`,
+          "x-association-id": associationId ?? "",
         },
         cache: "no-store",
       });
@@ -154,6 +158,7 @@ export default function MembersPage() {
     setLoadingInvitations(true);
 
     const token = getAccessToken();
+    const associationId = getActiveAssociationId();
 
     if (!token) {
       setInvitations([]);
@@ -162,10 +167,11 @@ export default function MembersPage() {
     }
 
     try {
-      const response = await fetch(`${API_URL}/invitations`, {
+       const response = await fetch("/api/invitations", {
         headers: {
           Accept: "application/json",
           Authorization: `Bearer ${token}`,
+          "x-association-id": associationId ?? "",
         },
         cache: "no-store",
       });
@@ -211,7 +217,8 @@ export default function MembersPage() {
     fetchMembers,
     fetchInvitations,
   ]);
-    async function handleInvite(
+
+  async function handleInvite(
     event: FormEvent<HTMLFormElement>,
   ) {
     event.preventDefault();
@@ -224,21 +231,28 @@ export default function MembersPage() {
     }
 
     const token = getAccessToken();
+    const associationId = getActiveAssociationId();
 
     if (!token) {
       toast.error("Sessione non disponibile");
       return;
     }
 
+    if (!associationId) {
+      toast.error("Seleziona prima un'associazione");
+      return;
+    }
+
     try {
       setLoadingInvite(true);
 
-      const response = await fetch(`${API_URL}/invitations`, {
+       const response = await fetch("/api/invitations", {
         method: "POST",
         headers: {
           Accept: "application/json",
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
+          "x-association-id": associationId,
         },
         body: JSON.stringify({
           email: cleanEmail,
@@ -260,6 +274,7 @@ export default function MembersPage() {
 
       toast.success("Invito inviato");
       setShowInviteForm(false);
+
       await fetchInvitations();
     } catch (error) {
       console.error("Errore invio invito:", error);
@@ -284,6 +299,7 @@ export default function MembersPage() {
     }
 
     const token = getAccessToken();
+    const associationId = getActiveAssociationId();
 
     if (!token) {
       toast.error("Sessione non disponibile");
@@ -291,12 +307,16 @@ export default function MembersPage() {
     }
 
     try {
-      const response = await fetch(`${API_URL}/memberships/${id}`, {
-        method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${token}`,
+      const response = await fetch(
+        `${API_URL}/memberships/${id}`,
+        {
+          method: "DELETE",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "x-association-id": associationId ?? "",
+          },
         },
-      });
+      );
 
       const data = await response.json().catch(() => null);
 
@@ -330,6 +350,7 @@ export default function MembersPage() {
     }
 
     const token = getAccessToken();
+    const associationId = getActiveAssociationId();
 
     if (!token) {
       toast.error("Sessione non disponibile");
@@ -337,12 +358,16 @@ export default function MembersPage() {
     }
 
     try {
-      const response = await fetch(`${API_URL}/invitations/${id}`, {
-        method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${token}`,
+      const response = await fetch(
+        `/api/invitations/${id}`,
+        {
+          method: "DELETE",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "x-association-id": associationId ?? "",
+          },
         },
-      });
+      );
 
       const data = await response.json().catch(() => null);
 
@@ -410,14 +435,15 @@ export default function MembersPage() {
           onSubmit={handleInvite}
         />
       )}
-            <Link
+
+      <Link
         href="/dashboard"
         className="inline-flex items-center text-sm font-medium text-slate-600 hover:text-slate-900"
       >
         ← Dashboard
       </Link>
 
-      <h2 className="text-lg font-semibold text-white">
+      <h2 className="text-lg font-semibold text-slate-900">
         Membri
       </h2>
 
@@ -435,11 +461,11 @@ export default function MembersPage() {
       />
 
       <MembersPendingInvitations
-  invitations={invitations}
-  loading={loadingInvitations}
-  canManageMembers={canManageMembers}
-  onRemove={removeInvitation}
-/>
+        invitations={invitations}
+        loading={loadingInvitations}
+        canManageMembers={canManageMembers}
+        onRemove={removeInvitation}
+      />
     </div>
   );
 }

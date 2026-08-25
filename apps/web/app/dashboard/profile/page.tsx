@@ -136,8 +136,16 @@ export default function ProfilePage() {
         );
       }
 
+      if (!data || typeof data !== "object") {
+        throw new Error("Profilo utente non disponibile.");
+      }
+
       setProfile(data);
-      setEmail(data.email ?? "");
+      setEmail(
+        typeof data.email === "string"
+          ? data.email
+          : "",
+      );
     } catch (error) {
       console.error(
         "Errore caricamento profilo:",
@@ -177,7 +185,7 @@ export default function ProfilePage() {
 
     if (!cleanEmail) {
       toast.error(
-        "L'email è obbligatoria.",
+        "L'email Ã¨ obbligatoria.",
       );
       return;
     }

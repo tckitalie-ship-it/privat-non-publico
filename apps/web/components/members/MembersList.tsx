@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 import Image from "next/image";
 import { useState } from "react";
 import {
@@ -11,7 +11,7 @@ import {
 import { toast } from "sonner";
 
 import { API_URL, getAccessToken } from "@/lib/api";
-
+import { getActiveAssociationId } from "@/lib/association";
 type Role = "OWNER" | "ADMIN" | "MEMBER";
 
 type Member = {
@@ -118,12 +118,13 @@ export default function MembersList({
     (member) => member.role === "OWNER",
   ).length;
 
-  async function updateRole(member: Member, newRole: Role) {
+    async function updateRole(member: Member, newRole: Role) {
     if (member.role === newRole) {
       return;
     }
 
     const token = getAccessToken();
+    const associationId = getActiveAssociationId();
 
     if (!token) {
       toast.error("Sessione non disponibile");
@@ -140,8 +141,11 @@ export default function MembersList({
           headers: {
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
+            "x-association-id": associationId ?? "",
           },
-          body: JSON.stringify({ role: newRole }),
+          body: JSON.stringify({
+            role: newRole,
+          }),
         },
       );
 
@@ -153,7 +157,8 @@ export default function MembersList({
           : data?.message;
 
         throw new Error(
-          message || `Errore aggiornamento ruolo (${response.status})`,
+          message ||
+            `Errore aggiornamento ruolo (${response.status})`,
         );
       }
 
@@ -183,14 +188,14 @@ export default function MembersList({
       return;
     }
 
-    toast.info("Il membro è già Owner");
+    toast.info("Il membro Ã¨ giÃ  Owner");
   }
 
   async function demoteMember(member: Member) {
     const isOnlyOwner = member.role === "OWNER" && ownersCount === 1;
 
     if (isOnlyOwner) {
-      toast.error("Non puoi retrocedere l’unico Owner dell’associazione");
+      toast.error("Non puoi retrocedere lâ€™unico Owner dellâ€™associazione");
       return;
     }
 
@@ -204,7 +209,7 @@ export default function MembersList({
       return;
     }
 
-    toast.info("Il membro ha già il ruolo più basso");
+    toast.info("Il membro ha giÃ  il ruolo piÃ¹ basso");
   }
 
   async function confirmRemove() {
@@ -230,7 +235,7 @@ export default function MembersList({
     }
 
     if (isOnlyOwner) {
-      toast.error("Non puoi rimuovere l’unico Owner dell’associazione");
+      toast.error("Non puoi rimuovere lâ€™unico Owner dellâ€™associazione");
       setConfirmRemoveId(null);
       return;
     }
@@ -345,7 +350,7 @@ export default function MembersList({
                   disabled={isLoading || cannotPromote}
                   title={
                     cannotPromote
-                      ? "Il membro è già Owner"
+                      ? "Il membro Ã¨ giÃ  Owner"
                       : "Promuovi il membro"
                   }
                   aria-label="Promuovi il membro"
@@ -367,9 +372,9 @@ export default function MembersList({
                   disabled={isLoading || cannotDemote}
                   title={
                     isOnlyOwner
-                      ? "L’unico Owner non può essere retrocesso"
+                      ? "Lâ€™unico Owner non puÃ² essere retrocesso"
                       : member.role === "MEMBER"
-                        ? "Il membro ha già il ruolo più basso"
+                        ? "Il membro ha giÃ  il ruolo piÃ¹ basso"
                         : "Retrocedi il membro"
                   }
                   aria-label="Retrocedi il membro"
@@ -394,7 +399,7 @@ export default function MembersList({
 
                     if (isOnlyOwner) {
                       toast.error(
-                        "Non puoi rimuovere l’unico Owner dell’associazione",
+                        "Non puoi rimuovere lâ€™unico Owner dellâ€™associazione",
                       );
                       return;
                     }
@@ -406,7 +411,7 @@ export default function MembersList({
                     isCurrentUser
                       ? "Non puoi rimuovere il tuo account"
                       : isOnlyOwner
-                        ? "L’unico Owner non può essere rimosso"
+                        ? "Lâ€™unico Owner non puÃ² essere rimosso"
                         : "Rimuovi il membro"
                   }
                   aria-label="Rimuovi il membro"
@@ -432,7 +437,7 @@ export default function MembersList({
             </h3>
 
             <p className="mt-2 text-sm text-gray-400">
-              Il membro perderà l&apos;accesso all&apos;associazione.
+              Il membro perderÃ  l&apos;accesso all&apos;associazione.
             </p>
 
             <div className="mt-6 flex justify-end gap-3">

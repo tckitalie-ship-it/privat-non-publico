@@ -1,35 +1,39 @@
 ﻿import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { getBackendApiUrl } from "@/lib/server-api";
 
-export async function GET(
+const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_URL ??
+  "http://127.0.0.1:3001/api";
+
+export async function DELETE(
   request: Request,
+  {
+    params,
+  }: {
+    params: Promise<{ id: string }>;
+  },
 ) {
   try {
-    const cookieStore =
-      await cookies();
+    const { id } = await params;
 
-    const cookieToken =
-      cookieStore
-        .get("access_token")
-        ?.value;
+    const cookieStore = await cookies();
 
     const headerAuthorization =
-      request.headers.get(
-        "authorization",
-      );
+      request.headers.get("authorization");
+
+    const cookieToken =
+      cookieStore.get("access_token")?.value;
 
     const authorization =
-      headerAuthorization ||
+      headerAuthorization ??
       (cookieToken
         ? `Bearer ${cookieToken}`
-        : "");
+        : null);
 
     if (!authorization) {
       return NextResponse.json(
         {
-          message:
-            "Sessione non disponibile",
+          message: "Sessione non disponibile",
         },
         {
           status: 401,
@@ -38,9 +42,7 @@ export async function GET(
     }
 
     const associationId =
-      request.headers.get(
-        "x-association-id",
-      );
+      request.headers.get("x-association-id");
 
     const headers: HeadersInit = {
       Accept: "application/json",
@@ -53,37 +55,29 @@ export async function GET(
     }
 
     const response = await fetch(
-      getBackendApiUrl(
-        "memberships/me",
-      ),
+      `${API_BASE_URL}/memberships/${id}`,
       {
-        method: "GET",
+        method: "DELETE",
         headers,
         cache: "no-store",
       },
     );
 
     const data =
-      await response
-        .json()
-        .catch(() => null);
+      await response.json().catch(() => null);
 
-    return NextResponse.json(
-      data,
-      {
-        status: response.status,
-      },
-    );
+    return NextResponse.json(data, {
+      status: response.status,
+    });
   } catch (error) {
     console.error(
-      "Errore GET /memberships/me:",
+      "Errore DELETE /memberships/:id:",
       error,
     );
 
     return NextResponse.json(
       {
-        message:
-          "Errore interno",
+        message: "Errore interno",
       },
       {
         status: 500,

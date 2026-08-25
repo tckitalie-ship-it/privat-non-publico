@@ -20,7 +20,8 @@ import {
 import { toast } from "sonner";
 
 import DashboardSidebar from "@/components/dashboard-sidebar";
-import { API_URL, getAccessToken } from "@/lib/api";
+import { getAccessToken } from "@/lib/api";
+import { getActiveAssociationId } from "@/lib/association";
 
 type Role = "OWNER" | "ADMIN" | "MEMBER";
 
@@ -69,12 +70,15 @@ export default function EventsPage() {
   const [, setLoading] = useState(false);
   const [, setLoadingEvents] = useState(true);
 
-  const [search] = useState("");
-  const [filter] =
-    useState<"ALL" | "UPCOMING">("ALL");
+  const [search, setSearch] = useState("");
+  const [filter, setFilter] =
+    useState<"ALL" | "UPCOMING" | "PAST">("ALL");
 
   const [confirmDeleteEvent, setConfirmDeleteEvent] =
     useState<EventItem | null>(null);
+
+  const [registeringEvent, setRegisteringEvent] =
+    useState<string | null>(null);
 
   const [deletingEvent, setDeletingEvent] =
     useState(false);
@@ -92,6 +96,9 @@ export default function EventsPage() {
   const [currentUserRole, setCurrentUserRole] =
     useState<Role | null>(null);
 
+  const associationId =
+    getActiveAssociationId();
+
   useEffect(() => {
     const token = getAccessToken();
 
@@ -99,12 +106,14 @@ export default function EventsPage() {
       getUserIdFromToken(token),
     );
 
-    loadEvents();
+    void loadEvents();
   }, []);
 
   useEffect(() => {
     const loadCurrentMembership = async () => {
       const token = getAccessToken();
+      const activeAssociationId =
+        getActiveAssociationId();
 
       if (!token) {
         setCurrentUserRole(null);
@@ -113,12 +122,14 @@ export default function EventsPage() {
 
       try {
         const response = await fetch(
-          `${API_URL}/memberships/me`,
+          "/api/memberships/me",
           {
             method: "GET",
             headers: {
               Accept: "application/json",
               Authorization: `Bearer ${token}`,
+              "x-association-id":
+                activeAssociationId ?? "",
             },
             cache: "no-store",
           },
@@ -162,17 +173,23 @@ export default function EventsPage() {
 
       const token = getAccessToken();
 
+      if (!token) {
+        setEvents([]);
+        return;
+      }
+
+      const activeAssociationId =
+        getActiveAssociationId();
+
       const res = await fetch(
-        `${API_URL}/events`,
+        "/api/events",
         {
           method: "GET",
           headers: {
             Accept: "application/json",
-            ...(token
-              ? {
-                  Authorization: `Bearer ${token}`,
-                }
-              : {}),
+            Authorization: `Bearer ${token}`,
+            "x-association-id":
+              activeAssociationId ?? "",
           },
           cache: "no-store",
         },
@@ -193,7 +210,11 @@ export default function EventsPage() {
       const data = await res.json();
 
       setEvents(
-        Array.isArray(data) ? data : [],
+        Array.isArray(data)
+          ? data
+          : data?.events && Array.isArray(data.events)
+            ? data.events
+            : [],
       );
     } catch (error: unknown) {
       const message =
@@ -221,66 +242,62 @@ export default function EventsPage() {
       return;
     }
 
+    const token = getAccessToken();
+    const activeAssociationId =
+      getActiveAssociationId();
+
+    if (!token) {
+      toast.error("Sessione non disponibile");
+      return;
+    }
+
+    if (!title.trim()) {
+      toast.error("Inserisci il titolo dell'evento");
+      return;
+    }
+
     try {
       setLoading(true);
 
-      const token = getAccessToken();
-
-      if (!token) {
-        throw new Error("Login richiesto");
-      }
-
-      if (!title.trim()) {
-        throw new Error(
-          "Titolo obbligatorio",
-        );
-      }
-
-      if (!startsAt) {
-        throw new Error(
-          "Data inizio obbligatoria",
-        );
-      }
-
-      const res = await fetch(
-        `${API_URL}/events`,
+      const response = await fetch(
+        "/api/events",
         {
           method: "POST",
           headers: {
+            Accept: "application/json",
             "Content-Type":
               "application/json",
             Authorization: `Bearer ${token}`,
+            "x-association-id":
+              activeAssociationId ?? "",
           },
           body: JSON.stringify({
             title: title.trim(),
             description:
-              description.trim(),
+              description.trim() || undefined,
             location:
-              location.trim(),
+              location.trim() || undefined,
             startsAt:
-              new Date(
-                startsAt,
-              ).toISOString(),
-            endsAt: endsAt
-              ? new Date(
-                  endsAt,
-                ).toISOString()
-              : undefined,
+              startsAt || undefined,
+            endsAt:
+              endsAt || undefined,
           }),
         },
       );
 
       const data =
-        await res.json().catch(
+        await response.json().catch(
           () => null,
         );
 
-      if (!res.ok) {
+      if (!response.ok) {
         throw new Error(
           data?.message ||
             "Errore creazione evento",
         );
       }
+
+      toast.success("Evento creato");
 
       setTitle("");
       setDescription("");
@@ -290,10 +307,6 @@ export default function EventsPage() {
       setShowForm(false);
 
       await loadEvents();
-
-      toast.success(
-        "Evento creato",
-      );
     } catch (error: unknown) {
       const message =
         error instanceof Error
@@ -307,56 +320,110 @@ export default function EventsPage() {
     }
   }
 
-  async function deleteEvent(
-    id: string,
+
+  async function handleRegisterEvent(event: EventItem) {
+    const token = getAccessToken();
+    const activeAssociationId =
+      getActiveAssociationId();
+
+    if (!token) {
+      toast.error("Sessione non disponibile");
+      return;
+    }
+
+    try {
+      setRegisteringEvent(event.id);
+
+      const response = await fetch(
+        `/api/events/${event.id}/register`,
+        {
+          method: "POST",
+          headers: {
+            Accept: "application/json",
+            Authorization: `Bearer ${token}`,
+            "x-association-id":
+              activeAssociationId ?? "",
+          },
+        },
+      );
+
+      const data =
+        await response.json().catch(() => null);
+
+      if (!response.ok) {
+        throw new Error(
+          data?.message ||
+            "Errore registrazione evento",
+        );
+      }
+
+      toast.success("Registrazione effettuata");
+
+      await loadEvents();
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Errore registrazione evento";
+
+      console.error(error);
+      toast.error(message);
+    } finally {
+      setRegisteringEvent(null);
+    }
+  }
+  async function handleDeleteEvent(
+    event: EventItem,
   ) {
     if (!canManageEvents) {
       toast.error(
         "Non hai i permessi per eliminare eventi",
       );
+      return;
+    }
 
-      setConfirmDeleteEvent(null);
+    const token = getAccessToken();
+    const activeAssociationId =
+      getActiveAssociationId();
+
+    if (!token) {
+      toast.error("Sessione non disponibile");
       return;
     }
 
     try {
       setDeletingEvent(true);
 
-      const token = getAccessToken();
-
-      if (!token) {
-        throw new Error("Login richiesto");
-      }
-
-      const res = await fetch(
-        `${API_URL}/events/${id}`,
+      const response = await fetch(
+        `/api/events/${event.id}`,
         {
           method: "DELETE",
           headers: {
+            Accept: "application/json",
             Authorization: `Bearer ${token}`,
+            "x-association-id":
+              activeAssociationId ?? "",
           },
         },
       );
 
       const data =
-        await res.json().catch(
+        await response.json().catch(
           () => null,
         );
 
-      if (!res.ok) {
+      if (!response.ok) {
         throw new Error(
           data?.message ||
             "Errore eliminazione evento",
         );
       }
 
-      await loadEvents();
+      toast.success("Evento eliminato");
 
       setConfirmDeleteEvent(null);
 
-      toast.success(
-        "Evento eliminato",
-      );
+      await loadEvents();
     } catch (error: unknown) {
       const message =
         error instanceof Error
@@ -370,395 +437,445 @@ export default function EventsPage() {
     }
   }
 
-  async function registerToEvent(
-    eventId: string,
-  ) {
-    try {
-      const token = getAccessToken();
-      const userId =
-        getUserIdFromToken(token);
-
-      if (!token || !userId) {
-        throw new Error(
-          "Login richiesto",
-        );
-      }
-
-      const res = await fetch(
-        `${API_URL}/events/${eventId}/register`,
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        },
-      );
-
-      const data =
-        await res.json().catch(
-          () => null,
-        );
-
-      if (!res.ok) {
-        throw new Error(
-          data?.message ||
-            "Errore registrazione evento",
-        );
-      }
-
-      await loadEvents();
-
-      toast.success(
-        "Registrazione completata",
-      );
-    } catch (error: unknown) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : "Errore registrazione evento";
-
-      console.error(error);
-      toast.error(message);
-    }
-  }
-
   const filteredEvents = useMemo(() => {
-    return events.filter((ev) => {
-      const normalizedSearch =
-        search.toLowerCase();
+    const now = new Date();
 
+    return events.filter((event) => {
       const matchesSearch =
-        ev.title
+        event.title
           .toLowerCase()
-          .includes(normalizedSearch) ||
-        ev.description
+          .includes(search.toLowerCase()) ||
+        event.description
           ?.toLowerCase()
-          .includes(normalizedSearch);
+          .includes(search.toLowerCase());
 
-      const isUpcoming =
-        filter === "UPCOMING"
-          ? Boolean(
-              ev.startsAt &&
-                new Date(ev.startsAt) >
-                  new Date(),
-            )
-          : true;
+      if (!matchesSearch) {
+        return false;
+      }
 
-      return (
-        matchesSearch &&
-        isUpcoming
-      );
+      if (filter === "UPCOMING") {
+        if (!event.startsAt) {
+          return false;
+        }
+
+        return new Date(event.startsAt) >= now;
+      }
+
+      if (filter === "PAST") {
+        if (!event.startsAt) {
+          return false;
+        }
+
+        return new Date(event.startsAt) < now;
+      }
+
+      return true;
     });
   }, [events, search, filter]);
 
+  const upcomingEvents =
+    events.filter((event) => {
+      if (!event.startsAt) {
+        return false;
+      }
+
+      return (
+        new Date(event.startsAt) >=
+        new Date()
+      );
+    });
+
+  const totalParticipants =
+    events.reduce(
+      (total, event) =>
+        total +
+        (event.registrations?.length ?? 0),
+      0,
+    );
+
   return (
-    <div className="flex min-h-screen bg-[#0f1117] text-white">
+    <div className="min-h-screen bg-[#020617] text-white">
       <DashboardSidebar />
 
-      <main className="flex-1 p-8 md:ml-72">
-        <div className="mx-auto max-w-7xl space-y-8">
+      <main className="mx-auto max-w-7xl px-6 py-10">
+        <div className="mb-8 flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <Link
-              href="/dashboard"
-              className="rounded-xl border border-white/10 px-4 py-2 text-sm transition hover:bg-white/5"
-            >
-              ← Dashboard
-            </Link>
-          </div>
+            <div className="mb-3 flex items-center gap-3">
+              <CalendarDays className="h-8 w-8 text-blue-400" />
 
-          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-            <div>
-              <p className="text-sm font-medium text-indigo-400">
-                Workspace
-              </p>
+              <div>
+                <h1 className="text-3xl font-bold">
+                  Gestione Eventi
+                </h1>
 
-              <h1 className="mt-2 text-5xl font-bold">
-                Eventi
-              </h1>
-
-              <p className="mt-3 max-w-2xl text-gray-400">
-                Gestisci gli eventi,
-                le registrazioni e le
-                attività principali
-                della piattaforma.
-              </p>
+                <p className="mt-2 text-gray-400">
+                  Organizza, pianifica e monitora
+                  tutti gli eventi della tua
+                  associazione.
+                </p>
+              </div>
             </div>
 
-            {canManageEvents && (
+            {!associationId && (
+              <p className="text-sm text-amber-400">
+                Nessuna associazione attiva selezionata.
+                Vai in Associazioni e apri
+                un'associazione.
+              </p>
+            )}
+          </div>
+
+          <button
+            type="button"
+            onClick={() =>
+              setShowForm(!showForm)
+            }
+            disabled={
+              !canManageEvents ||
+              !associationId
+            }
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-3 font-medium transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <Plus className="h-5 w-5" />
+
+            {showForm
+              ? "Chiudi"
+              : "Nuovo evento"}
+          </button>
+        </div>
+
+        <div className="mb-8 grid gap-4 md:grid-cols-4">
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
+            <p className="text-sm text-gray-400">
+              Eventi totali
+            </p>
+
+            <p className="mt-2 text-3xl font-bold">
+              {events.length}
+            </p>
+          </div>
+
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
+            <p className="text-sm text-gray-400">
+              Prossimi eventi
+            </p>
+
+            <p className="mt-2 text-3xl font-bold">
+              {upcomingEvents.length}
+            </p>
+          </div>
+
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
+            <p className="text-sm text-gray-400">
+              Partecipanti
+            </p>
+
+            <p className="mt-2 text-3xl font-bold">
+              {totalParticipants}
+            </p>
+          </div>
+
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
+            <p className="text-sm text-gray-400">
+              Location
+            </p>
+
+            <p className="mt-2 text-3xl font-bold">
+              {
+                new Set(
+                  events
+                    .map(
+                      (event) =>
+                        event.location,
+                    )
+                    .filter(Boolean),
+                ).size
+              }
+            </p>
+          </div>
+        </div>
+
+        {showForm && (
+          <form
+            onSubmit={handleCreateEvent}
+            className="mb-8 rounded-2xl border border-white/10 bg-white/5 p-6"
+          >
+            <h2 className="mb-6 text-xl font-semibold">
+              Nuovo evento
+            </h2>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <div>
+                <label className="mb-2 block text-sm text-gray-300">
+                  Titolo
+                </label>
+
+                <input
+                  value={title}
+                  onChange={(e) =>
+                    setTitle(e.target.value)
+                  }
+                  className="w-full rounded-xl border border-white/10 bg-black/20 px-4 py-3 outline-none focus:border-blue-500"
+                  placeholder="Titolo evento"
+                />
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm text-gray-300">
+                  Location
+                </label>
+
+                <input
+                  value={location}
+                  onChange={(e) =>
+                    setLocation(e.target.value)
+                  }
+                  className="w-full rounded-xl border border-white/10 bg-black/20 px-4 py-3 outline-none focus:border-blue-500"
+                  placeholder="Luogo evento"
+                />
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm text-gray-300">
+                  Data inizio
+                </label>
+
+                <input
+                  type="datetime-local"
+                  value={startsAt}
+                  onChange={(e) =>
+                    setStartsAt(e.target.value)
+                  }
+                  className="w-full rounded-xl border border-white/10 bg-black/20 px-4 py-3 outline-none focus:border-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm text-gray-300">
+                  Data fine
+                </label>
+
+                <input
+                  type="datetime-local"
+                  value={endsAt}
+                  onChange={(e) =>
+                    setEndsAt(e.target.value)
+                  }
+                  className="w-full rounded-xl border border-white/10 bg-black/20 px-4 py-3 outline-none focus:border-blue-500"
+                />
+              </div>
+            </div>
+
+            <div className="mt-4">
+              <label className="mb-2 block text-sm text-gray-300">
+                Descrizione
+              </label>
+
+              <textarea
+                value={description}
+                onChange={(e) =>
+                  setDescription(e.target.value)
+                }
+                rows={4}
+                className="w-full rounded-xl border border-white/10 bg-black/20 px-4 py-3 outline-none focus:border-blue-500"
+                placeholder="Descrizione dell'evento"
+              />
+            </div>
+
+            <div className="mt-6 flex gap-3">
+              <button
+                type="submit"
+                className="rounded-xl bg-blue-600 px-5 py-3 font-medium hover:bg-blue-500"
+              >
+                Crea evento
+              </button>
+
               <button
                 type="button"
                 onClick={() =>
-                  setShowForm(
-                    (value) => !value,
-                  )
+                  setShowForm(false)
                 }
-                className="inline-flex items-center gap-2 rounded-2xl bg-indigo-600 px-5 py-3 font-semibold transition hover:bg-indigo-500"
+                className="rounded-xl border border-white/10 px-5 py-3 hover:bg-white/5"
               >
-                <Plus size={18} />
-
-                {showForm
-                  ? "Chiudi"
-                  : "Nuovo evento"}
+                Annulla
               </button>
-            )}
+            </div>
+          </form>
+        )}
+
+        <div className="mb-6 flex flex-col gap-4 md:flex-row">
+          <div className="relative flex-1">
+            <Search className="absolute left-4 top-3.5 h-5 w-5 text-gray-500" />
+
+            <input
+              value={search}
+              onChange={(e) =>
+                setSearch(e.target.value)
+              }
+              placeholder="Cerca evento..."
+              className="w-full rounded-xl border border-white/10 bg-white/5 py-3 pl-12 pr-4 outline-none focus:border-blue-500"
+            />
           </div>
 
-          {showForm &&
-            canManageEvents && (
-              <form
-                onSubmit={
-                  handleCreateEvent
-                }
-                className="rounded-3xl border border-white/10 bg-[#1a1f2e] p-6 shadow-2xl"
+          <select
+            value={filter}
+            onChange={(e) =>
+              setFilter(
+                e.target.value as
+                  | "ALL"
+                  | "UPCOMING"
+                  | "PAST",
+              )
+            }
+            className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 outline-none"
+          >
+            <option value="ALL">
+              Tutti
+            </option>
+
+            <option value="UPCOMING">
+              Prossimi
+            </option>
+
+            <option value="PAST">
+              Passati
+            </option>
+          </select>
+        </div>
+
+        <div className="space-y-4">
+          {filteredEvents.length === 0 ? (
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-10 text-center text-gray-400">
+              Nessun evento programmato.
+            </div>
+          ) : (
+            filteredEvents.map((event) => (
+              <div
+                key={event.id}
+                className="rounded-2xl border border-white/10 bg-white/5 p-6"
               >
-                <h2 className="text-2xl font-bold">
-                  Crea evento
-                </h2>
+                <div className="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
+                  <div>
+                    <h2 className="text-xl font-semibold">
+                      {event.title}
+                    </h2>
 
-                <div className="mt-6 grid gap-5 md:grid-cols-2">
-                  <input
-                    value={title}
-                    onChange={(e) =>
-                      setTitle(
-                        e.target.value,
-                      )
-                    }
-                    placeholder="Titolo evento"
-                    required
-                    className="rounded-2xl border border-white/10 bg-[#111827] px-4 py-4 text-white outline-none focus:border-indigo-500"
-                  />
+                    {event.description && (
+                      <p className="mt-2 text-gray-400">
+                        {event.description}
+                      </p>
+                    )}
 
-                  <input
-                    value={location}
-                    onChange={(e) =>
-                      setLocation(
-                        e.target.value,
-                      )
-                    }
-                    placeholder="Luogo"
-                    className="rounded-2xl border border-white/10 bg-[#111827] px-4 py-4 text-white outline-none focus:border-indigo-500"
-                  />
-                </div>
+                    <div className="mt-4 flex flex-wrap gap-4 text-sm text-gray-400">
+                      {event.location && (
+                        <span className="flex items-center gap-2">
+                          <MapPin className="h-4 w-4" />
+                          {event.location}
+                        </span>
+                      )}
 
-                <div className="mt-6 grid gap-5 md:grid-cols-2">
-                  <input
-                    type="datetime-local"
-                    value={startsAt}
-                    onChange={(e) =>
-                      setStartsAt(
-                        e.target.value,
-                      )
-                    }
-                    required
-                    className="rounded-2xl border border-white/10 bg-[#111827] px-4 py-4 text-white outline-none focus:border-indigo-500"
-                  />
-
-                  <input
-                    type="datetime-local"
-                    value={endsAt}
-                    onChange={(e) =>
-                      setEndsAt(
-                        e.target.value,
-                      )
-                    }
-                    className="rounded-2xl border border-white/10 bg-[#111827] px-4 py-4 text-white outline-none focus:border-indigo-500"
-                  />
-                </div>
-
-                <textarea
-                  value={description}
-                  onChange={(e) =>
-                    setDescription(
-                      e.target.value,
-                    )
-                  }
-                  placeholder="Descrizione"
-                  className="mt-6 w-full rounded-2xl border border-white/10 bg-[#111827] px-4 py-4 text-white outline-none focus:border-indigo-500"
-                />
-
-                <button
-                  type="submit"
-                  className="mt-5 rounded-2xl bg-white px-5 py-3 font-semibold text-zinc-950 transition hover:bg-zinc-200"
-                >
-                  Salva evento
-                </button>
-              </form>
-            )}
-
-          <section className="grid gap-5">
-            {filteredEvents.length ===
-            0 ? (
-              <div className="rounded-3xl border border-dashed border-white/10 bg-[#1a1f2e] p-12 text-center text-gray-400">
-                Nessun evento
-                trovato.
-              </div>
-            ) : (
-              filteredEvents.map(
-                (ev) => (
-                  <div
-                    key={ev.id}
-                    className="rounded-3xl border border-white/5 bg-[#1a1f2e] p-6 shadow-xl"
-                  >
-                    <div className="flex items-start justify-between gap-4">
-                      <div>
-                        <h2 className="text-2xl font-bold">
-                          {ev.title}
-                        </h2>
-
-                        <p className="mt-2 text-gray-400">
-                          {ev.description}
-                        </p>
-
-                        <div className="mt-4 flex items-center gap-3 text-sm text-gray-400">
-                          <CalendarDays
-                            size={16}
-                          />
-
-                          {ev.startsAt
-                            ? new Date(
-                                ev.startsAt,
-                              ).toLocaleString(
-                                "it-IT",
-                              )
-                            : "Data non disponibile"}
-                        </div>
-
-                        {ev.location && (
-                          <div className="mt-2 flex items-center gap-3 text-sm text-gray-400">
-                            <MapPin
-                              size={16}
-                            />
-
-                            {ev.location}
-                          </div>
-                        )}
-                      </div>
-
-                      {canManageEvents && (
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setConfirmDeleteEvent(
-                              ev,
-                            )
-                          }
-                          className="inline-flex items-center gap-2 rounded-xl border border-red-500/30 px-4 py-2 text-sm text-red-300 transition hover:bg-red-500/10"
-                        >
-                          <Trash2
-                            size={16}
-                          />
-
-                          Elimina
-                        </button>
+                      {event.startsAt && (
+                        <span>
+                          {new Date(
+                            event.startsAt,
+                          ).toLocaleString(
+                            "it-IT",
+                          )}
+                        </span>
                       )}
                     </div>
+                  </div>
 
-                    <div className="mt-6 flex flex-wrap gap-3">
+                  <div className="flex flex-wrap gap-3">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        handleRegisterEvent(event)
+                      }
+                      disabled={
+                        registeringEvent === event.id
+                      }
+                      className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-white hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {registeringEvent === event.id
+                        ? "Registrazione..."
+                        : "Partecipa"}
+                    </button>
+
+                    {canManageEvents && (
                       <button
                         type="button"
                         onClick={() =>
-                          registerToEvent(
-                            ev.id,
+                          setConfirmDeleteEvent(
+                            event,
                           )
                         }
-                        className="inline-flex items-center gap-2 rounded-xl border border-indigo-500/30 px-4 py-2 text-sm text-indigo-300 transition hover:bg-indigo-500/10"
+                        className="inline-flex items-center gap-2 rounded-xl border border-red-500/30 px-4 py-2 text-red-400 hover:bg-red-500/10"
                       >
-                        <Plus
-                          size={16}
-                        />
-
-                        Registrati
+                        <Trash2 className="h-4 w-4" />
+                        Elimina
                       </button>
-
-                      <Link
-                        href={`/events/${ev.id}`}
-                        className="inline-flex items-center gap-2 rounded-xl border border-white/10 px-4 py-2 text-sm transition hover:bg-white/5"
-                      >
-                        <Search
-                          size={16}
-                        />
-
-                        Dettagli
-                      </Link>
-                    </div>
+                    )}
                   </div>
-                ),
-              )
-            )}
-          </section>
+                </div>
+              </div>
+            ))
+          )}
         </div>
-      </main>
 
-      {confirmDeleteEvent &&
-        canManageEvents && (
-          <div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="delete-event-title"
-          >
-            <div className="w-full max-w-md rounded-2xl border border-white/10 bg-[#111827] p-6 shadow-2xl">
-              <h2
-                id="delete-event-title"
-                className="text-lg font-semibold text-white"
-              >
-                Eliminare l&apos;evento?
+        {confirmDeleteEvent && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+            <div className="w-full max-w-md rounded-2xl border border-white/10 bg-slate-950 p-6">
+              <h2 className="text-xl font-semibold">
+                Eliminare evento?
               </h2>
 
-              <p className="mt-3 text-sm leading-6 text-gray-400">
-                Stai per eliminare
-                l&apos;evento{" "}
-                <span className="font-medium text-white">
-                  {
-                    confirmDeleteEvent.title
-                  }
-                </span>
-                . Questa operazione
-                non può essere
-                annullata.
+              <p className="mt-3 text-gray-400">
+                Stai per eliminare "
+                {confirmDeleteEvent.title}".
               </p>
 
-              <div className="mt-6 flex justify-end gap-3">
+              <div className="mt-6 flex gap-3">
                 <button
                   type="button"
+                  disabled={deletingEvent}
                   onClick={() =>
-                    setConfirmDeleteEvent(
-                      null,
+                    handleDeleteEvent(
+                      confirmDeleteEvent,
                     )
                   }
-                  disabled={
-                    deletingEvent
-                  }
-                  className="rounded-lg border border-white/10 px-4 py-2 text-sm font-medium text-gray-300 transition hover:bg-white/10 disabled:opacity-50"
+                  className="rounded-xl bg-red-600 px-5 py-3 font-medium hover:bg-red-500 disabled:opacity-50"
                 >
-                  Annulla
+                  {deletingEvent
+                    ? "Eliminazione..."
+                    : "Elimina"}
                 </button>
 
                 <button
                   type="button"
+                  disabled={deletingEvent}
                   onClick={() =>
-                    void deleteEvent(
-                      confirmDeleteEvent.id,
-                    )
+                    setConfirmDeleteEvent(null)
                   }
-                  disabled={
-                    deletingEvent
-                  }
-                  className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-red-500 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="rounded-xl border border-white/10 px-5 py-3 hover:bg-white/5"
                 >
-                  {deletingEvent && (
-                    <Loader2
-                      size={16}
-                      className="animate-spin"
-                    />
-                  )}
-
-                  Conferma eliminazione
+                  Annulla
                 </button>
               </div>
             </div>
           </div>
         )}
+
+        <div className="mt-10">
+          <Link
+            href="/dashboard"
+            className="text-sm text-gray-400 hover:text-white"
+          >
+            ← Dashboard
+          </Link>
+        </div>
+      </main>
     </div>
   );
 }
+

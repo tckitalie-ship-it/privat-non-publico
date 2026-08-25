@@ -3,6 +3,7 @@ import {
   Controller,
   Delete,
   Get,
+  Headers,
   Param,
   Patch,
   UseGuards,
@@ -21,37 +22,28 @@ export class MembershipsController {
     private readonly service: MembershipsService,
   ) {}
 
-  /**
-   * Tutti i membri dell'associazione attiva.
-   * Se il vecchio token non contiene associationId,
-   * il service usa la prima membership dell'utente.
-   */
   @Get()
   async findAll(
     @CurrentUser() user: JwtUser,
+    @Headers("x-association-id") associationId?: string,
   ) {
     return this.service.findAllForUser(
       user.id,
-      user.associationId,
+      associationId || user.associationId,
     );
   }
 
-  /**
-   * Membership dell'utente autenticato.
-   */
   @Get("me")
   async me(
     @CurrentUser() user: JwtUser,
+    @Headers("x-association-id") associationId?: string,
   ) {
     return this.service.me(
       user.id,
-      user.associationId,
+      associationId || user.associationId,
     );
   }
 
-  /**
-   * Modifica il ruolo di un membro.
-   */
   @Patch(":id/role")
   async updateRole(
     @CurrentUser() user: JwtUser,
@@ -65,9 +57,6 @@ export class MembershipsController {
     );
   }
 
-  /**
-   * Rimuove un membro.
-   */
   @Delete(":id")
   async remove(
     @CurrentUser() user: JwtUser,

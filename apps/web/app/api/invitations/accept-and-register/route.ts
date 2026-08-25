@@ -1,46 +1,53 @@
 import { NextResponse } from "next/server";
 
-const API_BASE_URL =
+const BACKEND_URL =
   process.env.NEXT_PUBLIC_API_URL ??
   "http://127.0.0.1:3001/api";
 
 export async function POST(request: Request) {
   try {
-    const authorization =
-      request.headers.get("authorization");
-
-    const body = await request.json();
+    const body = await request.text();
 
     const response = await fetch(
-      `${API_BASE_URL}/finances`,
+      `${BACKEND_URL}/invitations/accept-and-register`,
       {
         method: "POST",
         headers: {
           Accept: "application/json",
           "Content-Type": "application/json",
-          ...(authorization
-            ? { Authorization: authorization }
-            : {}),
         },
-        body: JSON.stringify(body),
+        body,
         cache: "no-store",
       },
     );
 
-    const data = await response.json().catch(() => null);
+    const text = await response.text();
+
+    let data: unknown;
+
+    try {
+      data = text ? JSON.parse(text) : {};
+    } catch {
+      data = { message: text };
+    }
 
     return NextResponse.json(data, {
       status: response.status,
     });
   } catch (error) {
+    console.error(
+      "Invitation accept-and-register proxy error:",
+      error,
+    );
+
     return NextResponse.json(
       {
         message:
           error instanceof Error
             ? error.message
-            : "Errore creazione transazione",
+            : "Backend non raggiungibile",
       },
-      { status: 500 },
+      { status: 502 },
     );
   }
 }

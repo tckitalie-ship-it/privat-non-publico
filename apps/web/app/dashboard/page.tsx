@@ -24,10 +24,17 @@ import UpcomingEvents from "@/components/dashboard/UpcomingEvents";
 import { PageHeader } from "@/components/ui";
 
 export default function DashboardPage() {
-  const [financeData, setFinanceData] = useState<FinanceTrendItem[]>([]);
-  const [membersData, setMembersData] = useState<MembersTrendItem[]>([]);
-  const [loadingCharts, setLoadingCharts] = useState(true);
-  const [chartsError, setChartsError] = useState<string | null>(null);
+  const [financeData, setFinanceData] =
+    useState<FinanceTrendItem[]>([]);
+
+  const [membersData, setMembersData] =
+    useState<MembersTrendItem[]>([]);
+
+  const [loadingCharts, setLoadingCharts] =
+    useState(true);
+
+  const [chartsError, setChartsError] =
+    useState<string | null>(null);
 
   const loadCharts = useCallback(async () => {
     setLoadingCharts(true);
@@ -39,10 +46,18 @@ export default function DashboardPage() {
         fetchMembersTrend(),
       ]);
 
-      setFinanceData(Array.isArray(finance) ? finance : []);
-      setMembersData(Array.isArray(members) ? members : []);
+      setFinanceData(
+        Array.isArray(finance) ? finance : [],
+      );
+
+      setMembersData(
+        Array.isArray(members) ? members : [],
+      );
     } catch (error) {
-      console.error("Errore caricamento grafici dashboard:", error);
+      console.error(
+        "Errore caricamento grafici dashboard:",
+        error,
+      );
 
       setFinanceData([]);
       setMembersData([]);
@@ -58,13 +73,7 @@ export default function DashboardPage() {
   }, []);
 
   useEffect(() => {
-    const timeoutId = window.setTimeout(() => {
-      void loadCharts();
-    }, 0);
-
-    return () => {
-      window.clearTimeout(timeoutId);
-    };
+    void loadCharts();
   }, [loadCharts]);
 
   useEffect(() => {
@@ -74,10 +83,16 @@ export default function DashboardPage() {
       }
     }
 
-    window.addEventListener("storage", handleStorage);
+    window.addEventListener(
+      "storage",
+      handleStorage,
+    );
 
     return () => {
-      window.removeEventListener("storage", handleStorage);
+      window.removeEventListener(
+        "storage",
+        handleStorage,
+      );
     };
   }, [loadCharts]);
 
@@ -147,3 +162,5 @@ export default function DashboardPage() {
     </div>
   );
 }
+
+

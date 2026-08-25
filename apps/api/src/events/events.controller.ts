@@ -3,151 +3,264 @@ import {
   Controller,
   Delete,
   Get,
+  Headers,
   Param,
   Patch,
   Post,
+  Req,
   UseGuards,
 } from "@nestjs/common";
+import { Request } from "express";
 
-import { CurrentUser } from "../auth/current-user.decorator";
 import { JwtAuthGuard } from "../auth/jwt-auth.guard";
-
 import { EventsService } from "./events.service";
+
+type AuthenticatedRequest = Request & {
+  user: {
+    id?: string;
+    sub?: string;
+  };
+};
 
 @Controller("events")
 @UseGuards(JwtAuthGuard)
 export class EventsController {
   constructor(
-    private readonly events: EventsService,
+    private readonly eventsService: EventsService,
   ) {}
 
-  /**
-   * Crea un evento.
-   */
-  @Post()
-  async create(
-    @CurrentUser() user: any,
-    @Body()
-    dto: {
-      associationId: string;
-      title: string;
-      description?: string | null;
-      startsAt: Date;
-      endsAt?: Date | null;
-      location?: string | null;
-    },
-  ) {
-    return this.events.createEvent(
-      user.sub,
-      dto,
-    );
+  private getUserId(
+    request: AuthenticatedRequest,
+  ): string {
+    const userId =
+      request.user?.id ??
+      request.user?.sub;
+
+    if (!userId) {
+      throw new Error(
+        "Utente autenticato non valido",
+      );
+    }
+
+    return userId;
   }
 
-  /**
-   * Elenco eventi dell'associazione.
-   */
   @Get("association/:associationId")
-  async findAll(
-    @CurrentUser() user: any,
+  async findAllByAssociation(
     @Param("associationId")
     associationId: string,
+    @Req()
+    request: AuthenticatedRequest,
   ) {
-    return this.events.findAll(
+    const userId =
+      this.getUserId(request);
+
+    return this.eventsService.findAll(
       associationId,
-      user.sub,
+      userId,
     );
   }
 
-  /**
-   * Registra l'utente autenticato all'evento.
-   */
-  @Post(":eventId/register")
-  async register(
-    @CurrentUser() user: any,
-    @Param("eventId") eventId: string,
-  ) {
-    return this.events.registerToEvent(
-      eventId,
-      user.sub,
-    );
-  }
-
-  /**
-   * Annulla la registrazione dell'utente.
-   */
-  @Delete(":eventId/register")
-  async unregister(
-    @CurrentUser() user: any,
-    @Param("eventId") eventId: string,
-  ) {
-    return this.events.unregisterFromEvent(
-      eventId,
-      user.sub,
-    );
-  }
-
-  /**
-   * Elenco partecipanti dell'evento.
-   */
-  @Get(":eventId/registrations")
-  async registrations(
-    @CurrentUser() user: any,
-    @Param("eventId") eventId: string,
-  ) {
-    return this.events.getRegistrations(
-      eventId,
-      user.sub,
-    );
-  }
-
-  /**
-   * Dettaglio evento.
-   */
-  @Get(":eventId")
+  @Get(":id")
   async findOne(
-    @CurrentUser() user: any,
-    @Param("eventId") eventId: string,
+    @Param("id") id: string,
+    @Req()
+    request: AuthenticatedRequest,
   ) {
-    return this.events.findOne(
-      eventId,
-      user.sub,
+    const userId =
+      this.getUserId(request);
+
+    return this.eventsService.findOne(
+      id,
+      userId,
     );
   }
 
-  /**
-   * Aggiorna evento.
-   */
-  @Patch(":eventId")
-  async update(
-    @CurrentUser() user: any,
-    @Param("eventId") eventId: string,
+  @Post()
+  async create(
     @Body()
-    dto: {
+    body: {
+      associationId?: string;
+      title: string;
+      description?: string | null;
+      location?: string | null;
+      startsAt: string;
+      endsAt?: string | null;
+    },
+    @Headers("x-association-id")
+    headerAssociationId: string | undefined,
+    @Req()
+    request: AuthenticatedRequest,
+  ) {
+    const userId =
+      this.getUserId(request);
+
+    const associationId =
+      body.associationId ??
+      headerAssociationId;
+
+    if (!associationId) {
+      throw new Error(
+        "Association ID mancante",
+      );
+    }
+
+    return this.eventsService.createEvent(
+      userId,
+      {
+        associationId,
+        title: body.title,
+        description:
+          body.description ?? null,
+        location:
+          body.location ?? null,
+        startsAt:
+          new Date(body.startsAt),
+        endsAt:
+          body.endsAt
+            ? new Date(body.endsAt)
+            : null,
+      },
+    );
+  }
+
+  @Patch(":id")
+  async update(
+    @Param("id") id: string,
+    @Body()
+    body: {
       title?: string;
       description?: string | null;
-      startsAt?: Date;
-      endsAt?: Date | null;
       location?: string | null;
+      startsAt?: string;
+      endsAt?: string | null;
     },
+    @Req()
+    request: AuthenticatedRequest,
   ) {
-    return this.events.updateEvent(
-      eventId,
-      user.sub,
-      dto,
+    const userId =
+      this.getUserId(request);
+
+    return this.eventsService.updateEvent(
+      id,
+      userId,
+      {
+        ...(body.title !== undefined
+          ? { title: body.title }
+          : {}),
+        ...(body.description !== undefined
+          ? {
+              description:
+                body.description,
+            }
+          : {}),
+        ...(body.location !== undefined
+          ? {
+              location:
+                body.location,
+            }
+          : {}),
+        ...(body.startsAt !== undefined
+          ? {
+              startsAt: new Date(
+                body.startsAt,
+              ),
+            }
+          : {}),
+        ...(body.endsAt !== undefined
+          ? {
+              endsAt:
+                body.endsAt
+                  ? new Date(body.endsAt)
+                  : null,
+            }
+          : {}),
+      },
     );
   }
 
-  /**
-   * Elimina evento.
-   */
-  @Delete(":eventId")
-  async delete(
-    @CurrentUser() user: any,
-    @Param("eventId") eventId: string,
+  @Delete(":id")
+  async remove(
+    @Param("id") id: string,
+    @Req()
+    request: AuthenticatedRequest,
   ) {
-    return this.events.deleteEvent(
-      eventId,
-      user.sub,
+    const userId =
+      this.getUserId(request);
+
+    return this.eventsService.deleteEvent(
+      id,
+      userId,
+    );
+  }
+
+  @Post(":id/register")
+  async register(
+    @Param("id") id: string,
+    @Req()
+    request: AuthenticatedRequest,
+  ) {
+    try {
+      const userId =
+        this.getUserId(request);
+
+      console.log(
+        "[EVENT REGISTER] richiesta ricevuta",
+        {
+          eventId: id,
+          userId,
+        },
+      );
+
+      const result =
+        await this.eventsService.registerToEvent(
+          id,
+          userId,
+        );
+
+      console.log(
+        "[EVENT REGISTER] successo",
+        result,
+      );
+
+      return result;
+    } catch (error) {
+      console.error(
+        "[EVENT REGISTER] ERRORE COMPLETO:",
+        error,
+      );
+
+      throw error;
+    }
+  }
+
+  @Get(":id/registrations")
+  async getRegistrations(
+    @Param("id") id: string,
+    @Req()
+    request: AuthenticatedRequest,
+  ) {
+    const userId =
+      this.getUserId(request);
+
+    return this.eventsService.getRegistrations(
+      id,
+      userId,
+    );
+  }
+
+  @Delete(":id/register")
+  async unregister(
+    @Param("id") id: string,
+    @Req()
+    request: AuthenticatedRequest,
+  ) {
+    const userId =
+      this.getUserId(request);
+
+    return this.eventsService.unregisterFromEvent(
+      id,
+      userId,
     );
   }
 }

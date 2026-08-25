@@ -1,29 +1,36 @@
 ﻿import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { getBackendApiUrl } from "@/lib/server-api";
 
-export async function GET(
+const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_URL ??
+  "http://127.0.0.1:3001/api";
+
+export async function PATCH(
   request: Request,
+  {
+    params,
+  }: {
+    params: Promise<{ id: string }>;
+  },
 ) {
   try {
-    const cookieStore =
-      await cookies();
+    const { id } = await params;
+
+    const cookieStore = await cookies();
+
+    const headerAuthorization =
+      request.headers.get("authorization");
 
     const cookieToken =
       cookieStore
         .get("access_token")
         ?.value;
 
-    const headerAuthorization =
-      request.headers.get(
-        "authorization",
-      );
-
     const authorization =
-      headerAuthorization ||
+      headerAuthorization ??
       (cookieToken
         ? `Bearer ${cookieToken}`
-        : "");
+        : null);
 
     if (!authorization) {
       return NextResponse.json(
@@ -42,8 +49,12 @@ export async function GET(
         "x-association-id",
       );
 
+    const body = await request.json();
+
     const headers: HeadersInit = {
       Accept: "application/json",
+      "Content-Type":
+        "application/json",
       Authorization: authorization,
     };
 
@@ -53,12 +64,11 @@ export async function GET(
     }
 
     const response = await fetch(
-      getBackendApiUrl(
-        "memberships/me",
-      ),
+      `${API_BASE_URL}/memberships/${id}/role`,
       {
-        method: "GET",
+        method: "PATCH",
         headers,
+        body: JSON.stringify(body),
         cache: "no-store",
       },
     );
@@ -68,22 +78,27 @@ export async function GET(
         .json()
         .catch(() => null);
 
-    return NextResponse.json(
+    console.log(
+      "[MEMBERSHIP ROLE PATCH]",
+      response.status,
       data,
-      {
-        status: response.status,
-      },
     );
+
+    return NextResponse.json(data, {
+      status: response.status,
+    });
   } catch (error) {
     console.error(
-      "Errore GET /memberships/me:",
+      "[MEMBERSHIP ROLE PATCH ERROR]",
       error,
     );
 
     return NextResponse.json(
       {
         message:
-          "Errore interno",
+          error instanceof Error
+            ? error.message
+            : "Errore aggiornamento ruolo",
       },
       {
         status: 500,

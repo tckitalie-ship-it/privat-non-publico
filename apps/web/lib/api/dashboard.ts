@@ -1,7 +1,4 @@
-import {
-  API_URL,
-  getAccessToken,
-} from "@/lib/api";
+import { getAccessToken } from "@/lib/api";
 
 export interface DashboardKpisData {
   associationsCount: number;
@@ -15,6 +12,7 @@ export interface DashboardKpisData {
   balanceCents: number;
   newMembersThisMonth: number;
   upcomingEvents: number;
+  pendingInvitations: number;
 }
 
 export interface FinanceTrendItem {
@@ -63,20 +61,44 @@ async function authenticatedGet(path: string) {
 }
 
 export async function fetchKpis(): Promise<DashboardKpisData> {
-  return authenticatedGet("/dashboard/kpis");
+  const data = await authenticatedGet("/dashboard/kpis");
+
+  return {
+    associationsCount: 0,
+    membersCount: data?.totalMembers ?? 0,
+    eventsCount: 0,
+    usersCount: 0,
+    transactionsCount: 0,
+    eventRegistrationsCount: 0,
+    incomeCents: data?.monthlyIncome ?? 0,
+    expenseCents: data?.monthlyExpenses ?? 0,
+    balanceCents:
+      (data?.monthlyIncome ?? 0) -
+      (data?.monthlyExpenses ?? 0),
+    newMembersThisMonth: 0,
+    upcomingEvents: data?.activeEvents ?? 0,
+    pendingInvitations: data?.pendingInvitations ?? 0,
+  };
 }
 
-export async function fetchFinanceTrend(): Promise<FinanceTrendItem[]> {
+export async function fetchFinanceTrend(): Promise<
+  FinanceTrendItem[]
+> {
   return authenticatedGet("/dashboard/finance-trend");
 }
 
-export async function fetchEventsTrend(): Promise<MembersTrendItem[]> {
+export async function fetchEventsTrend(): Promise<
+  MembersTrendItem[]
+> {
   return authenticatedGet("/dashboard/events-trend");
 }
 
-export async function fetchMembersTrend(): Promise<MembersTrendItem[]> {
-  return authenticatedGet("/dashboard/events-trend");
+export async function fetchMembersTrend(): Promise<
+  MembersTrendItem[]
+> {
+  return authenticatedGet("/dashboard/members-trend");
 }
+
 export interface LatestTransaction {
   id: string;
   title: string | null;
@@ -89,7 +111,9 @@ export interface LatestTransaction {
   updatedAt: string;
 }
 
-export async function fetchLatestTransactions(): Promise<LatestTransaction[]> {
+export async function fetchLatestTransactions(): Promise<
+  LatestTransaction[]
+> {
   const data = await authenticatedGet(
     "/dashboard/latest-transactions",
   );

@@ -1,51 +1,216 @@
-import { NextResponse } from 'next/server';
+﻿import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
 
-const API_BASE_URL = 'http://127.0.0.1:3000/api';
+const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_URL ??
+  "http://127.0.0.1:3001/api";
+
+async function getAuthorization(
+  request: Request,
+) {
+  const headerAuthorization =
+    request.headers.get("authorization");
+
+  if (headerAuthorization) {
+    return headerAuthorization;
+  }
+
+  const cookieStore = await cookies();
+
+  const cookieToken =
+    cookieStore
+      .get("access_token")
+      ?.value;
+
+  return cookieToken
+    ? `Bearer ${cookieToken}`
+    : null;
+}
+
+async function getResponseData(
+  response: Response,
+) {
+  const text = await response.text();
+
+  if (!text) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(text);
+  } catch {
+    return {
+      message: text,
+    };
+  }
+}
 
 export async function POST(
   request: Request,
-  context: { params: Promise<{ id: string }> },
+  context: {
+    params: Promise<{
+      id: string;
+    }>;
+  },
 ) {
-  const token = request.headers.get('authorization');
-  const body = await request.json();
-  const { id } = await context.params;
+  try {
+    const { id } =
+      await context.params;
 
-  const response = await fetch(`${API_BASE_URL}/events/${id}/register`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: token } : {}),
-    },
-    body: JSON.stringify(body),
-  });
+    const authorization =
+      await getAuthorization(request);
 
-  const data = await response.json();
+    if (!authorization) {
+      return NextResponse.json(
+        {
+          message:
+            "Sessione non disponibile",
+        },
+        {
+          status: 401,
+        },
+      );
+    }
 
-  return NextResponse.json(data, {
-    status: response.status,
-  });
+    const associationId =
+      request.headers.get(
+        "x-association-id",
+      );
+
+    const headers: HeadersInit = {
+      Accept: "application/json",
+      Authorization:
+        authorization,
+    };
+
+    if (associationId) {
+      headers[
+        "x-association-id"
+      ] = associationId;
+    }
+
+    const response =
+      await fetch(
+        `${API_BASE_URL}/events/${id}/register`,
+        {
+          method: "POST",
+          headers,
+          cache: "no-store",
+        },
+      );
+
+    const data =
+      await getResponseData(
+        response,
+      );
+
+    return NextResponse.json(
+      data,
+      {
+        status: response.status,
+      },
+    );
+  } catch (error) {
+    console.error(
+      "[EVENT REGISTER ERROR]",
+      error,
+    );
+
+    return NextResponse.json(
+      {
+        message:
+          error instanceof Error
+            ? error.message
+            : "Errore registrazione evento",
+      },
+      {
+        status: 500,
+      },
+    );
+  }
 }
 
 export async function DELETE(
   request: Request,
-  context: { params: Promise<{ id: string }> },
+  context: {
+    params: Promise<{
+      id: string;
+    }>;
+  },
 ) {
-  const token = request.headers.get('authorization');
-  const body = await request.json();
-  const { id } = await context.params;
+  try {
+    const { id } =
+      await context.params;
 
-  const response = await fetch(`${API_BASE_URL}/events/${id}/register`, {
-    method: 'DELETE',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: token } : {}),
-    },
-    body: JSON.stringify(body),
-  });
+    const authorization =
+      await getAuthorization(request);
 
-  const data = await response.json();
+    if (!authorization) {
+      return NextResponse.json(
+        {
+          message:
+            "Sessione non disponibile",
+        },
+        {
+          status: 401,
+        },
+      );
+    }
 
-  return NextResponse.json(data, {
-    status: response.status,
-  });
+    const associationId =
+      request.headers.get(
+        "x-association-id",
+      );
+
+    const headers: HeadersInit = {
+      Accept: "application/json",
+      Authorization:
+        authorization,
+    };
+
+    if (associationId) {
+      headers[
+        "x-association-id"
+      ] = associationId;
+    }
+
+    const response =
+      await fetch(
+        `${API_BASE_URL}/events/${id}/register`,
+        {
+          method: "DELETE",
+          headers,
+          cache: "no-store",
+        },
+      );
+
+    const data =
+      await getResponseData(
+        response,
+      );
+
+    return NextResponse.json(
+      data,
+      {
+        status: response.status,
+      },
+    );
+  } catch (error) {
+    console.error(
+      "[EVENT UNREGISTER ERROR]",
+      error,
+    );
+
+    return NextResponse.json(
+      {
+        message:
+          error instanceof Error
+            ? error.message
+            : "Errore annullamento partecipazione",
+      },
+      {
+        status: 500,
+      },
+    );
+  }
 }

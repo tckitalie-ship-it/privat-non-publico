@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { FormEvent, useEffect, useState } from 'react';
 import { Building2, Plus, Users, CalendarDays, Settings, Trash2 } from 'lucide-react';
 import { setActiveAssociationId } from "@/lib/association"; // ✅ AGGIUNTO
-import DashboardSidebar from '@/components/dashboard-sidebar';
+
 import { API_URL, getAccessToken } from "@/lib/api";
 type Association = {
   id: string;
@@ -137,12 +137,9 @@ export default function AssociationsPage() {
     );
   }
 
-  return (
-    <div className="flex min-h-screen bg-[#0f1117] text-white">
-      <DashboardSidebar />
-
-      <main className="flex-1 p-8 md:ml-72">
-        <div className="mx-auto max-w-7xl space-y-8">
+    return (
+  <div className="min-h-screen text-white">
+    <main className="p-4 sm:p-6 lg:p-8">     <div className="mx-auto max-w-7xl space-y-8">
 
           <div>
             <Link

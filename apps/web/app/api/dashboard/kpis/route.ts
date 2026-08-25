@@ -17,14 +17,25 @@ export async function GET(request: Request) {
 
     const authorization =
       headerAuthorization ??
-      (cookieToken ? `Bearer ${cookieToken}` : null);
+      (cookieToken
+        ? `Bearer ${cookieToken}`
+        : null);
 
     if (!authorization) {
       return NextResponse.json(
-        { message: "Sessione non disponibile" },
-        { status: 401 },
+        {
+          message: "Sessione non disponibile",
+        },
+        {
+          status: 401,
+        },
       );
     }
+
+    const associationId =
+      request.headers.get(
+        "x-association-id",
+      );
 
     const response = await fetch(
       `${API_BASE_URL}/dashboard/kpis`,
@@ -33,22 +44,44 @@ export async function GET(request: Request) {
         headers: {
           Accept: "application/json",
           Authorization: authorization,
+          ...(associationId
+            ? {
+                "x-association-id":
+                  associationId,
+              }
+            : {}),
         },
         cache: "no-store",
       },
     );
 
-    const data = await response.json().catch(() => null);
-
-    return NextResponse.json(data ?? {}, {
-      status: response.status,
-    });
-  } catch (error) {
-    console.error("Dashboard KPI proxy error:", error);
+    const data =
+      await response.json().catch(
+        () => null,
+      );
 
     return NextResponse.json(
-      { message: "API NestJS non raggiungibile" },
-      { status: 500 },
+      data ?? {},
+      {
+        status: response.status,
+      },
+    );
+  } catch (error) {
+    console.error(
+      "Dashboard KPI proxy error:",
+      error,
+    );
+
+    return NextResponse.json(
+      {
+        message:
+          error instanceof Error
+            ? error.message
+            : "API NestJS non raggiungibile",
+      },
+      {
+        status: 500,
+      },
     );
   }
 }

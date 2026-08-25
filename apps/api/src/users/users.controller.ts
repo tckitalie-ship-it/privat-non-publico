@@ -24,10 +24,91 @@ export class UsersController {
   ) {}
 
   /**
+   * Profilo dell'utente autenticato.
+   */
+  @Get("me")
+  async me(
+    @CurrentUser() user: any,
+  ) {
+    console.log("[USERS/ME] AUTH USER:", {
+      id: user?.id,
+      sub: user?.sub,
+      email: user?.email,
+      role: user?.role,
+    });
+
+    const profile = await this.prisma.user.findUnique({
+      where: {
+        id: user.sub,
+      },
+      select: {
+        id: true,
+        email: true,
+        createdAt: true,
+        memberships: {
+          select: {
+            id: true,
+            associationId: true,
+            role: true,
+            association: {
+              select: {
+                id: true,
+                name: true,
+                slug: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    console.log(
+      "[USERS/ME] PROFILE FOUND:",
+      !!profile,
+    );
+
+    if (profile) {
+      console.log(
+        "[USERS/ME] PROFILE ID:",
+        profile.id,
+      );
+      console.log(
+        "[USERS/ME] PROFILE EMAIL:",
+        profile.email,
+      );
+    }
+
+    if (!profile) {
+      throw new BadRequestException(
+        "Profilo utente non trovato",
+      );
+    }
+
+    return profile;
+  }
+
+  /**
+   * Associazioni dell'utente autenticato.
+   */
+  @Get("me/associations")
+  async myAssociations(
+    @CurrentUser() user: any,
+  ) {
+    return this.prisma.membership.findMany({
+      where: {
+        userId: user.sub,
+      },
+      include: {
+        association: true,
+      },
+      orderBy: {
+        createdAt: "asc",
+      },
+    });
+  }
+
+  /**
    * Profilo di un utente.
-   *
-   * L'utente autenticato può consultare
-   * i dati necessari alla gestione dell'app.
    */
   @Get(":id")
   async findOne(
@@ -84,64 +165,7 @@ export class UsersController {
   }
 
   /**
-   * Associazioni dell'utente autenticato.
-   */
-  @Get("me/associations")
-  async myAssociations(
-    @CurrentUser() user: any,
-  ) {
-    return this.prisma.membership.findMany({
-      where: {
-        userId: user.sub,
-      },
-      include: {
-        association: true,
-      },
-      orderBy: {
-        createdAt: "asc",
-      },
-    });
-  }
-
-  /**
-   * Profilo dell'utente autenticato.
-   */
-  @Get("me")
-  async me(
-    @CurrentUser() user: any,
-  ) {
-    return this.prisma.user.findUnique({
-      where: {
-        id: user.sub,
-      },
-      select: {
-        id: true,
-        email: true,
-        createdAt: true,
-        memberships: {
-          select: {
-            id: true,
-            associationId: true,
-            role: true,
-            association: {
-              select: {
-                id: true,
-                name: true,
-                slug: true,
-              },
-            },
-          },
-        },
-      },
-    });
-  }
-
-  /**
    * Modifica il profilo dell'utente autenticato.
-   *
-   * Per ora permettiamo solamente la modifica
-   * dell'email, perché è l'unico dato modificabile
-   * realmente presente nel modello User attuale.
    */
   @Patch("me")
   async updateMe(
