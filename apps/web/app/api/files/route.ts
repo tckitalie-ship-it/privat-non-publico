@@ -4,12 +4,16 @@ const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL ??
   "http://127.0.0.1:3001/api";
 
-function getHeaders(request: Request) {
+function getHeaders(request: Request): Record<string, string> {
   const authorization = request.headers.get("authorization");
 
-  return authorization
-    ? { Authorization: authorization }
-    : {};
+  if (!authorization) {
+    return {};
+  }
+
+  return {
+    Authorization: authorization,
+  };
 }
 
 export async function GET(request: Request) {
