@@ -261,7 +261,7 @@ export class DashboardService {
         transaction.description ??
         `${(transaction.amountCents / 100).toFixed(2)} €`,
       icon: "finance" as const,
-      createdAt: transaction.createdAt,
+      createdAt: transaction.date,
     }));
 
     return [
@@ -277,4 +277,5 @@ export class DashboardService {
       .slice(0, 10);
   }
 }
+
 
