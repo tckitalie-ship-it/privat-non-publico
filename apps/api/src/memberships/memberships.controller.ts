@@ -1,69 +1,63 @@
 import {
-  Body,
   Controller,
-  Delete,
   Get,
-  Headers,
   Param,
   Patch,
+  Delete,
+  Body,
   UseGuards,
 } from "@nestjs/common";
+import { AuthGuard } from "@nestjs/passport";
 
 import { CurrentUser } from "../auth/current-user.decorator";
-import { JwtAuthGuard } from "../auth/jwt-auth.guard";
 import type { JwtUser } from "../auth/jwt-user.interface";
-
 import { MembershipsService } from "./memberships.service";
 
+@UseGuards(AuthGuard("jwt"))
 @Controller("memberships")
-@UseGuards(JwtAuthGuard)
 export class MembershipsController {
   constructor(
-    private readonly service: MembershipsService,
+    private readonly membershipsService: MembershipsService,
   ) {}
 
   @Get()
-  async findAll(
+  findAll(
     @CurrentUser() user: JwtUser,
-    @Headers("x-association-id") associationId?: string,
   ) {
-    return this.service.findAllForUser(
+    return this.membershipsService.findAllForUser(
       user.id,
-      associationId || user.associationId,
     );
   }
 
   @Get("me")
-  async me(
+  me(
     @CurrentUser() user: JwtUser,
-    @Headers("x-association-id") associationId?: string,
   ) {
-    return this.service.me(
+    return this.membershipsService.me(
       user.id,
-      associationId || user.associationId,
     );
   }
 
   @Patch(":id/role")
-  async updateRole(
-    @CurrentUser() user: JwtUser,
-    @Param("id") id: string,
+  updateRole(
+    @Param("id") membershipId: string,
     @Body("role") role: string,
+    @CurrentUser() user: JwtUser,
   ) {
-    return this.service.updateRole(
-      id,
+    return this.membershipsService.updateRole(
+      membershipId,
       role,
       user.id,
     );
   }
 
   @Delete(":id")
-  async remove(
+  remove(
+    @Param("id") membershipId: string,
     @CurrentUser() user: JwtUser,
-    @Param("id") id: string,
   ) {
-    return this.service.remove(
-      id,
+    return this.membershipsService.remove(
+      membershipId,
       user.id,
     );
   }
