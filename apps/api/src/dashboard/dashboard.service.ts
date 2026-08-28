@@ -229,7 +229,7 @@ export class DashboardService {
 
       this.prisma.transaction.findMany({
         where: { associationId },
-        orderBy: { createdAt: "desc" },
+        orderBy: { date: "desc" },
         take: 5,
       }),
     ]);
@@ -277,5 +277,7 @@ export class DashboardService {
       .slice(0, 10);
   }
 }
+
+
 
 
