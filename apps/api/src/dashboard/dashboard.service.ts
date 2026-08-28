@@ -119,47 +119,20 @@ export class DashboardService {
     associationId: string,
     userId: string,
   ) {
-    await this.ensureMembership(
-      userId,
-      associationId,
-    );
+    await this.ensureMembership(userId, associationId);
 
-    const memberships =
-      await this.prisma.membership.findMany({
-        where: {
-          associationId,
-        },
-        orderBy: {
-          createdAt: "asc",
-        },
-        select: {
-          createdAt: true,
-        },
-      });
-
-    const trend: Record<string, number> = {};
-
-    for (const membership of memberships) {
-      const key = `${membership.createdAt.getFullYear()}-${String(
-        membership.createdAt.getMonth() + 1,
-      ).padStart(2, "0")}`;
-
-      trend[key] =
-        (trend[key] ?? 0) + 1;
-    }
-
-    let cumulative = 0;
-
-    return Object.entries(trend).map(
-      ([month, count]) => {
-        cumulative += count;
-
-        return {
-          month,
-          count: cumulative,
-        };
+    const total = await this.prisma.membership.count({
+      where: {
+        associationId,
       },
-    );
+    });
+
+    return [
+      {
+        month: new Date().toISOString().slice(0, 7),
+        count: total,
+      },
+    ];
   }
   async getEventsTrend(associationId: string, userId: string) {
     await this.ensureMembership(userId, associationId);
@@ -277,6 +250,7 @@ export class DashboardService {
       .slice(0, 10);
   }
 }
+
 
 
 
