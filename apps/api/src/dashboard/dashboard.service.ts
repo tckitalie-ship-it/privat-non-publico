@@ -119,7 +119,19 @@ export class DashboardService {
     associationId: string,
     userId: string,
   ) {
-    await this.ensureMembership(userId, associationId);
+    const membership = await this.prisma.membership.findFirst({
+      where: {
+        userId,
+        associationId,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (!membership) {
+      return [];
+    }
 
     const total = await this.prisma.membership.count({
       where: {
@@ -250,6 +262,7 @@ export class DashboardService {
       .slice(0, 10);
   }
 }
+
 
 
 
