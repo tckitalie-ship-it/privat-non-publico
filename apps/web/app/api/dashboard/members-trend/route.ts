@@ -1,27 +1,33 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
-export async function GET(request: Request) {
+const API_BASE_URL =
+  process.env.API_URL ??
+  "http://127.0.0.1:3001/api";
+
+export async function GET(request: NextRequest) {
   try {
     const authorization =
       request.headers.get("authorization");
 
     const response = await fetch(
-      "http://127.0.0.1:3001/api/dashboard/members-trend",
+      `${API_BASE_URL}/dashboard/members-trend`,
       {
-        headers: {
-          Authorization: authorization || "",
-        },
+        method: "GET",
+        headers: authorization
+          ? {
+              Authorization: authorization,
+            }
+          : {},
         cache: "no-store",
       },
     );
 
-    const text = await response.text();
+    const data = await response
+      .json()
+      .catch(() => null);
 
-    return new NextResponse(text, {
+    return NextResponse.json(data, {
       status: response.status,
-      headers: {
-        "Content-Type": "application/json",
-      },
     });
   } catch (error) {
     console.error(
@@ -33,9 +39,7 @@ export async function GET(request: Request) {
       {
         message: "Errore members trend",
       },
-      {
-        status: 500,
-      },
+      { status: 500 },
     );
   }
 }
