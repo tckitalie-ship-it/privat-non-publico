@@ -106,27 +106,6 @@ export default function MembersTrendChart({
                 bottom: 8,
               }}
             >
-              <defs>
-                <linearGradient
-                  id="membersTrendGradient"
-                  x1="0"
-                  y1="0"
-                  x2="0"
-                  y2="1"
-                >
-                  <stop
-                    offset="0%"
-                    stopColor="#10b981"
-                    stopOpacity={0.28}
-                  />
-                  <stop
-                    offset="100%"
-                    stopColor="#10b981"
-                    stopOpacity={0.03}
-                  />
-                </linearGradient>
-              </defs>
-
               <CartesianGrid
                 strokeDasharray="3 3"
                 stroke="#e5e7eb"
@@ -159,6 +138,7 @@ export default function MembersTrendChart({
                 axisLine={false}
                 tickLine={false}
                 width={55}
+                domain={[0, "dataMax + 1"]}
               />
 
               <Tooltip
@@ -195,13 +175,22 @@ export default function MembersTrendChart({
                 dataKey="count"
                 name="Membri"
                 stroke="#059669"
-                fill="url(#membersTrendGradient)"
                 strokeWidth={3}
-                dot={false}
-                activeDot={{
-                  r: 5,
+                fill="#10b981"
+                fillOpacity={0.25}
+                dot={{
+                  r: 4,
+                  fill: "#059669",
+                  stroke: "#ffffff",
                   strokeWidth: 2,
                 }}
+                activeDot={{
+                  r: 6,
+                  fill: "#047857",
+                  stroke: "#ffffff",
+                  strokeWidth: 2,
+                }}
+                isAnimationActive={false}
               />
             </AreaChart>
           )}
