@@ -1,27 +1,28 @@
 import { NextResponse } from "next/server";
 
 const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:3001/api";
+  process.env.API_URL ??
+  "http://127.0.0.1:3001/api";
 
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    console.log("LOGIN DEBUG:", {
-  email: body.email,
-  passwordLength: body.password?.length,
-});
-    const response = await fetch(`${API_BASE_URL}/auth/login`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
+
+    const response = await fetch(
+      `${API_BASE_URL}/auth/login`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(body),
+        cache: "no-store",
       },
-      body: JSON.stringify(body),
-      cache: "no-store",
-    });
+    );
 
     const text = await response.text();
 
-    let data: any = {};
+    let data: unknown = {};
 
     if (text) {
       try {
