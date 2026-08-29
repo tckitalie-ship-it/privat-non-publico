@@ -4,14 +4,14 @@ import {
   Get,
   UseGuards,
 } from "@nestjs/common";
-import { AuthGuard } from "@nestjs/passport";
+import { JwtAuthGuard } from "../auth/jwt-auth.guard";
 
 import { CurrentUser } from "../auth/current-user.decorator";
 import type { JwtUser } from "../auth/jwt-user.interface";
 import { PrismaService } from "../prisma/prisma.service";
 import { DashboardService } from "./dashboard.service";
 
-@UseGuards(AuthGuard("jwt"))
+@UseGuards(JwtAuthGuard)
 @Controller("dashboard")
 export class DashboardController {
   constructor(
