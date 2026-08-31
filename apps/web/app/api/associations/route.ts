@@ -42,7 +42,7 @@ export async function GET(request: Request) {
 export async function POST(req: Request) {
   try {
     const cookieStore = await cookies();
-    const token = cookieStore.get("access_token")?.value ?? request.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
+    const token = cookieStore.get("access_token")?.value ?? req.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
 
     if (!token) {
       return NextResponse.json(
@@ -72,6 +72,11 @@ export async function POST(req: Request) {
     );
   }
 }
+
+
+
+
+
 
 
 
