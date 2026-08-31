@@ -119,7 +119,7 @@ export default function RecentActivity() {
         setError(null);
 
         const response = await fetch(
-          `${API_URL}/dashboard/recent-activity`,
+          `/api/dashboard/recent-activity`,
           {
             headers: {
               Authorization: `Bearer ${token}`,
