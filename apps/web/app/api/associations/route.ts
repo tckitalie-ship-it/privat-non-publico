@@ -6,10 +6,10 @@ const API_URL = `${process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:3001/api
 // -----------------------------------------------------
 // GET /api/associations
 // -----------------------------------------------------
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const cookieStore = await cookies();
-    const token = cookieStore.get("access_token")?.value;
+    const token = cookieStore.get("access_token")?.value ?? request.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
 
     if (!token) {
       return NextResponse.json(
@@ -42,7 +42,7 @@ export async function GET() {
 export async function POST(req: Request) {
   try {
     const cookieStore = await cookies();
-    const token = cookieStore.get("access_token")?.value;
+    const token = cookieStore.get("access_token")?.value ?? request.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
 
     if (!token) {
       return NextResponse.json(
@@ -72,4 +72,6 @@ export async function POST(req: Request) {
     );
   }
 }
+
+
 
