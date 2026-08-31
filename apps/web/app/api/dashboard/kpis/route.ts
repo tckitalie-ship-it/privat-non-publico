@@ -13,7 +13,7 @@ export async function GET(request: Request) {
       request.headers.get("authorization");
 
     const cookieToken =
-      cookieStore.get("access_token")?.value;
+      cookieStore.get("access_token")?.value ?? request.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
 
     const authorization =
       headerAuthorization ??

@@ -1,4 +1,4 @@
-﻿import { cookies } from "next/headers";
+import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
 const API_BASE_URL =
@@ -13,7 +13,7 @@ export async function GET(request: Request) {
       request.headers.get("authorization");
 
     const cookieToken =
-      cookieStore.get("access_token")?.value;
+      cookieStore.get("access_token")?.value ?? request.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
 
     const authorization =
       headerAuthorization ??
@@ -55,3 +55,4 @@ export async function GET(request: Request) {
     );
   }
 }
+
