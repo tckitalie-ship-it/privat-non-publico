@@ -1,44 +1,53 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL ??
   "http://127.0.0.1:3001/api";
 
-export async function GET(request: NextRequest) {
+export async function GET(request: Request) {
   try {
-    const authorization =
-      request.headers.get("authorization");
+    const cookieStore = await cookies();
+
+    const token =
+      cookieStore.get("access_token")?.value ??
+      request.headers
+        .get("authorization")
+        ?.replace(/^Bearer\s+/i, "");
+
+    if (!token) {
+      return NextResponse.json(
+        {
+          message: "Authorization header mancante",
+          error: "Unauthorized",
+          statusCode: 401,
+        },
+        { status: 401 },
+      );
+    }
 
     const response = await fetch(
       `${API_BASE_URL}/dashboard/recent-activity`,
       {
         method: "GET",
-        headers: authorization
-          ? {
-              Authorization: authorization,
-            }
-          : {},
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
         cache: "no-store",
       },
     );
 
-    const data = await response
-      .json()
-      .catch(() => null);
+    const data = await response.json().catch(() => null);
 
     return NextResponse.json(data, {
       status: response.status,
     });
   } catch (error) {
-    console.error(
-      "Errore proxy recent activity:",
-      error,
-    );
+    console.error("Errore proxy recent activity:", error);
 
     return NextResponse.json(
       {
-        message:
-          "Errore caricamento attività recenti",
+        message: "Errore caricamento attività recenti",
       },
       { status: 500 },
     );
