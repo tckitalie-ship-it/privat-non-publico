@@ -33,3 +33,5 @@ apps/api/env
 *.bak
 *.backup
 *.before-*
+.vercel
+.env*

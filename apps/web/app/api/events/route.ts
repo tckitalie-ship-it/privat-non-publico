@@ -1,14 +1,24 @@
+import { getBackendApiUrl } from "@/lib/server-api";
 import { NextRequest, NextResponse } from "next/server";
 
-const BACKEND_URL = "http://127.0.0.1:3001/api";
+
 
 function getHeaders(request: NextRequest) {
   const headers: Record<string, string> = {
     Accept: "application/json",
   };
 
-  const authorization =
+  const headerAuthorization =
     request.headers.get("authorization");
+
+  const cookieToken =
+    request.cookies.get("access_token")?.value;
+
+  const authorization =
+    headerAuthorization ??
+    (cookieToken
+      ? `Bearer ${cookieToken}`
+      : null);
 
   if (authorization) {
     headers.Authorization = authorization;
@@ -21,9 +31,7 @@ export async function GET(request: NextRequest) {
   try {
     const associationId =
       request.headers.get("x-association-id") ??
-      request.nextUrl.searchParams.get(
-        "associationId",
-      );
+      request.nextUrl.searchParams.get("associationId");
 
     if (!associationId) {
       return NextResponse.json(
@@ -35,7 +43,7 @@ export async function GET(request: NextRequest) {
     }
 
     const response = await fetch(
-      `${BACKEND_URL}/events/association/${associationId}`,
+      `${getBackendApiUrl("events/association/")}${associationId}`,
       {
         method: "GET",
         headers: getHeaders(request),
@@ -46,7 +54,7 @@ export async function GET(request: NextRequest) {
     const data =
       await response.json().catch(() => null);
 
-    return NextResponse.json(data, {
+    return NextResponse.json(data ?? {}, {
       status: response.status,
     });
   } catch (error) {
@@ -66,13 +74,12 @@ export async function POST(request: NextRequest) {
     const body = await request.text();
 
     const response = await fetch(
-      `${BACKEND_URL}/events`,
+      `${getBackendApiUrl("events")}`,
       {
         method: "POST",
         headers: {
           ...getHeaders(request),
-          "Content-Type":
-            "application/json",
+          "Content-Type": "application/json",
         },
         body,
       },
@@ -81,7 +88,7 @@ export async function POST(request: NextRequest) {
     const data =
       await response.json().catch(() => null);
 
-    return NextResponse.json(data, {
+    return NextResponse.json(data ?? {}, {
       status: response.status,
     });
   } catch (error) {

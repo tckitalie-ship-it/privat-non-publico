@@ -1,9 +1,8 @@
+import { getBackendApiUrl } from "@/lib/server-api";
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL ??
-  "http://127.0.0.1:3001/api";
+
 
 export async function GET(request: Request) {
   try {
@@ -27,7 +26,7 @@ export async function GET(request: Request) {
     }
 
     const response = await fetch(
-      `${API_BASE_URL}/dashboard/recent-activity`,
+      `${getBackendApiUrl("dashboard/recent-activity")}`,
       {
         method: "GET",
         headers: {
@@ -53,3 +52,4 @@ export async function GET(request: Request) {
     );
   }
 }
+

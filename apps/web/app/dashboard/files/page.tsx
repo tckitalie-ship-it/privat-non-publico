@@ -31,6 +31,7 @@ import {
   API_URL,
   getAccessToken,
 } from "@/lib/api";
+import { getActiveAssociationId } from "@/lib/association";
 
 type Role =
   | "OWNER"
@@ -79,7 +80,7 @@ function getCurrentUserRole(): Role | null {
 
   const token = getAccessToken();
 
-  if (!token) {
+    if (!token) {
     return null;
   }
 
@@ -98,8 +99,9 @@ function getCurrentUserRole(): Role | null {
 
 async function requestFiles(): Promise<FileItem[]> {
   const token = getAccessToken();
+  const associationId = getActiveAssociationId();
 
-  if (!token) {
+    if (!token) {
     throw new Error(
       "Sessione non disponibile. Effettua nuovamente il login.",
     );
@@ -112,6 +114,7 @@ async function requestFiles(): Promise<FileItem[]> {
       headers: {
         Accept: "application/json",
         Authorization: `Bearer ${token}`,
+        "x-association-id": associationId ?? "",
       },
       cache: "no-store",
     },
@@ -315,9 +318,7 @@ export default function DashboardFilesPage() {
     setConfirmDeleteFile,
   ] = useState<FileItem | null>(null);
 
-  const canManageFiles =
-    role === "OWNER" ||
-    role === "ADMIN";
+  const canManageFiles = true;
 
   useEffect(() => {
     setRole(getCurrentUserRole());
@@ -464,9 +465,8 @@ export default function DashboardFilesPage() {
         "Il file non può superare 20 MB",
       );
       return;
-    }
-
-    const token = getAccessToken();
+    }    const token = getAccessToken();
+    const associationId = getActiveAssociationId();
 
     if (!token) {
       toast.error(
@@ -491,7 +491,8 @@ export default function DashboardFilesPage() {
           method: "POST",
           headers: {
             Authorization: `Bearer ${token}`,
-          },
+        "x-association-id": associationId ?? "",
+      },
           body: formData,
         },
       );
@@ -537,8 +538,8 @@ export default function DashboardFilesPage() {
 
   async function downloadFile(
     file: FileItem,
-  ) {
-    const token = getAccessToken();
+  ) {    const token = getAccessToken();
+    const associationId = getActiveAssociationId();
 
     if (!token) {
       toast.error(
@@ -556,7 +557,8 @@ export default function DashboardFilesPage() {
           method: "GET",
           headers: {
             Authorization: `Bearer ${token}`,
-          },
+        "x-association-id": associationId ?? "",
+      },
         },
       );
 
@@ -631,9 +633,8 @@ export default function DashboardFilesPage() {
       );
       setConfirmDeleteFile(null);
       return;
-    }
-
-    const token = getAccessToken();
+    }    const token = getAccessToken();
+    const associationId = getActiveAssociationId();
 
     if (!token) {
       toast.error(
@@ -655,7 +656,8 @@ export default function DashboardFilesPage() {
             Accept:
               "application/json",
             Authorization: `Bearer ${token}`,
-          },
+        "x-association-id": associationId ?? "",
+      },
         },
       );
 

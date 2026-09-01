@@ -1,9 +1,8 @@
-﻿import { cookies } from "next/headers";
+import { getBackendApiUrl } from "@/lib/server-api";
+import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL ??
-  "http://127.0.0.1:3001/api";
+
 
 export async function GET(
   request: Request,
@@ -53,7 +52,7 @@ export async function GET(
     }
 
     const response = await fetch(
-      `${API_BASE_URL}/memberships`,
+      `${getBackendApiUrl("memberships")}`,
       {
         method: "GET",
         headers,
@@ -89,3 +88,4 @@ export async function GET(
     );
   }
 }
+

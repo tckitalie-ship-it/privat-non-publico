@@ -1,8 +1,7 @@
-﻿import { NextResponse } from "next/server";
+import { getBackendApiUrl } from "@/lib/server-api";
+import { NextResponse } from "next/server";
 
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL ??
-  "http://127.0.0.1:3001/api";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "https://privat-non-publico.onrender.com/api";
 
 export async function PATCH(
   request: Request,

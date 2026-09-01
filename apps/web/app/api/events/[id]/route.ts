@@ -1,9 +1,8 @@
-﻿import { NextResponse } from "next/server";
+import { getBackendApiUrl } from "@/lib/server-api";
+import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL ??
-  "http://127.0.0.1:3001/api";
+
 
 async function getAuthorization(
   request: Request,
@@ -96,7 +95,7 @@ export async function PATCH(
 
     const response =
       await fetch(
-        `${API_BASE_URL}/events/${id}`,
+        getBackendApiUrl(`events/${id}`),
         {
           method: "PATCH",
           headers,
@@ -190,7 +189,7 @@ export async function DELETE(
 
     const response =
       await fetch(
-        `${API_BASE_URL}/events/${id}`,
+        getBackendApiUrl(`events/${id}`),
         {
           method: "DELETE",
           headers,

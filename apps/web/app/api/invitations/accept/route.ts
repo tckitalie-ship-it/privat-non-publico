@@ -1,9 +1,8 @@
-﻿import { cookies } from "next/headers";
+import { getBackendApiUrl } from "@/lib/server-api";
+import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
-const API_URL =
-  process.env.NEXT_PUBLIC_API_URL ??
-  "http://127.0.0.1:3001/api";
+
 
 export async function POST(request: Request) {
   try {
@@ -44,7 +43,7 @@ export async function POST(request: Request) {
     }
 
     const response = await fetch(
-      `${API_URL}/invitations/accept/${encodeURIComponent(token)}`,
+      `${getBackendApiUrl("invitations/accept/")}${encodeURIComponent(token)}`,
       {
         method: "POST",
         headers: {

@@ -1,9 +1,6 @@
-﻿import { NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
-
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL ??
-  "http://127.0.0.1:3001/api";
+import { getBackendApiUrl } from "@/lib/server-api";
 
 export async function DELETE(
   request: Request,
@@ -15,29 +12,22 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
-
     const cookieStore = await cookies();
-
-    const headerAuthorization =
-      request.headers.get("authorization");
 
     const cookieToken =
       cookieStore.get("access_token")?.value;
 
-    const authorization =
-      headerAuthorization ??
-      (cookieToken
-        ? `Bearer ${cookieToken}`
-        : null);
+    const headerAuthorization =
+      request.headers.get("authorization");
 
-    if (!authorization) {
+    const token =
+      cookieToken ??
+      headerAuthorization?.replace(/^Bearer\s+/i, "");
+
+    if (!token) {
       return NextResponse.json(
-        {
-          message: "Sessione non disponibile",
-        },
-        {
-          status: 401,
-        },
+        { message: "Sessione non disponibile" },
+        { status: 401 },
       );
     }
 
@@ -46,16 +36,15 @@ export async function DELETE(
 
     const headers: HeadersInit = {
       Accept: "application/json",
-      Authorization: authorization,
+      Authorization: `Bearer ${token}`,
     };
 
     if (associationId) {
-      headers["x-association-id"] =
-        associationId;
+      headers["x-association-id"] = associationId;
     }
 
     const response = await fetch(
-      `${API_BASE_URL}/memberships/${id}`,
+      getBackendApiUrl(`memberships/${id}`),
       {
         method: "DELETE",
         headers,
@@ -76,12 +65,8 @@ export async function DELETE(
     );
 
     return NextResponse.json(
-      {
-        message: "Errore interno",
-      },
-      {
-        status: 500,
-      },
+      { message: "Errore interno" },
+      { status: 500 },
     );
   }
 }

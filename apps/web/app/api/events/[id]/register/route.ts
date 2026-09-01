@@ -1,9 +1,8 @@
-﻿import { NextResponse } from "next/server";
+import { getBackendApiUrl } from "@/lib/server-api";
+import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL ??
-  "http://127.0.0.1:3001/api";
+
 
 async function getAuthorization(
   request: Request,
@@ -91,7 +90,7 @@ export async function POST(
 
     const response =
       await fetch(
-        `${API_BASE_URL}/events/${id}/register`,
+        getBackendApiUrl(`events/${id}/register`),
         {
           method: "POST",
           headers,
@@ -176,7 +175,7 @@ export async function DELETE(
 
     const response =
       await fetch(
-        `${API_BASE_URL}/events/${id}/register`,
+        getBackendApiUrl(`events/${id}/register`),
         {
           method: "DELETE",
           headers,

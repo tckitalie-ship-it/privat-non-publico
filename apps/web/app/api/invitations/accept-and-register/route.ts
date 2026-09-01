@@ -1,15 +1,14 @@
+import { getBackendApiUrl } from "@/lib/server-api";
 import { NextResponse } from "next/server";
 
-const BACKEND_URL =
-  process.env.NEXT_PUBLIC_API_URL ??
-  "http://127.0.0.1:3001/api";
+
 
 export async function POST(request: Request) {
   try {
     const body = await request.text();
 
     const response = await fetch(
-      `${BACKEND_URL}/invitations/accept-and-register`,
+      `${getBackendApiUrl("invitations/accept-and-register")}`,
       {
         method: "POST",
         headers: {

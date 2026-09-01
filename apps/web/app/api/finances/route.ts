@@ -1,8 +1,7 @@
+import { getBackendApiUrl } from "@/lib/server-api";
 import { NextResponse } from "next/server";
 
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL ??
-  "http://127.0.0.1:3001/api";
+
 
 export async function POST(request: Request) {
   try {
@@ -12,7 +11,7 @@ export async function POST(request: Request) {
     const body = await request.json();
 
     const response = await fetch(
-      `${API_BASE_URL}/finances`,
+      `${getBackendApiUrl("finances")}`,
       {
         method: "POST",
         headers: {

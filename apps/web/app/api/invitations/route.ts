@@ -1,6 +1,6 @@
-﻿import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
-const BACKEND_URL = "http://127.0.0.1:3001/api";
+const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL ?? "https://privat-non-publico.onrender.com/api";
 
 function headersFrom(request: NextRequest) {
   const headers: Record<string, string> = {
@@ -71,3 +71,4 @@ export async function POST(request: NextRequest) {
     );
   }
 }
+

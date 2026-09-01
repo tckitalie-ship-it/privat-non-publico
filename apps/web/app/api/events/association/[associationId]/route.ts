@@ -1,75 +1,56 @@
 import { NextRequest, NextResponse } from "next/server";
-
-const BACKEND_URL = "http://127.0.0.1:3001/api";
+import { cookies } from "next/headers";
+import { getBackendApiUrl } from "@/lib/server-api";
 
 export async function GET(
   request: NextRequest,
   {
     params,
   }: {
-    params: Promise<{
-      associationId: string;
-    }>;
+    params: Promise<{ associationId: string }>;
   },
 ) {
   try {
-    const {
-      associationId,
-    } = await params;
+    const { associationId } = await params;
+    const cookieStore = await cookies();
 
-    const authorization =
+    const cookieToken =
+      cookieStore.get("access_token")?.value;
+
+    const headerAuthorization =
       request.headers.get("authorization");
 
-    const headers: Record<string, string> = {
-      Accept: "application/json",
-    };
+    const token =
+      cookieToken ??
+      headerAuthorization?.replace(/^Bearer\s+/i, "");
 
-    if (authorization) {
-      headers.Authorization = authorization;
+    if (!token) {
+      return NextResponse.json(
+        { message: "Sessione non disponibile" },
+        { status: 401 },
+      );
     }
 
-    const backendUrl =
-      `${BACKEND_URL}/events/association/${associationId}`;
-
-    console.log(
-      "Proxy GET eventi:",
-      backendUrl,
-    );
-
     const response = await fetch(
-      backendUrl,
+      getBackendApiUrl(
+        `events/association/${associationId}`,
+      ),
       {
         method: "GET",
-        headers,
+        headers: {
+          Accept: "application/json",
+          Authorization: `Bearer ${token}`,
+        },
         cache: "no-store",
       },
     );
 
-    const contentType =
-      response.headers.get("content-type") ?? "";
+    const data =
+      await response.json().catch(() => null);
 
-    let data: unknown = null;
-
-    if (
-      contentType.includes(
-        "application/json",
-      )
-    ) {
-      data = await response
-        .json()
-        .catch(() => null);
-    } else {
-      data = await response
-        .text()
-        .catch(() => null);
-    }
-
-    return NextResponse.json(
-      data,
-      {
-        status: response.status,
-      },
-    );
+    return NextResponse.json(data ?? [], {
+      status: response.status,
+    });
   } catch (error) {
     console.error(
       "Proxy GET eventi associazione:",
@@ -77,13 +58,8 @@ export async function GET(
     );
 
     return NextResponse.json(
-      {
-        message:
-          "Backend non raggiungibile",
-      },
-      {
-        status: 502,
-      },
+      { message: "Backend non raggiungibile" },
+      { status: 502 },
     );
   }
 }

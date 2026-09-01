@@ -1,8 +1,7 @@
-﻿import { NextResponse } from "next/server";
+import { getBackendApiUrl } from "@/lib/server-api";
+import { NextResponse } from "next/server";
 
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL ??
-  "http://127.0.0.1:3001/api";
+
 
 export async function GET(
   request: Request,
@@ -20,7 +19,7 @@ export async function GET(
       request.headers.get("authorization");
 
     const response = await fetch(
-      `${API_BASE_URL}/finances/association/${associationId}`,
+      getBackendApiUrl(`finances/association/${associationId}`),
       {
         headers: {
           Accept: "application/json",

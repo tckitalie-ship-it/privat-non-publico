@@ -1,8 +1,6 @@
+import { getBackendApiUrl } from "@/lib/server-api";
 import { NextResponse } from "next/server";
-
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL ??
-  "http://127.0.0.1:3001/api";
+import { cookies } from "next/headers";
 
 export async function DELETE(
   request: Request,
@@ -13,16 +11,32 @@ export async function DELETE(
   try {
     const { id } = await context.params;
 
+    const cookieStore = await cookies();
+
+    const cookieToken =
+      cookieStore.get("access_token")?.value;
+
     const authorization =
       request.headers.get("authorization");
 
+    const associationId =
+      request.headers.get("x-association-id");
+
     const response = await fetch(
-      `${API_BASE_URL}/files/${id}`,
+      getBackendApiUrl(`files/${id}`),
       {
         method: "DELETE",
-        headers: authorization
-          ? { Authorization: authorization }
-          : {},
+        headers: {
+          Accept: "application/json",
+          ...(authorization
+            ? { Authorization: authorization }
+            : cookieToken
+              ? { Authorization: `Bearer ${cookieToken}` }
+              : {}),
+          ...(associationId
+            ? { "x-association-id": associationId }
+            : {}),
+        },
         cache: "no-store",
       },
     );
@@ -34,6 +48,11 @@ export async function DELETE(
       status: response.status,
     });
   } catch (error) {
+    console.error(
+      "DELETE /api/files/[id]:",
+      error,
+    );
+
     return NextResponse.json(
       {
         message:

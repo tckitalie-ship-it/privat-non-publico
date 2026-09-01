@@ -11,11 +11,13 @@ import {
 } from "next/navigation";
 
 import { setAccessToken } from "@/lib/api";
+import { setActiveAssociationId } from "@/lib/association";
 
 interface LoginResponse {
   accessToken?: string;
   access_token?: string;
   token?: string;
+  activeAssociationId?: string | null;
   message?: string | string[];
 }
 
@@ -74,6 +76,10 @@ function LoginContent() {
       }
 
       setAccessToken(token);
+
+      if (data?.activeAssociationId) {
+        setActiveAssociationId(data.activeAssociationId);
+      }
 
       const savedToken =
         localStorage.getItem("access_token");
@@ -169,6 +175,12 @@ function LoginContent() {
   }
 
   setAccessToken(refreshedToken);
+
+  if (refreshedLoginData?.activeAssociationId) {
+    setActiveAssociationId(
+      refreshedLoginData.activeAssociationId,
+    );
+  }
 
   localStorage.setItem(
     "membershipUpdated",

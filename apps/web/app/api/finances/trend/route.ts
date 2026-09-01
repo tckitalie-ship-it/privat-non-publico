@@ -1,15 +1,19 @@
-import { NextResponse } from 'next/server';
+import { NextResponse } from "next/server";
+import { getBackendApiUrl } from "@/lib/server-api";
 
 export async function GET(request: Request) {
   try {
-    const authorization = request.headers.get('authorization');
+    const authorization = request.headers.get("authorization");
 
     const response = await fetch(
-      'http://127.0.0.1:3001/api/dashboard/finance-trend',
+      getBackendApiUrl("dashboard/finance-trend"),
       {
+        method: "GET",
         headers: {
-          Authorization: authorization || '',
+          Accept: "application/json",
+          Authorization: authorization || "",
         },
+        cache: "no-store",
       },
     );
 
@@ -18,7 +22,7 @@ export async function GET(request: Request) {
     return new NextResponse(text, {
       status: response.status,
       headers: {
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
       },
     });
   } catch (error) {
@@ -26,7 +30,8 @@ export async function GET(request: Request) {
 
     return NextResponse.json(
       {
-        message: 'Errore durante il recupero del trend finanziario.',
+        message:
+          "Errore durante il recupero del trend finanziario.",
       },
       {
         status: 500,

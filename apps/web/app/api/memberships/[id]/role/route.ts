@@ -1,9 +1,6 @@
-﻿import { NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
-
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL ??
-  "http://127.0.0.1:3001/api";
+import { getBackendApiUrl } from "@/lib/server-api";
 
 export async function PATCH(
   request: Request,
@@ -15,56 +12,42 @@ export async function PATCH(
 ) {
   try {
     const { id } = await params;
-
     const cookieStore = await cookies();
+
+    const cookieToken =
+      cookieStore.get("access_token")?.value;
 
     const headerAuthorization =
       request.headers.get("authorization");
 
-    const cookieToken =
-      cookieStore
-        .get("access_token")
-        ?.value;
+    const token =
+      cookieToken ??
+      headerAuthorization?.replace(/^Bearer\s+/i, "");
 
-    const authorization =
-      headerAuthorization ??
-      (cookieToken
-        ? `Bearer ${cookieToken}`
-        : null);
-
-    if (!authorization) {
+    if (!token) {
       return NextResponse.json(
-        {
-          message:
-            "Sessione non disponibile",
-        },
-        {
-          status: 401,
-        },
+        { message: "Sessione non disponibile" },
+        { status: 401 },
       );
     }
 
     const associationId =
-      request.headers.get(
-        "x-association-id",
-      );
+      request.headers.get("x-association-id");
 
     const body = await request.json();
 
     const headers: HeadersInit = {
       Accept: "application/json",
-      "Content-Type":
-        "application/json",
-      Authorization: authorization,
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
     };
 
     if (associationId) {
-      headers["x-association-id"] =
-        associationId;
+      headers["x-association-id"] = associationId;
     }
 
     const response = await fetch(
-      `${API_BASE_URL}/memberships/${id}/role`,
+      getBackendApiUrl(`memberships/${id}/role`),
       {
         method: "PATCH",
         headers,
@@ -74,15 +57,7 @@ export async function PATCH(
     );
 
     const data =
-      await response
-        .json()
-        .catch(() => null);
-
-    console.log(
-      "[MEMBERSHIP ROLE PATCH]",
-      response.status,
-      data,
-    );
+      await response.json().catch(() => null);
 
     return NextResponse.json(data, {
       status: response.status,
@@ -100,9 +75,7 @@ export async function PATCH(
             ? error.message
             : "Errore aggiornamento ruolo",
       },
-      {
-        status: 500,
-      },
+      { status: 500 },
     );
   }
 }

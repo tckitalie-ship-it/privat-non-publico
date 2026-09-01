@@ -1,8 +1,5 @@
+import { getBackendApiUrl } from "@/lib/server-api";
 import { NextResponse } from "next/server";
-
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL ??
-  "http://127.0.0.1:3001/api";
 
 export async function GET(
   request: Request,
@@ -16,19 +13,29 @@ export async function GET(
     const authorization =
       request.headers.get("authorization");
 
+    const associationId =
+      request.headers.get("x-association-id");
+
     const response = await fetch(
-      `${API_BASE_URL}/files/${id}/download`,
+      getBackendApiUrl(`files/${id}/download`),
       {
         method: "GET",
-        headers: authorization
-          ? { Authorization: authorization }
-          : {},
+        headers: {
+          Accept: "application/octet-stream",
+          ...(authorization
+            ? { Authorization: authorization }
+            : {}),
+          ...(associationId
+            ? { "x-association-id": associationId }
+            : {}),
+        },
         cache: "no-store",
       },
     );
 
     if (!response.ok) {
-      const data = await response.json().catch(() => null);
+      const data =
+        await response.json().catch(() => null);
 
       return NextResponse.json(data, {
         status: response.status,
@@ -42,7 +49,8 @@ export async function GET(
     const contentDisposition =
       response.headers.get("content-disposition");
 
-    const buffer = await response.arrayBuffer();
+    const buffer =
+      await response.arrayBuffer();
 
     return new NextResponse(buffer, {
       status: 200,
@@ -50,7 +58,8 @@ export async function GET(
         "Content-Type": contentType,
         ...(contentDisposition
           ? {
-              "Content-Disposition": contentDisposition,
+              "Content-Disposition":
+                contentDisposition,
             }
           : {}),
       },

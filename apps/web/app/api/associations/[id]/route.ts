@@ -1,8 +1,8 @@
-﻿import { NextResponse } from "next/server";
+import { getBackendApiUrl } from "@/lib/server-api";
+import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 
-const API_URL =
-  "http://127.0.0.1:3001/api/associations";
+
 
 async function getToken() {
   const cookieStore = await cookies();
@@ -46,7 +46,7 @@ export async function GET(
     }
 
     const response = await fetch(
-      `${API_URL}/${id}`,
+      getBackendApiUrl(`associations/${id}`),
       {
         method: "GET",
         headers: {
@@ -108,7 +108,7 @@ export async function PATCH(
     }
 
     const response = await fetch(
-      `${API_URL}/${id}`,
+      getBackendApiUrl(`associations/${id}`),
       {
         method: "PATCH",
         headers: {
@@ -171,7 +171,7 @@ export async function DELETE(
     }
 
     const response = await fetch(
-      `${API_URL}/${id}`,
+      getBackendApiUrl(`associations/${id}`),
       {
         method: "DELETE",
         headers: {

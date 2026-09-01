@@ -1,7 +1,6 @@
-﻿import { NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
-
-const API_URL = "http://127.0.0.1:3001/api/users/me";
+import { getBackendApiUrl } from "@/lib/server-api";
 
 async function getToken() {
   const cookieStore = await cookies();
@@ -23,14 +22,17 @@ export async function GET() {
       );
     }
 
-    const response = await fetch(API_URL, {
-      method: "GET",
-      headers: {
-        Accept: "application/json",
-        Authorization: `Bearer ${token}`,
+    const response = await fetch(
+      getBackendApiUrl("users/me"),
+      {
+        method: "GET",
+        headers: {
+          Accept: "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        cache: "no-store",
       },
-      cache: "no-store",
-    });
+    );
 
     const data = await getData(response);
 
@@ -60,16 +62,19 @@ export async function PATCH(req: Request) {
 
     const body = await req.json();
 
-    const response = await fetch(API_URL, {
-      method: "PATCH",
-      headers: {
-        Accept: "application/json",
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
+    const response = await fetch(
+      getBackendApiUrl("users/me"),
+      {
+        method: "PATCH",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(body),
+        cache: "no-store",
       },
-      body: JSON.stringify(body),
-      cache: "no-store",
-    });
+    );
 
     const data = await getData(response);
 
