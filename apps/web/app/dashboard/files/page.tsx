@@ -318,7 +318,7 @@ export default function DashboardFilesPage() {
     setConfirmDeleteFile,
   ] = useState<FileItem | null>(null);
 
-  const canManageFiles = true;
+  const canManageFiles = role === "OWNER" || role === "ADMIN";
 
   useEffect(() => {
     setRole(getCurrentUserRole());
