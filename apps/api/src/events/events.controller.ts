@@ -22,6 +22,13 @@ type AuthenticatedRequest = Request & {
   };
 };
 
+type ImportedEvent = {
+  title: string;
+  description?: string | null;
+  startsAt: string;
+  endsAt?: string | null;
+};
+
 @Controller("events")
 @UseGuards(JwtAuthGuard)
 export class EventsController {
@@ -121,6 +128,34 @@ export class EventsController {
             ? new Date(body.endsAt)
             : null,
       },
+    );
+  }
+
+  @Post("import")
+  async importEvents(
+    @Body()
+    body: ImportedEvent[],
+    @Headers("x-association-id")
+    headerAssociationId: string | undefined,
+    @Req()
+    request: AuthenticatedRequest,
+  ) {
+    const userId =
+      this.getUserId(request);
+
+    const associationId =
+      headerAssociationId;
+
+    if (!associationId) {
+      throw new Error(
+        "Association ID mancante",
+      );
+    }
+
+    return this.eventsService.importEvents(
+      userId,
+      associationId,
+      body,
     );
   }
 

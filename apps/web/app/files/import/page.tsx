@@ -2,10 +2,8 @@
 import FileUploadForm from "@/components/files/FileUploadForm";
 import { useState, useCallback } from "react";
 import { API_URL, getAccessToken } from "@/lib/api";
+import { getActiveAssociationId } from "@/lib/association";
 
-//
-// TIPI MINIMI (eliminano tutti gli any)
-//
 type ImportedEvent = {
   title: string;
   description: string;
@@ -18,16 +16,9 @@ export default function ImportEventsPage() {
   const [uploading, setUploading] = useState(false);
   const [message, setMessage] = useState("");
 
-  //
-  // FIX: parseFile stabilizzato con useCallback
-  //
   const parseFile = useCallback(async (file: File) => {
     try {
       const text = await file.text();
-
-      //
-      // FIX: nessun any → unknown + cast controllato
-      //
       const json = JSON.parse(text) as unknown[];
 
       const mapped = json.map((e) => {
@@ -47,9 +38,6 @@ export default function ImportEventsPage() {
     }
   }, []);
 
-  //
-  // UPLOAD AL BACKEND
-  //
   const uploadToServer = useCallback(async () => {
     if (parsedEvents.length === 0) {
       setMessage("Nessun evento da importare");
@@ -60,12 +48,19 @@ export default function ImportEventsPage() {
       setUploading(true);
 
       const token = getAccessToken();
+      const associationId = getActiveAssociationId();
+
+      if (!associationId) {
+        setMessage("Nessuna associazione attiva selezionata");
+        return;
+      }
 
       const res = await fetch(`${API_URL}/events/import`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
+          "x-association-id": associationId,
         },
         body: JSON.stringify(parsedEvents),
       });
@@ -90,11 +85,11 @@ export default function ImportEventsPage() {
 
       <div className="rounded-2xl border border-white/10 bg-[#0F172A] p-6 shadow-xl space-y-4">
         <FileUploadForm
-  uploading={uploading}
-  parsedEventsCount={parsedEvents.length}
-  parseFile={parseFile}
-  uploadToServer={uploadToServer}
-/>
+          uploading={uploading}
+          parsedEventsCount={parsedEvents.length}
+          parseFile={parseFile}
+          uploadToServer={uploadToServer}
+        />
         {message && (
           <p className="text-sm text-gray-300 mt-2">{message}</p>
         )}

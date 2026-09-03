@@ -15,14 +15,17 @@ import {
 import { io, Socket } from 'socket.io-client';
 
 import DashboardSidebar from '@/components/dashboard-sidebar';
-const SOCKET_URL =
+import { getActiveAssociationId } from '@/lib/association';
+const SOCKET_URL = (
   process.env.NEXT_PUBLIC_API_URL ||
-  'https://api-production-0f62.up.railway.app';
+  'https://privat-non-publico.onrender.com'
+).replace(/\/api\/?$/, '');
 
 type ChatMessage = {
   id: string;
-  user?: string;
-  text: string;
+  associationId: string;
+  userEmail: string;
+  message: string;
   createdAt: string;
 };
 
@@ -89,7 +92,7 @@ export default function ChatPage() {
   const [message, setMessage] =
     useState('');
 
-  const [room] = useState('global');
+  const [associationId] = useState(() => getActiveAssociationId());
 
   const token = getAccessToken();
 
@@ -117,12 +120,15 @@ export default function ChatPage() {
       () => {
         setConnected(true);
 
-        socket.emit(
-          'chat:join',
-          {
-            room,
-          },
-        );
+        if (associationId) {
+          socket.emit(
+            'chat:join',
+            {
+              associationId,
+              userEmail: currentUser,
+            },
+          );
+        }
       },
     );
 
@@ -165,7 +171,7 @@ export default function ChatPage() {
     return () => {
       socket.disconnect();
     };
-  }, [room, token]);
+  }, [associationId, token, currentUser]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView(
@@ -177,33 +183,17 @@ export default function ChatPage() {
 
   async function sendMessage() {
     try {
-      if (!message.trim()) {
+      if (!message.trim() || !associationId) {
         return;
       }
-
-      const payload: ChatMessage =
-        {
-          id: crypto.randomUUID(),
-          user: currentUser,
-          text: message.trim(),
-          createdAt:
-            new Date().toISOString(),
-        };
 
       socketRef.current?.emit(
         'chat:send',
         {
-          room,
-          message:
-            payload,
+          associationId,
+          userEmail: currentUser,
+          message: message.trim(),
         },
-      );
-
-      setMessages(
-        (current) => [
-          ...current,
-          payload,
-        ],
       );
 
       setMessage('');
@@ -211,7 +201,6 @@ export default function ChatPage() {
       console.error(error);
     }
   }
-
   const orderedMessages =
     useMemo(() => {
       return [...messages].sort(
@@ -307,7 +296,7 @@ export default function ChatPage() {
                       item,
                     ) => {
                       const mine =
-                        item.user ===
+                        item.userEmail ===
                         currentUser;
 
                       return (
@@ -337,7 +326,7 @@ export default function ChatPage() {
                                 }
                               >
                                 {
-                                  item.user
+                                  item.userEmail
                                 }
                               </p>
 
@@ -358,7 +347,7 @@ export default function ChatPage() {
 
                             <p className="whitespace-pre-wrap break-words text-sm leading-relaxed">
                               {
-                                item.text
+                                item.message
                               }
                             </p>
                           </div>
@@ -432,3 +421,12 @@ export default function ChatPage() {
     </div>
   );
 }
+
+
+
+
+
+
+
+
+

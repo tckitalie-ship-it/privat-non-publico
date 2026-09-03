@@ -3,89 +3,191 @@
 import { useEffect, useState } from "react";
 import { Bell } from "lucide-react";
 
+import { API_URL, getAccessToken } from "@/lib/api";
+import { getSocket } from "@/lib/socket";
+
 type Notification = {
   id: string;
-  title: string;
+  title: string | null;
   message: string;
   read: boolean;
   createdAt: string;
 };
 
-const STORAGE_KEY = "notifications";
-
 export function NotificationBell() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [open, setOpen] = useState(false);
 
-  //
-  // ✅ FIX REACT 19 — requestAnimationFrame
-  //
   useEffect(() => {
-    requestAnimationFrame(() => {
-      const saved = localStorage.getItem(STORAGE_KEY);
+    let mounted = true;
 
-      if (saved) {
-        try {
-          setNotifications(JSON.parse(saved));
-        } catch {
-          setNotifications([]);
+    async function loadNotifications() {
+      try {
+        const token = getAccessToken();
+
+        if (!token) {
+          return;
         }
+
+        const response = await fetch(
+          `${API_URL}/notifications/me`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+            cache: "no-store",
+          },
+        );
+
+        if (!response.ok) {
+          console.error(
+            "Errore caricamento notifiche:",
+            response.status,
+          );
+          return;
+        }
+
+        const data =
+          (await response.json()) as Notification[];
+
+        if (mounted) {
+          setNotifications(data);
+        }
+      } catch (error) {
+        console.error(
+          "Errore caricamento notifiche:",
+          error,
+        );
       }
-    });
+    }
+
+    loadNotifications();
+
+    const socket = getSocket();
+
+    const handleNewNotification = (
+      notification: Notification,
+    ) => {
+      setNotifications((prev) => {
+        const alreadyExists = prev.some(
+          (item) => item.id === notification.id,
+        );
+
+        if (alreadyExists) {
+          return prev;
+        }
+
+        return [notification, ...prev];
+      });
+    };
+
+    socket.on(
+      "notification:new",
+      handleNewNotification,
+    );
+
+    return () => {
+      mounted = false;
+
+      socket.off(
+        "notification:new",
+        handleNewNotification,
+      );
+    };
   }, []);
 
-  //
-  // Persistenza locale
-  //
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(notifications));
-  }, [notifications]);
+  async function markAsRead(id: string) {
+    try {
+      const token = getAccessToken();
 
-  function markAsRead(id: string) {
-    setNotifications((prev) =>
-      prev.map((n) =>
-        n.id === id ? { ...n, read: true } : n
-      )
-    );
+      if (!token) {
+        return;
+      }
+
+      const response = await fetch(
+        `${API_URL}/notifications/${id}/read`,
+        {
+          method: "PATCH",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      );
+
+      if (!response.ok) {
+        console.error(
+          "Errore aggiornamento notifica:",
+          response.status,
+        );
+        return;
+      }
+
+      setNotifications((prev) =>
+        prev.map((notification) =>
+          notification.id === id
+            ? { ...notification, read: true }
+            : notification,
+        ),
+      );
+    } catch (error) {
+      console.error(
+        "Errore rete aggiornamento notifica:",
+        error,
+      );
+    }
   }
 
-  const unreadCount = notifications.filter((n) => !n.read).length;
+  const unreadCount = notifications.filter(
+    (notification) => !notification.read,
+  ).length;
 
   return (
     <div className="relative">
       <button
-        onClick={() => setOpen((o) => !o)}
-        className="relative p-2 rounded-lg hover:bg-slate-800"
+        onClick={() => setOpen((value) => !value)}
+        className="relative rounded-lg p-2 hover:bg-slate-800"
       >
-        <Bell className="w-6 h-6 text-white" />
+        <Bell className="h-6 w-6 text-white" />
 
         {unreadCount > 0 && (
-          <span className="absolute -top-1 -right-1 bg-red-600 text-white text-xs px-1.5 py-0.5 rounded-full">
+          <span className="absolute -right-1 -top-1 rounded-full bg-red-600 px-1.5 py-0.5 text-xs text-white">
             {unreadCount}
           </span>
         )}
       </button>
 
       {open && (
-        <div className="absolute right-0 mt-2 w-80 bg-slate-900 border border-white/10 rounded-xl shadow-xl p-4 space-y-3 z-50">
-          <h3 className="text-sm font-semibold text-white mb-2">
+        <div className="absolute bottom-full left-0 z-50 mb-2 w-80 space-y-3 rounded-xl border border-white/10 bg-slate-900 p-4 shadow-xl">
+          <h3 className="mb-2 text-sm font-semibold text-white">
             Notifiche
           </h3>
 
           {notifications.length === 0 && (
-            <p className="text-gray-400 text-sm">Nessuna notifica</p>
+            <p className="text-sm text-gray-400">
+              Nessuna notifica
+            </p>
           )}
 
-          {notifications.map((n) => (
+          {notifications.map((notification) => (
             <div
-              key={n.id}
-              className="p-3 rounded-lg bg-slate-800 border border-white/10 cursor-pointer"
-              onClick={() => markAsRead(n.id)}
+              key={notification.id}
+              className="cursor-pointer rounded-lg border border-white/10 bg-slate-800 p-3"
+              onClick={() =>
+                markAsRead(notification.id)
+              }
             >
-              <p className="font-medium text-white">{n.title}</p>
-              <p className="text-gray-400 text-sm">{n.message}</p>
-              <p className="text-gray-500 text-xs mt-1">
-                {new Date(n.createdAt).toLocaleString("it-IT")}
+              <p className="font-medium text-white">
+                {notification.title || "Notifica"}
+              </p>
+
+              <p className="text-sm text-gray-400">
+                {notification.message}
+              </p>
+
+              <p className="mt-1 text-xs text-gray-500">
+                {new Date(
+                  notification.createdAt,
+                ).toLocaleString("it-IT")}
               </p>
             </div>
           ))}

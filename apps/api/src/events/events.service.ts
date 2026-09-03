@@ -59,6 +59,106 @@ export class EventsService {
     },
   });
 }
+    async importEvents(
+    userId: string,
+    associationId: string,
+    events: Array<{
+      title: string;
+      description?: string | null;
+      startsAt: string;
+      endsAt?: string | null;
+    }>,
+  ) {
+    const membership =
+      await this.prisma.membership.findFirst({
+        where: {
+          userId,
+          associationId,
+        },
+      });
+
+    if (!membership) {
+      throw new ForbiddenException(
+        "Non sei membro di questa associazione",
+      );
+    }
+
+    if (
+      membership.role !== Role.OWNER &&
+      membership.role !== Role.ADMIN
+    ) {
+      throw new ForbiddenException(
+        "Non hai i permessi per importare eventi",
+      );
+    }
+
+    if (!Array.isArray(events) || events.length === 0) {
+      throw new BadRequestException(
+        "Nessun evento da importare",
+      );
+    }
+
+    const createdEvents: Array<{
+  id: string;
+  title: string;
+  description: string | null;
+  location: string | null;
+  startsAt: Date;
+  endsAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+  associationId: string;
+}> = [];
+
+    for (const event of events) {
+      if (!event.title || !event.startsAt) {
+        throw new BadRequestException(
+          "Ogni evento deve avere titolo e data di inizio",
+        );
+      }
+
+      const startsAt = new Date(event.startsAt);
+
+      const endsAt = event.endsAt
+        ? new Date(event.endsAt)
+        : null;
+
+      if (Number.isNaN(startsAt.getTime())) {
+        throw new BadRequestException(
+          `Data di inizio non valida per "${event.title}"`,
+        );
+      }
+
+      if (
+        endsAt &&
+        Number.isNaN(endsAt.getTime())
+      ) {
+        throw new BadRequestException(
+          `Data di fine non valida per "${event.title}"`,
+        );
+      }
+
+      const created =
+        await this.prisma.event.create({
+          data: {
+            associationId,
+            title: event.title,
+            description:
+              event.description ?? null,
+            startsAt,
+            endsAt,
+          },
+        });
+
+      createdEvents.push(created);
+    }
+
+    return {
+      success: true,
+      imported: createdEvents.length,
+      events: createdEvents,
+    };
+  }
 
   async findAll(
     associationId: string,

@@ -14,7 +14,35 @@ function getHeaders(request: Request) {
       : {}),
   };
 }
+ export async function GET(request: Request) {
+  try {
+    const response = await fetch(
+      `${getBackendApiUrl("notifications/me")}`,
+      {
+        method: "GET",
+        headers: getHeaders(request),
+        cache: "no-store",
+      },
+    );
 
+    const data =
+      await response.json().catch(() => null);
+
+    return NextResponse.json(data, {
+      status: response.status,
+    });
+  } catch (error) {
+    return NextResponse.json(
+      {
+        message:
+          error instanceof Error
+            ? error.message
+            : "Errore caricamento notifiche",
+      },
+      { status: 500 },
+    );
+  }
+}
 export async function POST(request: Request) {
   try {
     const body = await request.json();

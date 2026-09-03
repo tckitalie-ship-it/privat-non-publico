@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -53,6 +54,45 @@ const navigation = [
 
 export default function DashboardSidebar() {
   const pathname = usePathname();
+
+  const [user, setUser] = useState<{
+    name?: string | null;
+    email?: string | null;
+  } | null>(null);
+
+  useEffect(() => {
+    async function loadUser() {
+      try {
+        const token = localStorage.getItem("access_token");
+
+        if (!token) {
+          return;
+        }
+
+        const response = await fetch("/api/auth/me", {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+          cache: "no-store",
+        });
+
+        if (!response.ok) {
+          return;
+        }
+
+        const data = await response.json();
+
+        setUser(data);
+      } catch (error) {
+        console.error(
+          "Errore caricamento profilo:",
+          error,
+        );
+      }
+    }
+
+    loadUser();
+  }, []);
 
   function isActive(href: string) {
     if (href === "/dashboard") {
@@ -139,9 +179,13 @@ export default function DashboardSidebar() {
         </div>
 
         <div className="mb-3 rounded-xl border border-[#30363d] bg-[#161b22] px-4 py-3">
-          <p className="text-sm font-semibold text-white">Amministratore</p>
+          <p className="text-sm font-semibold text-white">
+            {user?.name || "Amministratore"}
+          </p>
 
-          <p className="mt-1 text-xs text-gray-400">Dashboard SaaS</p>
+          <p className="mt-1 text-xs text-gray-400">
+            {user?.email || "Dashboard SaaS"}
+          </p>
         </div>
 
         <LogoutButton />

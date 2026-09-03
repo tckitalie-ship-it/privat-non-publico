@@ -23,6 +23,7 @@ model User {
   invitationsSent    Invitation[]        @relation("InvitationInvitedBy")
   memberships        Membership[]
   notifications      Notification[]
+  reminders          Reminder[]
 }
 
 model Association {
@@ -44,6 +45,7 @@ model Association {
   invitations                  Invitation[]
   memberships                  Membership[]
   notifications                Notification[]
+  reminders                    Reminder[]
   transactions                 Transaction[]
 }
 
@@ -132,6 +134,26 @@ model Notification {
   @@index([associationId])
   @@index([userId])
   @@index([read])
+}
+
+model Reminder {
+  id            String   @id @default(cuid())
+  title         String?
+  message       String
+  remindAt      DateTime
+  completed     Boolean  @default(false)
+  userId        String
+  associationId String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  association Association? @relation(fields: [associationId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([associationId])
+  @@index([remindAt])
+  @@index([completed])
 }
 
 model Transaction {
