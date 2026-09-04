@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import {
   Bell,
   Calendar,
+  Clock,
   Folder,
   LayoutDashboard,
   Settings,
@@ -39,6 +40,11 @@ const navigation = [
     label: "Finanze",
     href: "/dashboard/finance",
     icon: Wallet,
+  },
+  {
+    label: "Reminder",
+    href: "/dashboard/reminders",
+    icon: Clock,
   },
   {
     label: "Notifiche",

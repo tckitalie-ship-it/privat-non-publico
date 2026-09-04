@@ -1,4 +1,10 @@
-import { Injectable, Logger } from "@nestjs/common";
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from "@nestjs/common";
 import { Cron } from "@nestjs/schedule";
 
 import { PrismaService } from "../prisma/prisma.service";
@@ -15,7 +21,145 @@ export class RemindersService {
     private readonly prisma: PrismaService,
     private readonly notifications: NotificationsService,
   ) {}
+     /**
+   * Recupera i reminder dell'utente autenticato.
+   */
+  async findUserReminders(userId: string) {
+    return this.prisma.reminder.findMany({
+      where: {
+        userId,
+      },
+      orderBy: {
+        remindAt: "asc",
+      },
+    });
+  }
+     /**
+   * Crea un reminder per l'utente autenticato.
+   */
+  async createReminder(
+    userId: string,
+    dto: {
+      title?: string | null;
+      message: string;
+      remindAt: Date;
+      associationId?: string | null;
+    },
+  ) {
+    const message = dto.message?.trim();
+    const title = dto.title?.trim();
 
+    if (!message) {
+      throw new BadRequestException(
+        "Il messaggio del reminder è obbligatorio",
+      );
+    }
+
+    if (Number.isNaN(dto.remindAt.getTime())) {
+      throw new BadRequestException(
+        "La data del reminder non è valida",
+      );
+    }
+
+    if (dto.associationId) {
+      const membership =
+        await this.prisma.membership.findFirst({
+          where: {
+            userId,
+            associationId: dto.associationId,
+          },
+        });
+
+      if (!membership) {
+        throw new ForbiddenException(
+          "Non sei membro di questa associazione",
+        );
+      }
+    }
+
+    return this.prisma.reminder.create({
+      data: {
+        title: title || null,
+        message,
+        remindAt: dto.remindAt,
+        userId,
+        associationId:
+          dto.associationId ?? null,
+      },
+    });
+  }
+     /**
+   * Segna un reminder come completato.
+   */
+      /**
+   * Elimina un reminder.
+   */
+  async deleteReminder(
+    reminderId: string,
+    userId: string,
+  ) {
+    const reminder =
+      await this.prisma.reminder.findUnique({
+        where: {
+          id: reminderId,
+        },
+      });
+
+    if (!reminder) {
+      throw new NotFoundException(
+        "Reminder non trovato",
+      );
+    }
+
+    if (reminder.userId !== userId) {
+      throw new ForbiddenException(
+        "Non hai accesso a questo reminder",
+      );
+    }
+
+    await this.prisma.reminder.delete({
+      where: {
+        id: reminderId,
+      },
+    });
+
+    return {
+      success: true,
+      message: "Reminder eliminato",
+    };
+  }
+  async completeReminder(
+    reminderId: string,
+    userId: string,
+  ) {
+    const reminder =
+      await this.prisma.reminder.findUnique({
+        where: {
+          id: reminderId,
+        },
+      });
+
+    if (!reminder) {
+      throw new NotFoundException(
+        "Reminder non trovato",
+      );
+    }
+
+    if (reminder.userId !== userId) {
+      throw new ForbiddenException(
+        "Non hai accesso a questo reminder",
+      );
+    }
+
+    return this.prisma.reminder.update({
+      where: {
+        id: reminderId,
+      },
+      data: {
+        completed: true,
+      },
+    });
+  }
   /**
    * Controlla periodicamente i reminder scaduti.
    *
