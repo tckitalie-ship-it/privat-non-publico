@@ -1,6 +1,6 @@
 "use client";
 
-import * as XLSX from "xlsx";
+import writeExcelFile from "write-excel-file/browser";
 
 type Transaction = {
   id: string;
@@ -16,23 +16,21 @@ export default function FinanceExportExcel({
 }: {
   transactions: Transaction[];
 }) {
-  const exportExcel = () => {
+  const exportExcel = async () => {
     if (!transactions.length) return;
 
-    const rows = transactions.map((t) => ({
-      Data: new Date(t.date).toLocaleDateString(),
-      Tipo: t.type === "INCOME" ? "Entrata" : "Uscita",
-      Categoria: t.category,
-      Descrizione: t.description,
-      "Importo (€)": (t.amountCents / 100).toFixed(2),
-    }));
+    const sheetData = [
+      ["Data", "Tipo", "Categoria", "Descrizione", "Importo (€)"],
+      ...transactions.map((t) => [
+        new Date(t.date).toLocaleDateString(),
+        t.type === "INCOME" ? "Entrata" : "Uscita",
+        t.category ?? "",
+        t.description ?? "",
+        t.amountCents / 100,
+      ]),
+    ];
 
-    const worksheet = XLSX.utils.json_to_sheet(rows);
-    const workbook = XLSX.utils.book_new();
-
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Finanze");
-
-    XLSX.writeFile(workbook, "finanze.xlsx");
+    await writeExcelFile([{ data: sheetData, sheet: "Finanze" }]).toFile("finanze.xlsx");
   };
 
   return (
