@@ -1,15 +1,19 @@
 import { MembershipDto } from "./memberships.dto";
 
-export function toMembershipDto(m: any): MembershipDto {
+export function toMembershipDto(membership: any): MembershipDto {
   return {
-    id: m.id,
-    role: m.role,
-    memberNumber: m.memberNumber ?? null,
-    createdAt: m.createdAt,
-
+    id: membership.id,
+    role: membership.role,
+    memberNumber: membership.memberNumber ?? null,
+    firstName: membership.firstName ?? null,
+    lastName: membership.lastName ?? null,
+    birthDate: membership.birthDate ?? null,
+    address: membership.address ?? null,
+    phone: membership.phone ?? null,
+    createdAt: membership.createdAt,
     user: {
-      id: m.user?.id ?? "",
-      email: m.user?.email ?? "",
+      id: membership.user.id,
+      email: membership.user.email,
     },
   };
 }

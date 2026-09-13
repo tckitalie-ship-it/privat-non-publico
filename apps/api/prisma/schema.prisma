@@ -57,6 +57,11 @@ model Membership {
   role          Role        @default(MEMBER)
   updatedAt     DateTime    @updatedAt
   memberNumber  Int?
+  address       String?
+  birthDate     DateTime?
+  firstName     String?
+  lastName      String?
+  phone         String?
   association   Association @relation(fields: [associationId], references: [id], onDelete: Cascade)
   user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -128,7 +133,9 @@ model Notification {
   userId        String?
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @updatedAt
+  reminderId    String?
   association   Association? @relation(fields: [associationId], references: [id], onDelete: Cascade)
+  Reminder      Reminder?    @relation(fields: [reminderId], references: [id], onDelete: Cascade)
   user          User?        @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([associationId])
@@ -137,17 +144,18 @@ model Notification {
 }
 
 model Reminder {
-  id            String       @id @default(cuid())
+  id            String         @id @default(cuid())
   title         String?
   message       String
   remindAt      DateTime
-  completed     Boolean      @default(false)
+  completed     Boolean        @default(false)
   userId        String
   associationId String?
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
-  association   Association? @relation(fields: [associationId], references: [id], onDelete: Cascade)
-  user          User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  Notification  Notification[]
+  association   Association?   @relation(fields: [associationId], references: [id], onDelete: Cascade)
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([associationId])
