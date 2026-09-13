@@ -14,4 +14,4 @@ RUN pnpm --filter api build
 
 EXPOSE 3001
 
-CMD ["sh", "-c", "pnpm prisma db push --schema=./prisma/schema.prisma && pnpm run start:prod"]
+CMD ["sh", "-c", "pnpm --filter api exec prisma db push --schema=./prisma/schema.prisma && pnpm --filter api run start:prod"]
