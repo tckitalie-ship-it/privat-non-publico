@@ -10,7 +10,7 @@ COPY . .
 
 RUN pnpm install --dangerously-allow-all-builds
 
-RUN pnpm build
+RUN pnpm --filter api build
 
 EXPOSE 3001
 
