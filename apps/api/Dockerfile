@@ -6,7 +6,7 @@ RUN npm install -g pnpm
 
 COPY . .
 
-RUN pnpm install
+RUN pnpm install --dangerously-allow-all-builds
 
 RUN pnpm build
 
