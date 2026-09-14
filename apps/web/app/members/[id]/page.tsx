@@ -499,7 +499,7 @@ export default function MemberPage({
 
                 <div className="shrink-0 text-center">
                   <QRCodeSVG
-                    value={`http://192.168.1.138:3000/verify/${member.id}`}
+                    value={`${typeof window !== "undefined" ? window.location.origin : ""}/verify/${member.id}`}
                     size={64}
                     level="M"
                     bgColor="#ffffff"
@@ -518,3 +518,4 @@ export default function MemberPage({
     </>
   );
 }
+
