@@ -11,10 +11,7 @@ type VerificationData = {
 };
 
 async function getMembership(id: string): Promise<VerificationData | null> {
-  const apiUrl =
-    process.env.API_URL ||
-    process.env.NEXT_PUBLIC_API_URL ||
-    "http://localhost:3001";
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
   const baseUrl = apiUrl.replace(/\/+$/, "");
 
