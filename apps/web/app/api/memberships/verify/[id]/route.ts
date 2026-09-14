@@ -6,10 +6,7 @@ export async function GET(
 ) {
   const { id } = await params;
 
-  const configuredUrl =
-    process.env.API_URL ||
-    process.env.NEXT_PUBLIC_API_URL ||
-    "http://localhost:3001";
+  const configuredUrl = "https://privat-non-publico-6kjd.onrender.com";
 
   const apiUrl = configuredUrl.replace(/\/+$/, "");
   const endpoint = apiUrl.endsWith("/api")
