@@ -42,7 +42,7 @@ export default async function VerifyMembershipPage({
         <div className="mx-auto flex min-h-[70vh] max-w-xl items-center justify-center">
           <section className="w-full rounded-3xl border border-red-400/20 bg-white/5 p-8 text-center shadow-2xl">
             <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-red-500/15 text-3xl text-red-300">
-              âœ•
+              OK
             </div>
 
             <p className="mt-6 text-sm font-semibold uppercase tracking-[0.2em] text-red-300">
@@ -71,7 +71,7 @@ export default async function VerifyMembershipPage({
         <section className="w-full overflow-hidden rounded-3xl border border-emerald-400/20 bg-white/5 shadow-2xl">
           <div className="bg-emerald-500 px-6 py-8 text-center text-slate-950">
             <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-white text-4xl font-black shadow-lg">
-              âœ“
+              OK
             </div>
 
             <p className="mt-5 text-sm font-black uppercase tracking-[0.25em]">
@@ -129,7 +129,7 @@ export default async function VerifyMembershipPage({
 
             <div className="mt-8 rounded-2xl border border-emerald-400/15 bg-emerald-400/5 p-4 text-center">
               <p className="text-sm font-semibold text-emerald-200">
-                âœ“ Verifica effettuata dal sistema
+                Verifica effettuata dal sistema
               </p>
               <p className="mt-1 text-xs text-slate-400">
                 Questa pagina conferma che la tessera esiste nel registro
@@ -149,3 +149,6 @@ export default async function VerifyMembershipPage({
     </main>
   );
 }
+
+
+
