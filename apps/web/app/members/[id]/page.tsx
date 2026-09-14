@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
@@ -499,7 +499,7 @@ export default function MemberPage({
 
                 <div className="shrink-0 text-center">
                   <QRCodeSVG
-                    value={`${typeof window !== "undefined" ? window.location.origin : ""}/verify/${member.id}`}
+                    value={`https://privat-non-publico-web.vercel.app/verify/${member.id}`}
                     size={64}
                     level="M"
                     bgColor="#ffffff"
@@ -518,4 +518,5 @@ export default function MemberPage({
     </>
   );
 }
+
 
