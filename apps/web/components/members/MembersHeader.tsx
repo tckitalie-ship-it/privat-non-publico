@@ -1,16 +1,18 @@
-"use client";
+﻿"use client";
 
-import { Users, UserPlus } from "lucide-react";
+import { Users, UserPlus, UserRoundPlus } from "lucide-react";
 
 interface MembersHeaderProps {
   membersCount: number;
   invitationsCount: number;
   canManageMembers: boolean;
   onInviteClick?: () => void;
+  onRegistrationClick?: () => void;
 }
 
 export default function MembersHeader({
   onInviteClick,
+  onRegistrationClick,
   canManageMembers,
 }: MembersHeaderProps) {
   return (
@@ -32,14 +34,25 @@ export default function MembersHeader({
       </div>
 
       {canManageMembers && (
-        <button
-          type="button"
-          onClick={onInviteClick}
-          className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-500"
-        >
-          <UserPlus size={17} />
-          Invita membro
-        </button>
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <button
+            type="button"
+            onClick={onRegistrationClick}
+            className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-500"
+          >
+            <UserRoundPlus size={17} />
+            Nuova iscrizione
+          </button>
+
+          <button
+            type="button"
+            onClick={onInviteClick}
+            className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-500"
+          >
+            <UserPlus size={17} />
+            Invita membro
+          </button>
+        </div>
       )}
     </section>
   );
