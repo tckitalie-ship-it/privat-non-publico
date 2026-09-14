@@ -24,14 +24,10 @@ async function getMembership(id: string): Promise<VerificationData | null> {
       cache: "no-store",
     });
 
-    if (!response.ok) {
-      return null;
-    }
+    if (!response.ok) { throw new Error(`VERIFY ${response.status}: ${endpoint}`); }
 
     return (await response.json()) as VerificationData;
-  } catch {
-    return null;
-  }
+  } catch (error) { console.error("VERIFY ERROR", error); return null; }
 }
 
 export default async function VerifyMembershipPage({
