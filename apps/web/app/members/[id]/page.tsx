@@ -499,7 +499,7 @@ export default function MemberPage({
 
                 <div className="shrink-0 text-center">
                   <QRCodeSVG
-                    value={`https://privat-non-publico-web.vercel.app/verify/${member.id}`}
+                    value={`https://privat-non-publico-web-tckitalie-ship-its-projects.vercel.app/verify/${member.id}`}
                     size={64}
                     level="M"
                     bgColor="#ffffff"
@@ -518,5 +518,6 @@ export default function MemberPage({
     </>
   );
 }
+
 
 
