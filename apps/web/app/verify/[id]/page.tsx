@@ -11,7 +11,7 @@ type VerificationData = {
 };
 
 async function getMembership(id: string): Promise<VerificationData | null> {
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+  const apiUrl = "https://privat-non-publico-6kjd.onrender.com";
 
   const baseUrl = apiUrl.replace(/\/+$/, "");
 
