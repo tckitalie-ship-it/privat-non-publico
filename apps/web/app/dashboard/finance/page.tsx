@@ -139,6 +139,12 @@ export default function FinancePage() {
   const [amount, setAmount] =
     useState("");
 
+  const [filterType, setFilterType] = useState<"ALL" | "INCOME" | "EXPENSE">("ALL");
+  const [filterCategory, setFilterCategory] = useState("");
+  const [filterDateFrom, setFilterDateFrom] = useState("");
+  const [filterDateTo, setFilterDateTo] = useState("");
+  const [filterMinAmount, setFilterMinAmount] = useState("");
+  const [filterMaxAmount, setFilterMaxAmount] = useState("");
   const [editOpen, setEditOpen] =
     useState(false);
 
@@ -682,8 +688,34 @@ export default function FinancePage() {
     );
   }
 
+  const visibleTransactions = transactions.filter((transaction) => {
+    const minAmountCents = filterMinAmount.trim() === ""
+      ? null
+      : Math.round(Number(filterMinAmount) * 100);
+
+    const maxAmountCents = filterMaxAmount.trim() === ""
+      ? null
+      : Math.round(Number(filterMaxAmount) * 100);
+
+    if (filterType !== "ALL" && transaction.type !== filterType) return false;
+
+    if (
+      filterCategory.trim() !== "" &&
+      transaction.category?.toLowerCase() !== filterCategory.trim().toLowerCase()
+    ) return false;
+
+    if (filterDateFrom && transaction.date.slice(0, 10) < filterDateFrom) return false;
+
+    if (filterDateTo && transaction.date.slice(0, 10) > filterDateTo) return false;
+
+    if (minAmountCents !== null && transaction.amountCents < minAmountCents) return false;
+
+    if (maxAmountCents !== null && transaction.amountCents > maxAmountCents) return false;
+
+    return true;
+  });
   const tableTransactions =
-    transactions.map(
+    visibleTransactions.map(
       (transaction) => ({
         ...transaction,
         description:
@@ -775,6 +807,85 @@ export default function FinancePage() {
         </div>
       )}
 
+      <div className="mb-6 rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+        <div className="mb-3 flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-gray-900">Filtri movimenti</h3>
+          <button
+            type="button"
+            onClick={() => {
+              setFilterType("ALL");
+              setFilterCategory("");
+              setFilterDateFrom("");
+              setFilterDateTo("");
+              setFilterMinAmount("");
+              setFilterMaxAmount("");
+            }}
+            className="text-sm font-medium text-gray-600 hover:text-gray-900"
+          >
+            Azzera filtri
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
+          <select
+            value={filterType}
+            onChange={(e) =>
+              setFilterType(e.target.value as "ALL" | "INCOME" | "EXPENSE")
+            }
+            className="rounded-lg border border-gray-300 px-3 py-2 text-sm"
+          >
+            <option value="ALL">Tutti i movimenti</option>
+            <option value="INCOME">Entrate</option>
+            <option value="EXPENSE">Uscite</option>
+          </select>
+
+          <input
+            type="text"
+            value={filterCategory}
+            onChange={(e) => setFilterCategory(e.target.value)}
+            placeholder="Categoria"
+            className="rounded-lg border border-gray-300 px-3 py-2 text-sm"
+          />
+
+          <input
+            type="date"
+            value={filterDateFrom}
+            onChange={(e) => setFilterDateFrom(e.target.value)}
+            className="rounded-lg border border-gray-300 px-3 py-2 text-sm"
+          />
+
+          <input
+            type="date"
+            value={filterDateTo}
+            onChange={(e) => setFilterDateTo(e.target.value)}
+            className="rounded-lg border border-gray-300 px-3 py-2 text-sm"
+          />
+
+          <input
+            type="number"
+            min="0"
+            step="0.01"
+            value={filterMinAmount}
+            onChange={(e) => setFilterMinAmount(e.target.value)}
+            placeholder="Importo minimo â‚¬"
+            className="rounded-lg border border-gray-300 px-3 py-2 text-sm"
+          />
+
+          <input
+            type="number"
+            min="0"
+            step="0.01"
+            value={filterMaxAmount}
+            onChange={(e) => setFilterMaxAmount(e.target.value)}
+            placeholder="Importo massimo â‚¬"
+            className="rounded-lg border border-gray-300 px-3 py-2 text-sm"
+          />
+        </div>
+
+        <p className="mt-3 text-xs text-gray-500">
+          Visualizzati {visibleTransactions.length} di {transactions.length} movimenti
+        </p>
+      </div>
       {transactions.length === 0 ? (
         <div className="rounded-2xl border border-white/10 bg-[#0f172a] p-8 text-center">
           <p className="font-semibold text-white">
