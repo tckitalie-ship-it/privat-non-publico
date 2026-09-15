@@ -73,25 +73,37 @@ function getErrorMessage(
   return fallback;
 }
 
-function getCurrentUserRole(): Role | null {
-  if (typeof window === "undefined") {
-    return null;
-  }
-
+async function getCurrentUserRole(): Promise<Role | null> {
   const token = getAccessToken();
 
-    if (!token) {
+  if (!token) {
     return null;
   }
 
   try {
-    const payload = JSON.parse(
-      atob(token.split(".")[1]),
-    ) as {
+    const associationId = getActiveAssociationId();
+
+    const response = await fetch(`${API_URL}/memberships/me`, {
+      method: "GET",
+      headers: {
+        Accept: "application/json",
+        Authorization: `Bearer ${token}`,
+        ...(associationId
+          ? { "x-association-id": associationId }
+          : {}),
+      },
+      cache: "no-store",
+    });
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const data = (await response.json()) as {
       role?: Role;
     };
 
-    return payload.role ?? null;
+    return data.role ?? null;
   } catch {
     return null;
   }
@@ -320,9 +332,7 @@ export default function DashboardFilesPage() {
 
   const canManageFiles = role === "OWNER" || role === "ADMIN";
 
-  useEffect(() => {
-    setRole(getCurrentUserRole());
-  }, []);
+  useEffect(() => { void getCurrentUserRole().then((currentRole) => { console.log("FILES USER ROLE:", currentRole); setRole(currentRole); }); }, []);
 
   const loadFiles =
     useCallback(async () => {
@@ -462,7 +472,7 @@ export default function DashboardFilesPage() {
       20 * 1024 * 1024
     ) {
       toast.error(
-        "Il file non può superare 20 MB",
+        "Il file non puÃ² superare 20 MB",
       );
       return;
     }    const token = getAccessToken();
@@ -932,7 +942,7 @@ export default function DashboardFilesPage() {
                           {formatFileSize(
                             file.size,
                           )}
-                          {" · "}
+                          {" Â· "}
                           {getFileTypeLabel(
                             file.mimetype,
                           )}
@@ -1050,7 +1060,7 @@ export default function DashboardFilesPage() {
             </div>
 
             <p className="mt-4 text-sm text-red-300">
-              Questa operazione non può essere annullata.
+              Questa operazione non puÃ² essere annullata.
             </p>
 
             <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
@@ -1093,3 +1103,6 @@ export default function DashboardFilesPage() {
     </div>
   );
 }
+
+
+
