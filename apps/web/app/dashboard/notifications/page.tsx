@@ -5,6 +5,7 @@ import {
   Bell,
   Check,
   CheckCheck,
+  Clock3,
   Loader2,
   RefreshCw,
   Trash2,
@@ -76,13 +77,9 @@ function formatDate(value: string) {
   }).format(new Date(value));
 }
 
-function getAssociationIdFromToken(): string | null {
-  const token = getAccessToken();
-
-  if (!token) {
-    return null;
-  }
-
+function decodeJwtPayload(
+  token: string,
+): Record<string, unknown> | null {
   try {
     const payload = token.split(".")[1];
 
@@ -94,10 +91,16 @@ function getAssociationIdFromToken(): string | null {
       .replace(/-/g, "+")
       .replace(/_/g, "/");
 
-    const decoded = JSON.parse(
+    const padded =
+      normalized +
+      "=".repeat(
+        (4 - (normalized.length % 4)) % 4,
+      );
+
+    return JSON.parse(
       decodeURIComponent(
         window
-          .atob(normalized)
+          .atob(padded)
           .split("")
           .map(
             (character) =>
@@ -108,17 +111,29 @@ function getAssociationIdFromToken(): string | null {
           )
           .join(""),
       ),
-    );
-
-    return decoded.associationId ?? null;
+    ) as Record<string, unknown>;
   } catch (error) {
     console.error(
-      "Errore lettura associationId dal JWT:",
+      "Errore lettura JWT:",
       error,
     );
 
     return null;
   }
+}
+
+function getAssociationIdFromToken(): string | null {
+  const token = getAccessToken();
+
+  if (!token) {
+    return null;
+  }
+
+  const payload = decodeJwtPayload(token);
+
+  return typeof payload?.associationId === "string"
+    ? payload.associationId
+    : null;
 }
 
 function getRoleFromToken(): UserRole | null {
@@ -128,42 +143,18 @@ function getRoleFromToken(): UserRole | null {
     return null;
   }
 
-  try {
-    const payload = token.split(".")[1];
+  const payload = decodeJwtPayload(token);
+  const role = payload?.role;
 
-    if (!payload) {
-      return null;
-    }
-
-    const normalized = payload
-      .replace(/-/g, "+")
-      .replace(/_/g, "/");
-
-    const decoded = JSON.parse(
-      decodeURIComponent(
-        window
-          .atob(normalized)
-          .split("")
-          .map(
-            (character) =>
-              `%${character
-                .charCodeAt(0)
-                .toString(16)
-                .padStart(2, "0")}`,
-          )
-          .join(""),
-      ),
-    ) as { role?: UserRole };
-
-    return decoded.role ?? null;
-  } catch (error) {
-    console.error(
-      "Errore lettura ruolo dal JWT:",
-      error,
-    );
-
-    return null;
+  if (
+    role === "OWNER" ||
+    role === "ADMIN" ||
+    role === "MEMBER"
+  ) {
+    return role;
   }
+
+  return null;
 }
 
 function Toast({
@@ -190,7 +181,9 @@ export default function NotificationsPage() {
 
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
-  const [markingAll, setMarkingAll] = useState(false);
+  const [markingAll, setMarkingAll] =
+    useState(false);
+
   const [actionId, setActionId] =
     useState<string | null>(null);
 
@@ -230,19 +223,9 @@ export default function NotificationsPage() {
       setError(null);
 
       try {
-        const associationId =
-          getAssociationIdFromToken();
-
-        if (!associationId) {
-          throw new Error(
-            "Associazione attiva non disponibile.",
-          );
-        }
-
-        const response =
-          await authenticatedFetch(
-            `/notifications/association/${associationId}`,
-          );
+        const response = await authenticatedFetch(
+          "/notifications/me",
+        );
 
         if (!response.ok) {
           throw new Error(
@@ -254,9 +237,7 @@ export default function NotificationsPage() {
           (await response.json()) as Notification[];
 
         setNotifications(
-          Array.isArray(data)
-            ? data
-            : [],
+          Array.isArray(data) ? data : [],
         );
       } catch (error) {
         console.error(
@@ -304,9 +285,9 @@ export default function NotificationsPage() {
             method: "POST",
             body: JSON.stringify({
               title: "Notifica di prova",
-              message:
-                "Il sistema delle notifiche funziona correttamente.",
+              message: "Il sistema delle notifiche funziona correttamente.",
               associationId,
+              userId: decodeJwtPayload(getAccessToken() ?? "")?.sub ?? null,
             }),
           },
         );
@@ -339,20 +320,16 @@ export default function NotificationsPage() {
       setCreating(false);
     }
   }
-
-  async function markAsRead(
-    notificationId: string,
-  ) {
+    async function markAsRead(notificationId: string) {
     setActionId(notificationId);
 
     try {
-      const response =
-        await authenticatedFetch(
-          `/notifications/${notificationId}/read`,
-          {
-            method: "PATCH",
-          },
-        );
+      const response = await authenticatedFetch(
+        `/notifications/${notificationId}/read`,
+        {
+          method: "PATCH",
+        },
+      );
 
       if (!response.ok) {
         throw new Error(
@@ -445,6 +422,73 @@ export default function NotificationsPage() {
     }
   }
 
+  async function completeReminder(
+    notification: Notification,
+  ) {
+    if (!notification.reminderId) {
+      return;
+    }
+
+    setActionId(notification.id);
+
+    try {
+      const response =
+        await authenticatedFetch(
+          `/reminders/${notification.reminderId}/complete`,
+          {
+            method: "PATCH",
+          },
+        );
+
+      if (!response.ok) {
+        throw new Error(
+          await readErrorMessage(response),
+        );
+      }
+
+      setNotifications((current) =>
+        current.map((item) =>
+          item.id === notification.id
+            ? {
+                ...item,
+                read: true,
+              }
+            : item,
+        ),
+      );
+
+      await loadNotifications(false);
+
+      window.dispatchEvent(
+        new CustomEvent("reminder:completed", {
+          detail: {
+            reminderId:
+              notification.reminderId,
+          },
+        }),
+      );
+
+      showToast(
+        "success",
+        "Reminder completato",
+      );
+    } catch (error) {
+      console.error(
+        "Errore completamento reminder:",
+        error,
+      );
+
+      showToast(
+        "error",
+        error instanceof Error
+          ? error.message
+          : "Impossibile completare il reminder",
+      );
+    } finally {
+      setActionId(null);
+    }
+  }
+
   async function deleteNotification(
     notificationId: string,
   ) {
@@ -506,12 +550,17 @@ export default function NotificationsPage() {
       (notification) => !notification.read,
     ).length;
 
+  const reminderCount =
+    notifications.filter(
+      (notification) =>
+        Boolean(notification.reminderId),
+    ).length;
+
   const canCreateNotifications =
     currentUserRole === "OWNER" ||
     currentUserRole === "ADMIN";
-
-  return (
-    <div className="mx-auto w-full max-w-4xl space-y-6 px-6 py-10">
+      return (
+    <div className="mx-auto w-full max-w-5xl space-y-6 px-6 py-10">
       {toast && <Toast toast={toast} />}
 
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -525,6 +574,12 @@ export default function NotificationsPage() {
               ? "Non hai notifiche da leggere."
               : `${unreadCount} notifiche non lette.`}
           </p>
+
+          {reminderCount > 0 && (
+            <p className="mt-1 text-xs text-gray-500">
+              {reminderCount} notifiche collegate a reminder.
+            </p>
+          )}
         </div>
 
         <div className="flex flex-wrap gap-3">
@@ -608,7 +663,6 @@ export default function NotificationsPage() {
               size={20}
               className="animate-spin"
             />
-
             Caricamento notifiche...
           </div>
         </div>
@@ -634,6 +688,9 @@ export default function NotificationsPage() {
               const isLoading =
                 actionId === notification.id;
 
+              const isReminder =
+                Boolean(notification.reminderId);
+
               return (
                 <li
                   key={notification.id}
@@ -646,6 +703,20 @@ export default function NotificationsPage() {
                   <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-3">
+                        <div
+                          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
+                            isReminder
+                              ? "bg-pink-500/15 text-pink-400"
+                              : "bg-indigo-500/15 text-indigo-400"
+                          }`}
+                        >
+                          {isReminder ? (
+                            <Clock3 size={20} />
+                          ) : (
+                            <Bell size={20} />
+                          )}
+                        </div>
+
                         <h2 className="text-lg font-semibold text-white">
                           {notification.title ??
                             "Notifica"}
@@ -656,9 +727,15 @@ export default function NotificationsPage() {
                             Nuova
                           </span>
                         )}
+
+                        {isReminder && (
+                          <span className="rounded-full bg-pink-500/15 px-2.5 py-1 text-xs font-semibold text-pink-300">
+                            Reminder
+                          </span>
+                        )}
                       </div>
 
-                      <p className="mt-2 text-sm leading-6 text-gray-300">
+                      <p className="mt-3 text-sm leading-6 text-gray-300">
                         {notification.message}
                       </p>
 
@@ -669,7 +746,31 @@ export default function NotificationsPage() {
                       </p>
                     </div>
 
-                    <div className="flex shrink-0 gap-2">
+                    <div className="flex shrink-0 flex-wrap gap-2">
+                      {isReminder && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            void completeReminder(
+                              notification,
+                            )
+                          }
+                          disabled={isLoading}
+                          className="inline-flex items-center gap-2 rounded-lg border border-pink-400/20 bg-pink-500/10 px-3 py-2 text-xs font-medium text-pink-300 transition hover:bg-pink-500/20 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          {isLoading ? (
+                            <Loader2
+                              size={15}
+                              className="animate-spin"
+                            />
+                          ) : (
+                            <Check size={15} />
+                          )}
+
+                          Completa reminder
+                        </button>
+                      )}
+
                       {!notification.read && (
                         <button
                           type="button"
@@ -726,3 +827,15 @@ export default function NotificationsPage() {
     </div>
   );
 }
+
+
+
+
+
+
+
+
+
+
+
+
