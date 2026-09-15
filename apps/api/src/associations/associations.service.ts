@@ -1,9 +1,10 @@
-import {
+﻿import {
+  BadRequestException,
   ForbiddenException,
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
-import { Role } from "@prisma/client";
+import { Prisma, Role } from "@prisma/client";
 
 import { PrismaService } from "../prisma/prisma.service";
 import { CreateAssociationDto } from "./dto/create-association.dto";
@@ -11,84 +12,63 @@ import { UpdateAssociationDto } from "./dto/update-association.dto";
 
 @Injectable()
 export class AssociationsService {
-  constructor(
-    private readonly prisma: PrismaService,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
-  /**
-   * Restituisce tutte le associazioni
-   * di cui l'utente � membro.
-   */
   async findAllForUser(userId: string) {
     return this.prisma.association.findMany({
       where: {
         memberships: {
-          some: {
-            userId,
-          },
+          some: { userId },
         },
       },
       include: {
         memberships: true,
         events: true,
       },
+      orderBy: {
+        createdAt: "asc",
+      },
     });
   }
 
-  /**
-   * Restituisce una singola associazione
-   * solo se l'utente ne fa parte.
-   */
-  async findOneForUser(
-    id: string,
-    userId: string,
-  ) {
-    const association =
-      await this.prisma.association.findUnique({
-        where: {
-          id,
-        },
-        include: {
-          memberships: true,
-          events: true,
-        },
-      });
+  async findOneForUser(id: string, userId: string) {
+    const association = await this.prisma.association.findUnique({
+      where: { id },
+      include: {
+        memberships: true,
+        events: true,
+      },
+    });
 
     if (!association) {
-      throw new NotFoundException(
-        "Associazione non trovata",
-      );
+      throw new NotFoundException("Associazione non trovata");
     }
 
-    const isMember =
-      association.memberships.some(
-        (membership) =>
-          membership.userId === userId,
-      );
+    const isMember = association.memberships.some(
+      (membership) => membership.userId === userId,
+    );
 
     if (!isMember) {
-      throw new ForbiddenException(
-        "Accesso negato",
-      );
+      throw new ForbiddenException("Accesso negato");
     }
 
     return association;
   }
 
-  /**
-   * Crea una nuova associazione.
-   *
-   * L'utente che la crea diventa OWNER.
-   */
-  async create(
-    dto: CreateAssociationDto,
-    userId: string,
-  ) {
+  async create(dto: CreateAssociationDto, userId: string) {
+    const name = dto.name.trim();
+    const description = dto.description?.trim() ?? "";
+
+    if (name.length < 2) {
+      throw new BadRequestException(
+        "Il nome dell'associazione deve contenere almeno 2 caratteri",
+      );
+    }
+
     return this.prisma.association.create({
       data: {
-        name: dto.name,
-        description: dto.description ?? "",
-
+        name,
+        description,
         memberships: {
           create: {
             userId,
@@ -103,69 +83,108 @@ export class AssociationsService {
     });
   }
 
-  /**
-   * Modifica i dati dell'associazione.
-   *
-   * SOLO OWNER.
-   */
   async update(
     id: string,
     dto: UpdateAssociationDto,
     userId: string,
   ) {
-    await this.ensureOwner(
-      id,
-      userId,
-    );
+    await this.ensureManager(id, userId);
 
-    return this.prisma.association.update({
-      where: {
-        id,
-      },
-      data: dto,
-      include: {
-        memberships: true,
-        events: true,
-      },
-    });
-  }
+    const data: Prisma.AssociationUpdateInput = {};
 
-  /**
-   * Elimina definitivamente l'associazione.
-   *
-   * SOLO OWNER.
-   */
-  async remove(
-    id: string,
-    userId: string,
-  ) {
-    await this.ensureOwner(
-      id,
-      userId,
-    );
+    if (dto.name !== undefined) {
+      const name = dto.name.trim();
 
-    return this.prisma.association.delete({
-      where: {
-        id,
-      },
-    });
-  }
+      if (name.length < 2) {
+        throw new BadRequestException(
+          "Il nome dell'associazione deve contenere almeno 2 caratteri",
+        );
+      }
 
-  /**
-   * Verifica che l'utente sia membro
-   * dell'associazione.
-   */
-  private async ensureMembership(
-    id: string,
-    userId: string,
-  ) {
-    const membership =
-      await this.prisma.membership.findFirst({
-        where: {
-          associationId: id,
-          userId,
+      data.name = name;
+    }
+
+    if (dto.description !== undefined && dto.description !== null) {
+      data.description = dto.description.trim();
+    }
+
+    if (dto.slug !== undefined && dto.slug !== null) {
+      const slug = dto.slug.trim().toLowerCase();
+
+      if (slug.length > 120) {
+        throw new BadRequestException(
+          "Lo slug non può superare 120 caratteri",
+        );
+      }
+
+      data.slug = slug || null;
+    }
+
+    if (dto.logoUrl !== undefined && dto.logoUrl !== null) {
+      const logoUrl = dto.logoUrl.trim();
+
+      if (logoUrl.length > 500) {
+        throw new BadRequestException(
+          "L'URL del logo non può superare 500 caratteri",
+        );
+      }
+
+      data.logoUrl = logoUrl || null;
+    }
+
+    if (Object.keys(data).length === 0) {
+      throw new BadRequestException(
+        "Nessuna modifica da salvare",
+      );
+    }
+
+    try {
+      return await this.prisma.association.update({
+        where: { id },
+        data,
+        include: {
+          memberships: true,
+          events: true,
         },
       });
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2025"
+      ) {
+        throw new NotFoundException("Associazione non trovata");
+      }
+
+      throw error;
+    }
+  }
+
+  async remove(id: string, userId: string) {
+    await this.ensureOwner(id, userId);
+
+    try {
+      return await this.prisma.association.delete({
+        where: { id },
+      });
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2025"
+      ) {
+        throw new NotFoundException("Associazione non trovata");
+      }
+
+      throw error;
+    }
+  }
+
+  private async ensureMembership(id: string, userId: string) {
+    const membership = await this.prisma.membership.findFirst({
+      where: {
+        associationId: id,
+        userId,
+      },
+    });
 
     if (!membership) {
       throw new ForbiddenException(
@@ -176,29 +195,31 @@ export class AssociationsService {
     return membership;
   }
 
-  /**
-   * Verifica che l'utente sia OWNER.
-   *
-   * Le impostazioni principali
-   * dell'associazione sono riservate
-   * al proprietario.
-   */
-  private async ensureOwner(
-    id: string,
-    userId: string,
-  ) {
-    const membership =
-      await this.ensureMembership(
-        id,
-        userId,
+  private async ensureManager(id: string, userId: string) {
+    const membership = await this.ensureMembership(id, userId);
+
+    if (
+      membership.role !== Role.OWNER &&
+      membership.role !== Role.ADMIN
+    ) {
+      throw new ForbiddenException(
+        "Solo OWNER o ADMIN possono modificare questa associazione",
       );
+    }
+
+    return membership;
+  }
+
+  private async ensureOwner(id: string, userId: string) {
+    const membership = await this.ensureMembership(id, userId);
 
     if (membership.role !== Role.OWNER) {
       throw new ForbiddenException(
-        "Solo il proprietario pu� modificare questa associazione",
+        "Solo il proprietario può eliminare questa associazione",
       );
     }
 
     return membership;
   }
 }
+
