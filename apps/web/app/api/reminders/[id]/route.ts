@@ -1,4 +1,4 @@
-import { getBackendApiUrl } from "@/lib/server-api";
+﻿import { getBackendApiUrl } from "@/lib/server-api";
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 
@@ -61,14 +61,18 @@ export async function PATCH(
       );
     }
 
+    const body = await request.text();
+
     const response = await fetch(
-      getBackendApiUrl(`reminders/${id}/complete`),
+      getBackendApiUrl(`reminders/${id}`),
       {
         method: "PATCH",
         headers: {
           Accept: "application/json",
+          "Content-Type": "application/json",
           Authorization: authorization,
         },
+        body,
         cache: "no-store",
       },
     );
@@ -95,7 +99,7 @@ export async function PATCH(
         message:
           error instanceof Error
             ? error.message
-            : "Errore completamento reminder",
+            : "Errore modifica reminder",
       },
       {
         status: 500,
