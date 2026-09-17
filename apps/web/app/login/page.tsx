@@ -76,7 +76,9 @@ function LoginContent() {
       }
 
       setAccessToken(token);
-
+      document.cookie = `access_token=${encodeURIComponent(
+  token,
+)}; path=/; max-age=${60 * 60 * 24 * 7}; SameSite=Lax`;
       if (data?.activeAssociationId) {
         setActiveAssociationId(data.activeAssociationId);
       }
@@ -175,7 +177,9 @@ function LoginContent() {
   }
 
   setAccessToken(refreshedToken);
-
+    document.cookie = `access_token=${encodeURIComponent(
+  refreshedToken,
+)}; path=/; max-age=${60 * 60 * 24 * 7}; SameSite=Lax`;
   if (refreshedLoginData?.activeAssociationId) {
     setActiveAssociationId(
       refreshedLoginData.activeAssociationId,

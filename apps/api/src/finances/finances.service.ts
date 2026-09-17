@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -10,11 +11,88 @@ import { PrismaService } from "../prisma/prisma.service";
 
 type TransactionType = "INCOME" | "EXPENSE";
 
+type CreateTransactionInput = {
+  associationId: string;
+  title?: string | null;
+  description?: string | null;
+  category?: string | null;
+  amountCents: number;
+  type: TransactionType;
+  date: Date;
+};
+
+type UpdateTransactionInput = {
+  title?: string | null;
+  description?: string | null;
+  category?: string | null;
+  amountCents?: number;
+  type?: TransactionType;
+  date?: Date;
+};
+
+type FinanceFilters = {
+  type?: TransactionType;
+  category?: string;
+  dateFrom?: Date;
+  dateTo?: Date;
+  minAmount?: number;
+  maxAmount?: number;
+};
+
 @Injectable()
 export class FinancesService {
   constructor(
     private readonly prisma: PrismaService,
   ) {}
+
+  private validateTransactionData(
+    amountCents: number,
+    type: string,
+    date: Date,
+  ) {
+    if (
+      !Number.isInteger(amountCents) ||
+      amountCents <= 0
+    ) {
+      throw new BadRequestException(
+        "L'importo deve essere un numero intero positivo espresso in centesimi",
+      );
+    }
+
+    if (
+      type !== "INCOME" &&
+      type !== "EXPENSE"
+    ) {
+      throw new BadRequestException(
+        "Tipo di transazione non valido",
+      );
+    }
+
+    if (
+      !(date instanceof Date) ||
+      Number.isNaN(date.getTime())
+    ) {
+      throw new BadRequestException(
+        "Data della transazione non valida",
+      );
+    }
+  }
+
+  private cleanOptionalText(
+    value?: string | null,
+  ): string | null | undefined {
+    if (value === undefined) {
+      return undefined;
+    }
+
+    if (value === null) {
+      return null;
+    }
+
+    const clean = value.trim();
+
+    return clean || null;
+  }
 
   private async ensureMembership(
     userId: string,
@@ -42,18 +120,10 @@ export class FinancesService {
     associationId: string,
   ) {
     const membership =
-      await this.prisma.membership.findFirst({
-        where: {
-          userId,
-          associationId,
-        },
-      });
-
-    if (!membership) {
-      throw new ForbiddenException(
-        "Non sei membro di questa associazione",
+      await this.ensureMembership(
+        userId,
+        associationId,
       );
-    }
 
     if (
       membership.role !== Role.OWNER &&
@@ -66,29 +136,43 @@ export class FinancesService {
 
     return membership;
   }
-    async createTransaction(
+
+  async createTransaction(
     userId: string,
-    dto: {
-      associationId: string;
-      title?: string | null;
-      description?: string | null;
-      category?: string | null;
-      amountCents: number;
-      type: TransactionType;
-      date: Date;
-    },
+    dto: CreateTransactionInput,
   ) {
+    if (!dto.associationId?.trim()) {
+      throw new BadRequestException(
+        "Associazione non specificata",
+      );
+    }
+
+    this.validateTransactionData(
+      dto.amountCents,
+      dto.type,
+      dto.date,
+    );
+
     await this.ensureCanManageFinance(
       userId,
       dto.associationId,
     );
 
+    const title =
+      this.cleanOptionalText(dto.title);
+
+    const description =
+      this.cleanOptionalText(dto.description);
+
+    const category =
+      this.cleanOptionalText(dto.category);
+
     return this.prisma.transaction.create({
       data: {
         associationId: dto.associationId,
-        title: dto.title ?? null,
-        description: dto.description ?? null,
-        category: dto.category ?? null,
+        title,
+        description,
+        category,
         amountCents: dto.amountCents,
         type: dto.type,
         date: dto.date,
@@ -109,9 +193,14 @@ export class FinancesService {
       where: {
         associationId,
       },
-      orderBy: {
-        date: "desc",
-      },
+      orderBy: [
+        {
+          date: "desc",
+        },
+        {
+          createdAt: "desc",
+        },
+      ],
     });
   }
 
@@ -139,17 +228,11 @@ export class FinancesService {
 
     return transaction;
   }
-    async updateTransaction(
+
+  async updateTransaction(
     id: string,
     userId: string,
-    dto: {
-      title?: string | null;
-      description?: string | null;
-      category?: string | null;
-      amountCents?: number;
-      type?: TransactionType;
-      date?: Date;
-    },
+    dto: UpdateTransactionInput,
   ) {
     const transaction =
       await this.prisma.transaction.findUnique({
@@ -169,18 +252,92 @@ export class FinancesService {
       transaction.associationId,
     );
 
+    const nextAmount =
+      dto.amountCents ??
+      transaction.amountCents;
+
+    const nextType =
+      dto.type ??
+      transaction.type;
+
+    const nextDate =
+      dto.date ??
+      transaction.date;
+
+    this.validateTransactionData(
+      nextAmount,
+      nextType,
+      nextDate,
+    );
+
+    const data: {
+      title?: string | null;
+      description?: string | null;
+      category?: string | null;
+      amountCents?: number;
+      type?: TransactionType;
+      date?: Date;
+    } = {};
+
+    if (
+      dto.title !== undefined
+    ) {
+      data.title =
+        this.cleanOptionalText(
+          dto.title,
+        );
+    }
+
+    if (
+      dto.description !== undefined
+    ) {
+      data.description =
+        this.cleanOptionalText(
+          dto.description,
+        );
+    }
+
+    if (
+      dto.category !== undefined
+    ) {
+      data.category =
+        this.cleanOptionalText(
+          dto.category,
+        );
+    }
+
+    if (
+      dto.amountCents !== undefined
+    ) {
+      data.amountCents =
+        dto.amountCents;
+    }
+
+    if (
+      dto.type !== undefined
+    ) {
+      data.type = dto.type;
+    }
+
+    if (
+      dto.date !== undefined
+    ) {
+      data.date = dto.date;
+    }
+
+    if (
+      Object.keys(data).length === 0
+    ) {
+      throw new BadRequestException(
+        "Nessuna modifica specificata",
+      );
+    }
+
     return this.prisma.transaction.update({
       where: {
         id,
       },
-      data: {
-        title: dto.title,
-        description: dto.description,
-        category: dto.category,
-        amountCents: dto.amountCents,
-        type: dto.type,
-        date: dto.date,
-      },
+      data,
     });
   }
 
@@ -216,7 +373,8 @@ export class FinancesService {
       message: "Transazione eliminata",
     };
   }
-    async getSummary(
+
+  async getSummary(
     associationId: string,
     userId: string,
   ) {
@@ -225,33 +383,32 @@ export class FinancesService {
       associationId,
     );
 
-    const income =
-      await this.prisma.transaction.aggregate({
+    const result =
+      await this.prisma.transaction.groupBy({
+        by: ["type"],
         where: {
           associationId,
-          type: "INCOME",
         },
         _sum: {
           amountCents: true,
         },
       });
 
-    const expense =
-      await this.prisma.transaction.aggregate({
-        where: {
-          associationId,
-          type: "EXPENSE",
-        },
-        _sum: {
-          amountCents: true,
-        },
-      });
+    let totalIncome = 0;
+    let totalExpense = 0;
 
-    const totalIncome =
-      income._sum.amountCents ?? 0;
+    for (const row of result) {
+      const amount =
+        row._sum.amountCents ?? 0;
 
-    const totalExpense =
-      expense._sum.amountCents ?? 0;
+      if (row.type === "INCOME") {
+        totalIncome += amount;
+      }
+
+      if (row.type === "EXPENSE") {
+        totalExpense += amount;
+      }
+    }
 
     return {
       totalIncome,
@@ -264,43 +421,129 @@ export class FinancesService {
   async filter(
     associationId: string,
     userId: string,
-    filters: {
-      type?: TransactionType;
-      category?: string;
-      dateFrom?: Date;
-      dateTo?: Date;
-      minAmount?: number;
-      maxAmount?: number;
-    },
+    filters: FinanceFilters,
   ) {
     await this.ensureMembership(
       userId,
       associationId,
     );
 
+    if (
+      filters.type !== undefined &&
+      filters.type !== "INCOME" &&
+      filters.type !== "EXPENSE"
+    ) {
+      throw new BadRequestException(
+        "Tipo di transazione non valido",
+      );
+    }
+
+    if (
+      filters.dateFrom &&
+      Number.isNaN(
+        filters.dateFrom.getTime(),
+      )
+    ) {
+      throw new BadRequestException(
+        "Data iniziale non valida",
+      );
+    }
+
+    if (
+      filters.dateTo &&
+      Number.isNaN(
+        filters.dateTo.getTime(),
+      )
+    ) {
+      throw new BadRequestException(
+        "Data finale non valida",
+      );
+    }
+
+    if (
+      filters.dateFrom &&
+      filters.dateTo &&
+      filters.dateFrom > filters.dateTo
+    ) {
+      throw new BadRequestException(
+        "L'intervallo di date non è valido",
+      );
+    }
+
+    if (
+      filters.minAmount !== undefined &&
+      (
+        !Number.isInteger(
+          filters.minAmount,
+        ) ||
+        filters.minAmount < 0
+      )
+    ) {
+      throw new BadRequestException(
+        "Importo minimo non valido",
+      );
+    }
+
+    if (
+      filters.maxAmount !== undefined &&
+      (
+        !Number.isInteger(
+          filters.maxAmount,
+        ) ||
+        filters.maxAmount < 0
+      )
+    ) {
+      throw new BadRequestException(
+        "Importo massimo non valido",
+      );
+    }
+
+    if (
+      filters.minAmount !== undefined &&
+      filters.maxAmount !== undefined &&
+      filters.minAmount >
+        filters.maxAmount
+    ) {
+      throw new BadRequestException(
+        "L'intervallo degli importi non è valido",
+      );
+    }
+
+    const category =
+      filters.category?.trim();
+
     return this.prisma.transaction.findMany({
       where: {
         associationId,
+
         type: filters.type,
-        category: filters.category
+
+        category: category
           ? {
-              contains:
-                filters.category,
+              contains: category,
               mode: "insensitive",
             }
           : undefined,
+
         date: {
           gte: filters.dateFrom,
           lte: filters.dateTo,
         },
+
         amountCents: {
           gte: filters.minAmount,
           lte: filters.maxAmount,
         },
       },
-      orderBy: {
-        date: "desc",
-      },
+
+      orderBy: [
+        {
+          date: "desc",
+        },
+        {
+          createdAt: "desc",
+        },
+      ],
     });
   }
-  }
+}

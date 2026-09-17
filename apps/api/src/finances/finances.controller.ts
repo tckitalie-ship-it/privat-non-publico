@@ -22,9 +22,6 @@ export class FinancesController {
     private readonly finances: FinancesService,
   ) {}
 
-  /**
-   * Crea una transazione
-   */
   @Post()
   async create(
     @CurrentUser() user: JwtUser,
@@ -39,19 +36,29 @@ export class FinancesController {
       date: string;
     },
   ) {
-    return this.finances.createTransaction(user.id, {
-      ...dto,
-      date: new Date(dto.date),
-    });
+    if (
+      !dto ||
+      !dto.associationId
+    ) {
+      throw new Error(
+        "Associazione non specificata",
+      );
+    }
+
+    return this.finances.createTransaction(
+      user.id,
+      {
+        ...dto,
+        date: new Date(dto.date),
+      },
+    );
   }
 
-  /**
-   * Tutte le transazioni dell'associazione
-   */
   @Get("association/:associationId")
   async findAll(
     @CurrentUser() user: JwtUser,
-    @Param("associationId") associationId: string,
+    @Param("associationId")
+    associationId: string,
   ) {
     return this.finances.findAll(
       associationId,
@@ -59,13 +66,11 @@ export class FinancesController {
     );
   }
 
-  /**
-   * Riepilogo finanziario
-   */
   @Get("summary/:associationId")
   async summary(
     @CurrentUser() user: JwtUser,
-    @Param("associationId") associationId: string,
+    @Param("associationId")
+    associationId: string,
   ) {
     return this.finances.getSummary(
       associationId,
@@ -73,32 +78,31 @@ export class FinancesController {
     );
   }
 
-  /**
-   * Filtri avanzati
-   */
   @Post("filter/:associationId")
   async filter(
     @CurrentUser() user: JwtUser,
-    @Param("associationId") associationId: string,
+    @Param("associationId")
+    associationId: string,
     @Body()
-    
     filters: {
-  type?: "INCOME" | "EXPENSE";
-  category?: string;
-  dateFrom?: string;
-  dateTo?: string;
-  minAmount?: number;
-  maxAmount?: number;
-},
+      type?: "INCOME" | "EXPENSE";
+      category?: string;
+      dateFrom?: string;
+      dateTo?: string;
+      minAmount?: number;
+      maxAmount?: number;
+    },
   ) {
     return this.finances.filter(
       associationId,
       user.id,
       {
         ...filters,
+
         dateFrom: filters.dateFrom
           ? new Date(filters.dateFrom)
           : undefined,
+
         dateTo: filters.dateTo
           ? new Date(filters.dateTo)
           : undefined,
@@ -106,20 +110,17 @@ export class FinancesController {
     );
   }
 
-  /**
-   * Dettaglio transazione
-   */
   @Get(":id")
   async findOne(
     @CurrentUser() user: JwtUser,
     @Param("id") id: string,
   ) {
-    return this.finances.findOne(id, user.id);
+    return this.finances.findOne(
+      id,
+      user.id,
+    );
   }
 
-  /**
-   * Aggiorna transazione
-   */
   @Patch(":id")
   async update(
     @CurrentUser() user: JwtUser,
@@ -139,6 +140,7 @@ export class FinancesController {
       user.id,
       {
         ...dto,
+
         date: dto.date
           ? new Date(dto.date)
           : undefined,
@@ -146,9 +148,6 @@ export class FinancesController {
     );
   }
 
-  /**
-   * Elimina transazione
-   */
   @Delete(":id")
   async delete(
     @CurrentUser() user: JwtUser,

@@ -1,11 +1,11 @@
 ﻿"use client";
 
 import { useEffect } from "react";
-
 import {
   ArrowDownLeft,
   ArrowUpRight,
   Clock3,
+  Wallet,
   Users,
 } from "lucide-react";
 
@@ -25,8 +25,13 @@ const cards = [
     key: "members",
     label: "Totale membri",
     icon: Users,
-    iconClass:
-      "bg-blue-50 text-blue-600 border-blue-100",
+    iconClass: "bg-blue-50 text-blue-600 border-blue-100",
+  },
+  {
+    key: "balance",
+    label: "Saldo",
+    icon: Wallet,
+    iconClass: "bg-indigo-50 text-indigo-600 border-indigo-100",
   },
   {
     key: "income",
@@ -65,7 +70,7 @@ function LoadingCard() {
   );
 }
 
-export function DashboardKpis() {
+export default function DashboardKpis() {
   const {
     data,
     loading,
@@ -110,8 +115,8 @@ export function DashboardKpis() {
 
   if (loading) {
     return (
-      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-4">
-        {[1, 2, 3, 4].map((item) => (
+      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-5">
+        {[1, 2, 3, 4, 5].map((item) => (
           <LoadingCard key={item} />
         ))}
       </div>
@@ -140,20 +145,30 @@ export function DashboardKpis() {
     );
   }
 
+  const members = data?.membersCount ?? 0;
+  const income = data?.incomeCents ?? 0;
+  const expense = data?.expenseCents ?? 0;
+  const invitations = data?.pendingInvitations ?? 0;
+
+  const balance = income - expense;
+
   const values: Record<
     (typeof cards)[number]["key"],
     string | number
   > = {
-    members: data?.membersCount ?? 0,
-    income: formatCurrency(data?.incomeCents ?? 0),
-    expense: formatCurrency(data?.expenseCents ?? 0),
-    invitations: data?.pendingInvitations ?? 0,
+    members,
+    balance: formatCurrency(balance),
+    income: formatCurrency(income),
+    expense: formatCurrency(expense),
+    invitations,
   };
 
   return (
-    <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-4">
+    <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
       {cards.map((card) => {
         const Icon = card.icon;
+
+        const isBalance = card.key === "balance";
 
         return (
           <article
@@ -179,9 +194,23 @@ export function DashboardKpis() {
               {card.label}
             </p>
 
-            <p className="mt-2 truncate text-3xl font-bold tracking-tight text-slate-900">
+            <p
+              className={`mt-2 truncate text-3xl font-bold tracking-tight ${
+                isBalance
+                  ? balance >= 0
+                    ? "text-indigo-600"
+                    : "text-red-600"
+                  : "text-slate-900"
+              }`}
+            >
               {values[card.key]}
             </p>
+
+            {isBalance && (
+              <p className="mt-2 text-xs text-slate-400">
+                Entrate − uscite
+              </p>
+            )}
           </article>
         );
       })}

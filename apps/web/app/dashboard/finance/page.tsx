@@ -807,9 +807,9 @@ export default function FinancePage() {
         </div>
       )}
 
-      <div className="mb-6 rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+      <div className="mb-6 rounded-2xl border border-white/10 bg-[#0f172a] p-5 shadow-xl">
         <div className="mb-3 flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-gray-900">Filtri movimenti</h3>
+          <h3 className="text-sm font-semibold text-white">Filtri movimenti</h3>
           <button
             type="button"
             onClick={() => {
@@ -820,7 +820,7 @@ export default function FinancePage() {
               setFilterMinAmount("");
               setFilterMaxAmount("");
             }}
-            className="text-sm font-medium text-gray-600 hover:text-gray-900"
+            className="text-sm font-medium text-gray-400 hover:text-white"
           >
             Azzera filtri
           </button>
@@ -832,7 +832,7 @@ export default function FinancePage() {
             onChange={(e) =>
               setFilterType(e.target.value as "ALL" | "INCOME" | "EXPENSE")
             }
-            className="rounded-lg border border-gray-300 px-3 py-2 text-sm"
+            className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-gray-500"
           >
             <option value="ALL">Tutti i movimenti</option>
             <option value="INCOME">Entrate</option>
@@ -844,21 +844,21 @@ export default function FinancePage() {
             value={filterCategory}
             onChange={(e) => setFilterCategory(e.target.value)}
             placeholder="Categoria"
-            className="rounded-lg border border-gray-300 px-3 py-2 text-sm"
+            className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-gray-500"
           />
 
           <input
             type="date"
             value={filterDateFrom}
             onChange={(e) => setFilterDateFrom(e.target.value)}
-            className="rounded-lg border border-gray-300 px-3 py-2 text-sm"
+            className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-gray-500"
           />
 
           <input
             type="date"
             value={filterDateTo}
             onChange={(e) => setFilterDateTo(e.target.value)}
-            className="rounded-lg border border-gray-300 px-3 py-2 text-sm"
+            className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-gray-500"
           />
 
           <input
@@ -867,8 +867,8 @@ export default function FinancePage() {
             step="0.01"
             value={filterMinAmount}
             onChange={(e) => setFilterMinAmount(e.target.value)}
-            placeholder="Importo minimo â‚¬"
-            className="rounded-lg border border-gray-300 px-3 py-2 text-sm"
+            placeholder="Importo minimo EUR"
+            className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-gray-500"
           />
 
           <input
@@ -877,8 +877,8 @@ export default function FinancePage() {
             step="0.01"
             value={filterMaxAmount}
             onChange={(e) => setFilterMaxAmount(e.target.value)}
-            placeholder="Importo massimo â‚¬"
-            className="rounded-lg border border-gray-300 px-3 py-2 text-sm"
+            placeholder="Importo massimo EUR"
+            className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-gray-500"
           />
         </div>
 

@@ -247,6 +247,14 @@ export class FilesService {
       orderBy: {
         createdAt: "desc",
       },
+      include: {
+        uploadedBy: {
+          select: {
+            id: true,
+            email: true,
+          },
+        },
+      },
     });
   }
 
@@ -333,6 +341,7 @@ export class FilesService {
   /**
    * Elimina il record e, quando presente,
    * anche il file fisico.
+   *
    * Solo OWNER e ADMIN possono eliminare
    * file dell'associazione.
    */

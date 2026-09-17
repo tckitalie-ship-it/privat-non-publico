@@ -1,47 +1,42 @@
-import { getBackendApiUrl } from "@/lib/server-api";
+﻿import { getBackendApiUrl } from "@/lib/server-api";
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 
+async function getToken(req: Request) {
+  const authorization = req.headers.get("authorization");
 
+  if (authorization?.startsWith("Bearer ")) {
+    return authorization.slice(7).trim();
+  }
 
-async function getToken() {
   const cookieStore = await cookies();
-
-  return cookieStore
-    .get("access_token")
-    ?.value;
+  return cookieStore.get("access_token")?.value;
 }
 
-async function getData(
-  response: Response,
-) {
+async function getData(response: Response) {
   return response.json().catch(() => null);
 }
+
+type RouteContext = {
+  params: Promise<{ id: string }>;
+};
 
 // -----------------------------------------------------
 // GET /api/associations/:id
 // Tutti i membri possono leggere l'associazione
 // -----------------------------------------------------
 export async function GET(
-  _req: Request,
-  {
-    params,
-  }: {
-    params: Promise<{ id: string }>;
-  },
+  req: Request,
+  { params }: RouteContext,
 ) {
   try {
     const { id } = await params;
-    const token = await getToken();
+    const token = await getToken(req);
 
     if (!token) {
       return NextResponse.json(
-        {
-          message: "Missing JWT token",
-        },
-        {
-          status: 401,
-        },
+        { message: "Missing JWT token" },
+        { status: 401 },
       );
     }
 
@@ -69,12 +64,8 @@ export async function GET(
     );
 
     return NextResponse.json(
-      {
-        message: "Errore interno",
-      },
-      {
-        status: 500,
-      },
+      { message: "Errore interno" },
+      { status: 500 },
     );
   }
 }
@@ -85,27 +76,20 @@ export async function GET(
 // -----------------------------------------------------
 export async function PATCH(
   req: Request,
-  {
-    params,
-  }: {
-    params: Promise<{ id: string }>;
-  },
+  { params }: RouteContext,
 ) {
   try {
     const { id } = await params;
-    const token = await getToken();
-    const body = await req.json();
+    const token = await getToken(req);
 
     if (!token) {
       return NextResponse.json(
-        {
-          message: "Missing JWT token",
-        },
-        {
-          status: 401,
-        },
+        { message: "Missing JWT token" },
+        { status: 401 },
       );
     }
+
+    const body = await req.json();
 
     const response = await fetch(
       getBackendApiUrl(`associations/${id}`),
@@ -133,12 +117,8 @@ export async function PATCH(
     );
 
     return NextResponse.json(
-      {
-        message: "Errore interno",
-      },
-      {
-        status: 500,
-      },
+      { message: "Errore interno" },
+      { status: 500 },
     );
   }
 }
@@ -148,25 +128,17 @@ export async function PATCH(
 // Il backend permette solo OWNER
 // -----------------------------------------------------
 export async function DELETE(
-  _req: Request,
-  {
-    params,
-  }: {
-    params: Promise<{ id: string }>;
-  },
+  req: Request,
+  { params }: RouteContext,
 ) {
   try {
     const { id } = await params;
-    const token = await getToken();
+    const token = await getToken(req);
 
     if (!token) {
       return NextResponse.json(
-        {
-          message: "Missing JWT token",
-        },
-        {
-          status: 401,
-        },
+        { message: "Missing JWT token" },
+        { status: 401 },
       );
     }
 
@@ -194,12 +166,8 @@ export async function DELETE(
     );
 
     return NextResponse.json(
-      {
-        message: "Errore interno",
-      },
-      {
-        status: 500,
-      },
+      { message: "Errore interno" },
+      { status: 500 },
     );
   }
 }

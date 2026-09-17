@@ -1,4 +1,4 @@
-import {
+﻿import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
@@ -6,6 +6,7 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
+import { NotificationsGateway } from "../notifications/notifications.gateway";
 import { randomUUID } from "crypto";
 import * as bcrypt from "bcrypt";
 
@@ -23,29 +24,125 @@ interface AcceptAndRegisterDto {
 
 @Injectable()
 export class InvitationsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+  ) {}
 
-  async findAll(userId: string, associationId: string) {
+  private async notify(
+    userId: string,
+    associationId: string,
+    title: string,
+    message: string,
+  ) {
+    const existing =
+      await this.prisma.notification.findFirst({
+        where: {
+          userId,
+          associationId,
+          title,
+          message,
+        },
+      });
+
+    if (existing) {
+      return existing;
+    }
+
+    const notification =
+      await this.prisma.notification.create({
+        data: {
+          title,
+          message,
+          read: false,
+          associationId,
+          userId,
+        },
+      });
+
+    NotificationsGateway.emitNotification(
+      notification,
+    );
+
+    return notification;
+  }
+
+  private async notifyManagers(
+    associationId: string,
+    title: string,
+    message: string,
+    excludeUserId?: string,
+  ) {
+    const managers =
+      await this.prisma.membership.findMany({
+        where: {
+          associationId,
+          role: {
+            in: ["OWNER", "ADMIN"] as any,
+          },
+          ...(excludeUserId
+            ? {
+                userId: {
+                  not: excludeUserId,
+                },
+              }
+            : {}),
+        },
+        select: {
+          userId: true,
+        },
+      });
+
+    for (const manager of managers) {
+      await this.notify(
+        manager.userId,
+        associationId,
+        title,
+        message,
+      );
+    }
+  }
+
+  async findAll(
+    userId: string,
+    associationId: string,
+  ) {
     if (!userId) {
-      throw new BadRequestException("Utente non valido.");
+      throw new BadRequestException(
+        "Utente non valido.",
+      );
     }
 
     if (!associationId) {
-      throw new BadRequestException("Associazione non valida.");
+      throw new BadRequestException(
+        "Associazione non valida.",
+      );
     }
 
-    const membership = await this.prisma.membership.findFirst({
-      where: {
-        userId,
-        associationId,
-      },
-    });
+    const membership =
+      await this.prisma.membership.findFirst({
+        where: {
+          userId,
+          associationId,
+        },
+      });
 
     if (!membership) {
       throw new ForbiddenException(
         "Non appartieni a questa associazione.",
       );
     }
+
+    const requesterRole = String(membership.role)
+      .trim()
+      .toUpperCase();
+
+    if (requesterRole !== "OWNER" && requesterRole !== "ADMIN") {
+      throw new ForbiddenException(
+        "Non hai il permesso di visualizzare gli inviti.",
+      );
+    }
+
+
 
     return this.prisma.invitation.findMany({
       where: {
@@ -69,19 +166,30 @@ export class InvitationsService {
     userId: string,
     dto: CreateInvitationDto,
   ) {
-    const email = dto.email?.trim().toLowerCase();
-    const role = dto.role?.trim().toUpperCase();
+    const email = dto.email
+      ?.trim()
+      .toLowerCase();
+
+    const role = dto.role
+      ?.trim()
+      .toUpperCase();
 
     if (!userId) {
-      throw new BadRequestException("Utente non valido.");
+      throw new BadRequestException(
+        "Utente non valido.",
+      );
     }
 
     if (!email) {
-      throw new BadRequestException("Email mancante.");
+      throw new BadRequestException(
+        "Email mancante.",
+      );
     }
 
     if (!role) {
-      throw new BadRequestException("Ruolo mancante.");
+      throw new BadRequestException(
+        "Ruolo mancante.",
+      );
     }
 
     const allowedRoles = [
@@ -91,7 +199,9 @@ export class InvitationsService {
     ];
 
     if (!allowedRoles.includes(role)) {
-      throw new BadRequestException("Ruolo non valido.");
+      throw new BadRequestException(
+        "Ruolo non valido.",
+      );
     }
 
     const associationId =
@@ -123,30 +233,6 @@ export class InvitationsService {
       .trim()
       .toUpperCase();
 
-    console.log(
-      "=== INVITATION PERMISSION DEBUG ===",
-    );
-    console.log("userId:", userId);
-    console.log(
-      "associationId:",
-      associationId,
-    );
-    console.log(
-      "membershipId:",
-      requesterMembership.id,
-    );
-    console.log(
-      "membershipRole:",
-      requesterMembership.role,
-    );
-    console.log(
-      "normalizedRole:",
-      requesterRole,
-    );
-    console.log(
-      "===================================",
-    );
-
     if (
       requesterRole !== "OWNER" &&
       requesterRole !== "ADMIN"
@@ -163,6 +249,7 @@ export class InvitationsService {
         },
         select: {
           id: true,
+          email: true,
         },
       });
 
@@ -177,7 +264,7 @@ export class InvitationsService {
 
       if (existingMembership) {
         throw new ConflictException(
-          "Questo utente appartiene già all'associazione.",
+          "Questo utente appartiene giÃ  all'associazione.",
         );
       }
     }
@@ -191,27 +278,42 @@ export class InvitationsService {
 
     const token = randomUUID();
 
-    return this.prisma.invitation.create({
-      data: {
-        associationId,
-        email,
-        role: role as any,
-        token,
-        invitedById: userId,
-        expiresAt: new Date(
-          Date.now() +
-            7 * 24 * 60 * 60 * 1000,
-        ),
-      },
-      include: {
-        association: {
-          select: {
-            id: true,
-            name: true,
+    const invitation =
+      await this.prisma.invitation.create({
+        data: {
+          associationId,
+          email,
+          role: role as any,
+          token,
+          invitedById: userId,
+          expiresAt: new Date(
+            Date.now() +
+              7 * 24 * 60 * 60 * 1000,
+          ),
+        },
+        include: {
+          association: {
+            select: {
+              id: true,
+              name: true,
+            },
           },
         },
-      },
-    });
+      });
+
+    if (
+      existingUser &&
+      existingUser.id !== userId
+    ) {
+      await this.notify(
+        existingUser.id,
+        associationId,
+        "Nuovo invito",
+        `Sei stato invitato a partecipare all'associazione "${invitation.association?.name ?? "associazione"}" con ruolo ${role}.`,
+      );
+    }
+
+    return invitation;
   }
 
   async checkToken(token: string) {
@@ -292,6 +394,14 @@ export class InvitationsService {
         where: {
           token: normalizedToken,
         },
+        include: {
+          association: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+        },
       });
 
     if (!invitation) {
@@ -314,6 +424,10 @@ export class InvitationsService {
       await this.prisma.user.findUnique({
         where: {
           id: userId,
+        },
+        select: {
+          id: true,
+          email: true,
         },
       });
 
@@ -365,13 +479,19 @@ export class InvitationsService {
           role: invitation.role as any,
         },
       }),
-
       this.prisma.invitation.delete({
         where: {
           id: invitation.id,
         },
       }),
     ]);
+
+    await this.notifyManagers(
+      invitation.associationId,
+      "Invito accettato",
+      `${user.email} ha accettato l'invito ed Ã¨ entrato nell'associazione "${invitation.association?.name ?? "associazione"}" con ruolo ${invitation.role}.`,
+      userId,
+    );
 
     return {
       success: true,
@@ -385,7 +505,9 @@ export class InvitationsService {
     dto: AcceptAndRegisterDto,
   ) {
     const token = dto.token?.trim();
-    const email = dto.email?.trim().toLowerCase();
+    const email = dto.email
+      ?.trim()
+      .toLowerCase();
     const password = dto.password;
 
     if (!token) {
@@ -416,6 +538,14 @@ export class InvitationsService {
       await this.prisma.invitation.findUnique({
         where: {
           token,
+        },
+        include: {
+          association: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
         },
       });
 
@@ -453,7 +583,7 @@ export class InvitationsService {
 
     if (existingUser) {
       throw new ConflictException(
-        "Esiste già un account con questa email. Effettua il login per accettare l'invito.",
+        "Esiste giÃ  un account con questa email. Effettua il login per accettare l'invito.",
       );
     }
 
@@ -493,6 +623,13 @@ export class InvitationsService {
           };
         },
       );
+
+    await this.notifyManagers(
+      result.associationId,
+      "Nuovo membro",
+      `${email} ha accettato l'invito ed Ã¨ entrato nell'associazione "${invitation.association?.name ?? "associazione"}" con ruolo ${invitation.role}.`,
+      result.userId,
+    );
 
     return {
       success: true,
@@ -573,3 +710,5 @@ export class InvitationsService {
     };
   }
 }
+
+

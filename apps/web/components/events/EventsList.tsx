@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import EventCard, {
   type EventItem,
@@ -12,6 +12,9 @@ interface EventsListProps {
   onDelete?: (id: string) => void;
   onRegister?: (id: string) => void;
   onUnregister?: (id: string) => void;
+  onViewParticipants?: (id: string) => void;
+  onViewDetail?: (id: string) => void;
+  canManageEvents?: boolean;
 }
 
 export default function EventsList({
@@ -22,6 +25,9 @@ export default function EventsList({
   onDelete,
   onRegister,
   onUnregister,
+  onViewParticipants,
+  onViewDetail,
+  canManageEvents = false,
 }: EventsListProps) {
   if (loading) {
     return (
@@ -62,12 +68,16 @@ export default function EventsList({
             onDelete={onDelete}
             onRegister={onRegister}
             onUnregister={onUnregister}
+            onViewParticipants={onViewParticipants}
+            onViewDetail={onViewDetail}
             registrationLoading={
               registrationLoadingId === event.id
             }
+            canManageEvents={canManageEvents}
           />
         ))}
       </div>
     </section>
   );
 }
+

@@ -1,20 +1,19 @@
-"use client";
+﻿"use client";
 
 import { useCallback, useEffect, useState } from "react";
 import {
   Bell,
-  Check,
   Clock,
   Loader2,
   Plus,
   RefreshCw,
-  Trash2,
 } from "lucide-react";
 
 import {
   API_URL,
   getAccessToken,
 } from "@/lib/api";
+import { getSocket } from "@/lib/socket";
 
 type Reminder = {
   id: string;
@@ -92,6 +91,47 @@ function formatDate(value: string) {
   }).format(new Date(value));
 }
 
+function parseDateTimeLocal(value: string): Date | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(value);
+
+  if (!match) {
+    return null;
+  }
+
+  const [, year, month, day, hours, minutes] = match;
+  const date = new Date(
+    Number(year),
+    Number(month) - 1,
+    Number(day),
+    Number(hours),
+    Number(minutes),
+    0,
+    0,
+  );
+
+  if (
+    date.getFullYear() !== Number(year) ||
+    date.getMonth() !== Number(month) - 1 ||
+    date.getDate() !== Number(day) ||
+    date.getHours() !== Number(hours) ||
+    date.getMinutes() !== Number(minutes)
+  ) {
+    return null;
+  }
+
+  return date;
+}
+
+function toDateTimeLocalValue(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  const hours = String(date.getHours()).padStart(2, "0");
+  const minutes = String(date.getMinutes()).padStart(2, "0");
+
+  return `${year}-${month}-${day}T${hours}:${minutes}`;
+}
+
 async function requestAssociationId(): Promise<string> {
   const token = getAccessToken();
 
@@ -165,6 +205,35 @@ function Toast({
   );
 }
 
+function getReminderStatus(remindAt: string) {
+  const now = new Date();
+  const date = new Date(remindAt);
+
+  if (date.getTime() < now.getTime()) {
+    return {
+      label: "Scaduto",
+      className: "bg-red-500/15 text-red-300",
+    };
+  }
+
+  const isToday =
+    date.getFullYear() === now.getFullYear() &&
+    date.getMonth() === now.getMonth() &&
+    date.getDate() === now.getDate();
+
+  if (isToday) {
+    return {
+      label: "Oggi",
+      className: "bg-amber-500/15 text-amber-300",
+    };
+  }
+
+  return {
+    label: "Programmato",
+    className: "bg-blue-500/15 text-blue-300",
+  };
+}
+
 export default function RemindersPage() {
   const [reminders, setReminders] =
     useState<Reminder[]>([]);
@@ -195,6 +264,17 @@ export default function RemindersPage() {
 
   const [associationId, setAssociationId] =
     useState<string | null>(null);
+
+  const [editingReminderId, setEditingReminderId] =
+    useState<string | null>(null);
+
+  const [editTitle, setEditTitle] = useState("");
+  const [editMessage, setEditMessage] = useState("");
+  const [editRemindAt, setEditRemindAt] = useState("");
+
+  const [filter, setFilter] = useState<
+    "all" | "pending" | "today" | "overdue" | "completed"
+  >("all");
 
   function showToast(
     type: "success" | "error",
@@ -274,6 +354,56 @@ export default function RemindersPage() {
       });
   }, [loadReminders]);
 
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      void loadReminders(false);
+    }, 30000);
+
+    return () => window.clearInterval(interval);
+  }, [loadReminders]);
+
+  useEffect(() => {
+    const socket = getSocket();
+
+    const handleNewNotification = (notification: {
+      reminderId?: string | null;
+    }) => {
+      const reminderId = notification?.reminderId;
+      if (!reminderId) return;
+
+      window.setTimeout(() => {
+        void loadReminders(false);
+      }, 300);
+    };
+
+    const handleReminderCompleted = (event: Event) => {
+      const customEvent = event as CustomEvent<{ reminderId?: string }>;
+      const reminderId = customEvent.detail?.reminderId;
+      if (!reminderId) return;
+
+      setReminders((current) =>
+        current.map((reminder) =>
+          reminder.id === reminderId
+            ? { ...reminder, completed: true }
+            : reminder,
+        ),
+      );
+    };
+
+    socket.on("notification:new", handleNewNotification);
+    window.addEventListener("reminder:completed", handleReminderCompleted);
+
+    return () => {
+      socket.off("notification:new", handleNewNotification);
+      window.removeEventListener("reminder:completed", handleReminderCompleted);
+    };
+  }, [loadReminders]);
+
+  function setQuickReminder(hoursFromNow: number) {
+    const date = new Date(Date.now() + hoursFromNow * 60 * 60 * 1000);
+    setRemindAt(toDateTimeLocalValue(date));
+  }
+
   async function createReminder(
     event: React.FormEvent<HTMLFormElement>,
   ) {
@@ -291,6 +421,16 @@ export default function RemindersPage() {
       showToast(
         "error",
         "Seleziona data e ora del reminder.",
+      );
+      return;
+    }
+
+    const selectedDate = parseDateTimeLocal(remindAt);
+
+    if (!selectedDate || remindAt <= toDateTimeLocalValue(new Date())) {
+      showToast(
+        "error",
+        "La data del reminder deve essere nel futuro.",
       );
       return;
     }
@@ -328,7 +468,7 @@ export default function RemindersPage() {
 
       showToast(
         "success",
-        "Reminder programmato correttamente.",
+        "Promemoria programmato correttamente.",
       );
 
       await loadReminders(false);
@@ -350,6 +490,111 @@ export default function RemindersPage() {
     }
   }
 
+  function startEditingReminder(reminder: Reminder) {
+    const date = new Date(reminder.remindAt);
+
+    setEditingReminderId(reminder.id);
+    setEditTitle(reminder.title ?? "");
+    setEditMessage(reminder.message);
+    setEditRemindAt(toDateTimeLocalValue(date));
+  }
+
+  function cancelEditingReminder() {
+    setEditingReminderId(null);
+    setEditTitle("");
+    setEditMessage("");
+    setEditRemindAt("");
+  }
+
+  async function updateReminder(
+    event: React.FormEvent<HTMLFormElement>,
+  ) {
+    event.preventDefault();
+
+    if (!editingReminderId) {
+      return;
+    }
+
+    if (!editMessage.trim()) {
+      showToast(
+        "error",
+        "Il messaggio del reminder è obbligatorio.",
+      );
+      return;
+    }
+
+    if (!editRemindAt) {
+      showToast(
+        "error",
+        "Seleziona data e ora del reminder.",
+      );
+      return;
+    }
+
+    const selectedDate = parseDateTimeLocal(editRemindAt);
+
+    if (!selectedDate || editRemindAt <= toDateTimeLocalValue(new Date())) {
+      showToast(
+        "error",
+        "La data del reminder deve essere nel futuro.",
+      );
+      return;
+    }
+
+    setActionId(editingReminderId);
+
+    try {
+      const response = await authenticatedFetch(
+        `/reminders/${editingReminderId}`,
+        {
+          method: "PATCH",
+          body: JSON.stringify({
+            title: editTitle.trim() || null,
+            message: editMessage.trim(),
+            remindAt: selectedDate.toISOString(),
+          }),
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error(
+          await readErrorMessage(response),
+        );
+      }
+
+      const updated = (await response.json()) as Reminder;
+
+      setReminders((current) =>
+        current.map((reminder) =>
+          reminder.id === editingReminderId
+            ? updated
+            : reminder,
+        ),
+      );
+
+      cancelEditingReminder();
+
+      showToast(
+        "success",
+        "Reminder modificato correttamente.",
+      );
+    } catch (error) {
+      console.error(
+        "Errore modifica reminder:",
+        error,
+      );
+
+      showToast(
+        "error",
+        error instanceof Error
+          ? error.message
+          : "Impossibile modificare il reminder",
+      );
+    } finally {
+      setActionId(null);
+    }
+  }
+
   async function completeReminder(
     reminderId: string,
   ) {
@@ -358,7 +603,7 @@ export default function RemindersPage() {
     try {
       const response =
         await authenticatedFetch(
-          `/reminders/${reminderId}`,
+          `/reminders/${reminderId}/complete`,
           {
             method: "PATCH",
           },
@@ -381,9 +626,15 @@ export default function RemindersPage() {
         ),
       );
 
+      window.dispatchEvent(
+        new CustomEvent("reminder:completed", {
+          detail: { reminderId },
+        }),
+      );
+
       showToast(
         "success",
-        "Reminder completato.",
+        "Promemoria completato.",
       );
     } catch (error) {
       console.error(
@@ -406,7 +657,7 @@ export default function RemindersPage() {
     reminderId: string,
   ) {
     const confirmed = window.confirm(
-      "Vuoi eliminare questo reminder?",
+      "Vuoi eliminare questo promemoria?",
     );
 
     if (!confirmed) {
@@ -439,7 +690,7 @@ export default function RemindersPage() {
 
       showToast(
         "success",
-        "Reminder eliminato.",
+        "Promemoria eliminato.",
       );
     } catch (error) {
       console.error(
@@ -458,48 +709,232 @@ export default function RemindersPage() {
     }
   }
 
-  const pendingCount =
-    reminders.filter(
-      (reminder) => !reminder.completed,
-    ).length;
+  const pendingReminders = reminders
+    .filter((reminder) => !reminder.completed)
+    .sort(
+      (a, b) =>
+        new Date(a.remindAt).getTime() -
+        new Date(b.remindAt).getTime(),
+    );
+
+  const completedReminders = reminders
+    .filter((reminder) => reminder.completed)
+    .sort(
+      (a, b) =>
+        new Date(b.remindAt).getTime() -
+        new Date(a.remindAt).getTime(),
+    );
+
+  const pendingCount = pendingReminders.length;
+  const completedCount = completedReminders.length;
+
+  const overdueCount = pendingReminders.filter(
+    (reminder) =>
+      new Date(reminder.remindAt).getTime() < Date.now(),
+  ).length;
+
+  const totalCount = reminders.length;
+
+  const filteredPendingReminders = pendingReminders.filter((reminder) => {
+    if (filter === "all" || filter === "pending") {
+      return true;
+    }
+
+    if (filter === "today") {
+      const now = new Date();
+      const date = new Date(reminder.remindAt);
+
+      return (
+        date.getFullYear() === now.getFullYear() &&
+        date.getMonth() === now.getMonth() &&
+        date.getDate() === now.getDate()
+      );
+    }
+
+    if (filter === "overdue") {
+      return new Date(reminder.remindAt).getTime() < Date.now();
+    }
+
+    return false;
+  });
+
+  const filteredCompletedReminders =
+    filter === "all" || filter === "completed"
+      ? completedReminders
+      : [];
+
+  const showPendingSection =
+    filteredPendingReminders.length > 0;
+
+  const showCompletedSection =
+    filteredCompletedReminders.length > 0;
 
   return (
-    <div className="mx-auto w-full max-w-4xl space-y-6 px-6 py-10">
+    <div className="w-full space-y-6">
       {toast && <Toast toast={toast} />}
 
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-3xl font-bold text-white">
-            Reminder
+            Promemoria
           </h1>
 
           <p className="mt-2 text-sm text-gray-400">
-            {pendingCount === 0
-              ? "Non hai reminder programmati."
-              : `${pendingCount} reminder ancora da completare.`}
+            {pendingCount > 0
+              ? `${pendingCount} promemoria ancora da completare.`
+              : completedCount > 0
+                ? `${completedCount} promemoria completati.`
+                : "Non hai ancora programmato nessun promemoria."}
           </p>
         </div>
 
         <button
           type="button"
-          onClick={() =>
-            void loadReminders()
-          }
+          onClick={() => void loadReminders()}
           disabled={loading}
           className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-3 text-sm font-medium text-white transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {loading ? (
-            <Loader2
-              size={17}
-              className="animate-spin"
-            />
+            <Loader2 size={17} className="animate-spin" />
           ) : (
             <RefreshCw size={17} />
           )}
-
           Aggiorna
         </button>
       </div>
+
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="rounded-2xl border border-white/10 bg-[#0f172a] p-4">
+          <p className="text-xs font-medium text-gray-500">Totali</p>
+          <p className="mt-2 text-2xl font-bold text-white">{totalCount}</p>
+        </div>
+        <div className="rounded-2xl border border-blue-500/20 bg-blue-500/5 p-4">
+          <p className="text-xs font-medium text-blue-300">Da completare</p>
+          <p className="mt-2 text-2xl font-bold text-white">{pendingCount}</p>
+        </div>
+        <div className="rounded-2xl border border-red-500/20 bg-red-500/5 p-4">
+          <p className="text-xs font-medium text-red-300">Scaduti</p>
+          <p className="mt-2 text-2xl font-bold text-white">{overdueCount}</p>
+        </div>
+        <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/5 p-4">
+          <p className="text-xs font-medium text-emerald-300">Completati</p>
+          <p className="mt-2 text-2xl font-bold text-white">{completedCount}</p>
+        </div>
+      </div>
+
+      <div className="flex flex-wrap gap-2 rounded-2xl border border-white/10 bg-[#0f172a] p-3">
+        {[
+          ["all", "Tutti"],
+          ["pending", "Da completare"],
+          ["today", "Oggi"],
+          ["overdue", "Scaduti"],
+          ["completed", "Completati"],
+        ].map(([value, label]) => (
+          <button
+            key={value}
+            type="button"
+            onClick={() =>
+              setFilter(
+                value as
+                  | "all"
+                  | "pending"
+                  | "today"
+                  | "overdue"
+                  | "completed",
+              )
+            }
+            className={`rounded-lg px-3 py-2 text-xs font-medium transition ${
+              filter === value
+                ? "bg-blue-600 text-white shadow-lg shadow-blue-900/20"
+                : "bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white"
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {editingReminderId && (
+        <form
+          onSubmit={updateReminder}
+          className="rounded-2xl border border-amber-500/20 bg-amber-500/5 p-6"
+        >
+          <div className="mb-5">
+            <h2 className="text-lg font-semibold text-white">
+              Modifica promemoria
+            </h2>
+            <p className="mt-1 text-sm text-gray-400">
+              Aggiorna titolo, messaggio, data e ora.
+            </p>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className="block">
+              <span className="mb-2 block text-sm font-medium text-gray-300">
+                Titolo
+              </span>
+              <input
+                type="text"
+                value={editTitle}
+                onChange={(event) => setEditTitle(event.target.value)}
+                className="w-full rounded-xl border border-white/10 bg-[#161b22] px-4 py-3 text-sm text-white outline-none transition placeholder:text-gray-600 focus:border-amber-500"
+              />
+            </label>
+
+            <label className="block">
+              <span className="mb-2 block text-sm font-medium text-gray-300">
+                Data e ora
+              </span>
+              <input
+                type="datetime-local"
+                value={editRemindAt}
+                onChange={(event) => setEditRemindAt(event.target.value)}
+                required
+                className="w-full rounded-xl border border-white/10 bg-[#161b22] px-4 py-3 text-sm text-white outline-none transition focus:border-amber-500"
+              />
+            </label>
+          </div>
+
+          <label className="mt-4 block">
+            <span className="mb-2 block text-sm font-medium text-gray-300">
+              Messaggio
+            </span>
+            <textarea
+              value={editMessage}
+              onChange={(event) => setEditMessage(event.target.value)}
+              rows={4}
+              required
+              className="w-full resize-none rounded-xl border border-white/10 bg-[#161b22] px-4 py-3 text-sm text-white outline-none transition placeholder:text-gray-600 focus:border-amber-500"
+            />
+          </label>
+
+          <div className="mt-5 flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={cancelEditingReminder}
+              disabled={actionId === editingReminderId}
+              className="rounded-xl border border-white/10 px-4 py-3 text-sm font-medium text-gray-300 transition hover:bg-white/5 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Annulla
+            </button>
+
+            <button
+              type="submit"
+              disabled={actionId === editingReminderId}
+              className="rounded-xl bg-amber-600 px-5 py-3 text-sm font-medium text-white transition hover:bg-amber-500 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {actionId === editingReminderId ? (
+                <span className="inline-flex items-center gap-2">
+                  <Loader2 size={17} className="animate-spin" />
+                  Salvataggio...
+                </span>
+              ) : (
+                "Salva modifiche"
+              )}
+            </button>
+          </div>
+        </form>
+      )}
 
       <form
         onSubmit={createReminder}
@@ -512,7 +947,7 @@ export default function RemindersPage() {
 
           <div>
             <h2 className="text-lg font-semibold text-white">
-              Nuovo reminder
+              Nuovo promemoria
             </h2>
 
             <p className="text-sm text-gray-400">
@@ -554,6 +989,24 @@ export default function RemindersPage() {
               required
               className="w-full rounded-xl border border-white/10 bg-[#161b22] px-4 py-3 text-sm text-white outline-none transition focus:border-blue-500"
             />
+
+            <div className="mt-2 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => setQuickReminder(1)}
+                className="rounded-lg bg-white/5 px-3 py-1.5 text-xs font-medium text-gray-400 transition hover:bg-white/10 hover:text-white"
+              >
+                Tra 1 ora
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setQuickReminder(24)}
+                className="rounded-lg bg-white/5 px-3 py-1.5 text-xs font-medium text-gray-400 transition hover:bg-white/10 hover:text-white"
+              >
+                Domani
+              </button>
+            </div>
           </label>
         </div>
 
@@ -596,7 +1049,7 @@ export default function RemindersPage() {
               <Bell size={17} />
             )}
 
-            Programma reminder
+            Programma promemoria
           </button>
         </div>
       </form>
@@ -607,14 +1060,13 @@ export default function RemindersPage() {
         </div>
       )}
 
-      {loading ? (
+{loading ? (
         <div className="flex min-h-40 items-center justify-center rounded-2xl border border-white/10 bg-[#0f172a]">
           <div className="flex items-center gap-3 text-sm text-gray-400">
             <Loader2
               size={20}
               className="animate-spin"
             />
-
             Caricamento reminder...
           </div>
         </div>
@@ -630,109 +1082,197 @@ export default function RemindersPage() {
           </p>
 
           <p className="mt-2 text-sm text-gray-400">
-            Non hai ancora programmato
-            nessun reminder.
+            Non hai ancora programmato nessun reminder.
           </p>
         </div>
       ) : (
-        <ul className="space-y-4">
-          {reminders.map(
-            (reminder) => {
-              const isLoading =
-                actionId === reminder.id;
+        <div className="space-y-8">
+          {pendingReminders.length > 0 && (
+            <section>
+              <div className="mb-3 flex items-center justify-between">
+                <div>
+                  <h2 className="text-lg font-semibold text-white">
+                    Da completare
+                  </h2>
 
-              return (
-                <li
-                  key={reminder.id}
-                  className={`rounded-2xl border p-5 transition ${
-                    reminder.completed
-                      ? "border-white/10 bg-[#0f172a] opacity-70"
-                      : "border-blue-500/30 bg-blue-500/10"
-                  }`}
-                >
-                  <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-3">
-                        <h2 className="text-lg font-semibold text-white">
-                          {reminder.title ??
-                            "Reminder"}
-                        </h2>
+                  <p className="mt-1 text-sm text-gray-400">
+                    Promemoria ancora da completare.
+                  </p>
+                </div>
 
-                        {reminder.completed && (
-                          <span className="rounded-full bg-emerald-500 px-2.5 py-1 text-xs font-semibold text-white">
-                            Completato
-                          </span>
-                        )}
+                <span className="rounded-full bg-blue-500/10 px-3 py-1 text-xs font-medium text-blue-300">
+                  {pendingCount}
+                </span>
+              </div>
+
+              <ul className="space-y-4">
+                {filteredPendingReminders.map((reminder) => {
+                  const isLoading = actionId === reminder.id;
+
+                  return (
+                    <li
+                      key={reminder.id}
+                      className="rounded-2xl border border-blue-500/30 bg-blue-500/10 p-5 transition hover:border-blue-500/50"
+                    >
+                      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-3">
+                            <h3 className="text-lg font-semibold text-white">
+                              {reminder.title ?? "Promemoria"}
+                            </h3>
+
+                            <span className="rounded-full bg-blue-500/15 px-2.5 py-1 text-xs font-semibold text-blue-300">
+                              Da completare
+                            </span>
+
+                            {(() => {
+                              const status = getReminderStatus(reminder.remindAt);
+
+                              return (
+                                <span
+                                  className={`rounded-full px-2.5 py-1 text-xs font-semibold ${status.className}`}
+                                >
+                                  {status.label}
+                                </span>
+                              );
+                            })()}
+                          </div>
+
+                          <p className="mt-2 text-sm leading-6 text-gray-300">
+                            {reminder.message}
+                          </p>
+
+                          <p className="mt-3 flex items-center gap-2 text-xs text-gray-500">
+                            <Clock size={14} />
+                            {formatDate(reminder.remindAt)}
+                          </p>
+                        </div>
+
+                        <div className="flex shrink-0 gap-2">
+                          <button
+                            type="button"
+                            onClick={(event) => { event.preventDefault(); event.stopPropagation(); startEditingReminder(reminder); }}
+                            disabled={isLoading}
+                            className="rounded-xl border border-white/10 px-3 py-2 text-sm font-medium text-gray-300 transition hover:bg-white/5 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            Modifica
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => void completeReminder(reminder.id)}
+                            disabled={isLoading}
+                            className="inline-flex items-center gap-2 rounded-xl bg-emerald-500/10 px-3 py-2 text-sm font-medium text-emerald-300 transition hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            {isLoading ? (
+                              <Loader2
+                                size={16}
+                                className="animate-spin"
+                              />
+                            ) : (
+                              "Completa"
+                            )}
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => void deleteReminder(reminder.id)}
+                            disabled={isLoading}
+                            className="rounded-xl border border-red-500/20 px-3 py-2 text-sm font-medium text-red-300 transition hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            Elimina
+                          </button>
+                        </div>
                       </div>
-
-                      <p className="mt-2 text-sm leading-6 text-gray-300">
-                        {reminder.message}
-                      </p>
-
-                      <p className="mt-3 flex items-center gap-2 text-xs text-gray-500">
-                        <Clock size={14} />
-                        {formatDate(
-                          reminder.remindAt,
-                        )}
-                      </p>
-                    </div>
-
-                    <div className="flex shrink-0 gap-2">
-                      {!reminder.completed && (
-                        <button
-                          type="button"
-                          onClick={() =>
-                            void completeReminder(
-                              reminder.id,
-                            )
-                          }
-                          disabled={isLoading}
-                          className="inline-flex items-center gap-2 rounded-lg border border-emerald-400/20 bg-emerald-500/10 px-3 py-2 text-xs font-medium text-emerald-300 transition hover:bg-emerald-500/20 disabled:opacity-50"
-                        >
-                          {isLoading ? (
-                            <Loader2
-                              size={15}
-                              className="animate-spin"
-                            />
-                          ) : (
-                            <Check size={15} />
-                          )}
-
-                          Completa
-                        </button>
-                      )}
-
-                      <button
-                        type="button"
-                        onClick={() =>
-                          void deleteReminder(
-                            reminder.id,
-                          )
-                        }
-                        disabled={isLoading}
-                        className="inline-flex items-center gap-2 rounded-lg border border-red-400/20 bg-red-500/10 px-3 py-2 text-xs font-medium text-red-300 transition hover:bg-red-500/20 disabled:opacity-50"
-                      >
-                        {isLoading ? (
-                          <Loader2
-                            size={15}
-                            className="animate-spin"
-                          />
-                        ) : (
-                          <Trash2 size={15} />
-                        )}
-
-                        Elimina
-                      </button>
-                    </div>
-                  </div>
-                </li>
-              );
-            },
+                    </li>
+                  );
+                })}
+              </ul>
+            </section>
           )}
-        </ul>
+
+          {completedReminders.length > 0 && (
+            <section>
+              <div className="mb-3 flex items-center justify-between">
+                <div>
+                  <h2 className="text-lg font-semibold text-white">
+                    Completati
+                  </h2>
+
+                  <p className="mt-1 text-sm text-gray-400">
+                    Promemoria già completati.
+                  </p>
+                </div>
+
+                <span className="rounded-full bg-emerald-500/10 px-3 py-1 text-xs font-medium text-emerald-300">
+                  {completedCount}
+                </span>
+              </div>
+
+              <ul className="space-y-4">
+                {filteredCompletedReminders.map((reminder) => {
+                  const isLoading = actionId === reminder.id;
+
+                  return (
+                    <li
+                      key={reminder.id}
+                      className="rounded-2xl border border-emerald-500/10 bg-[#0f172a] p-5 transition hover:border-emerald-500/20"
+                    >
+                      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-3">
+                            <h3 className="text-lg font-semibold text-white">
+                              {reminder.title ?? "Promemoria"}
+                            </h3>
+
+                            <span className="rounded-full bg-emerald-500/10 px-2.5 py-1 text-xs font-semibold text-emerald-300">
+                              Completato
+                            </span>
+                          </div>
+
+                          <p className="mt-2 text-sm leading-6 text-gray-400">
+                            {reminder.message}
+                          </p>
+
+                          <p className="mt-3 flex items-center gap-2 text-xs text-gray-500">
+                            <Clock size={14} />
+                            {formatDate(reminder.remindAt)}
+                          </p>
+                        </div>
+
+                        <div className="flex shrink-0 gap-2">
+                          <button
+                            type="button"
+                            onClick={(event) => { event.preventDefault(); event.stopPropagation(); startEditingReminder(reminder); }}
+                            disabled={isLoading}
+                            className="rounded-xl border border-white/10 px-3 py-2 text-sm font-medium text-gray-300 transition hover:bg-white/5 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            Modifica
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => void deleteReminder(reminder.id)}
+                            disabled={isLoading}
+                            className="rounded-xl border border-red-500/20 px-3 py-2 text-sm font-medium text-red-300 transition hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            Elimina
+                          </button>
+                        </div>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            </section>
+          )}
+        </div>
       )}
     </div>
   );
 }
+
+
+
 
 

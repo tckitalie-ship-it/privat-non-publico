@@ -24,6 +24,9 @@ export default function CreateEventModal({
   const [location, setLocation] = useState("");
   const [startsAt, setStartsAt] = useState("");
   const [endsAt, setEndsAt] = useState("");
+  const [capacity, setCapacity] = useState("");
+  const [registrationEnabled, setRegistrationEnabled] = useState(true);
+  const [status, setStatus] = useState<"SCHEDULED" | "CANCELLED" | "COMPLETED">("SCHEDULED");
   const [loading, setLoading] = useState(false);
 
   // ✅ CORRETTO: solo open
@@ -60,6 +63,16 @@ export default function CreateEventModal({
       return;
     }
 
+    const parsedCapacity = capacity.trim() ? Number(capacity) : null;
+
+    if (
+      parsedCapacity !== null &&
+      (!Number.isInteger(parsedCapacity) || parsedCapacity < 1)
+    ) {
+      toast.error("La capienza deve essere un numero intero maggiore di zero");
+      return;
+    }
+
     const token = getAccessToken();
     if (!token) {
       toast.error("Sessione non disponibile");
@@ -83,6 +96,9 @@ export default function CreateEventModal({
           location: location.trim() || null,
           startsAt: new Date(startsAt).toISOString(),
           endsAt: endsAt ? new Date(endsAt).toISOString() : null,
+          capacity: parsedCapacity,
+          registrationEnabled,
+          status,
         }),
       });
 
@@ -189,6 +205,132 @@ export default function CreateEventModal({
             </div>
           </div>
 
+          <div className="grid gap-5 md:grid-cols-2">
+            <div>
+              <label className="text-sm font-medium text-gray-300">
+                Capienza massima
+              </label>
+              <input
+                type="number"
+                min="1"
+                step="1"
+                value={capacity}
+                onChange={(e) => setCapacity(e.target.value)}
+                className="mt-2 w-full rounded-xl border border-white/10 bg-[#111827] px-4 py-3 text-white outline-none focus:border-indigo-500"
+                placeholder="Nessun limite"
+              />
+              <p className="mt-1 text-xs text-gray-500">
+                Lascia vuoto per non impostare un limite.
+              </p>
+            </div>
+
+            <div>
+              <label className="text-sm font-medium text-gray-300">
+                Stato
+              </label>
+              <select
+                value={status}
+                onChange={(e) =>
+                  setStatus(
+                    e.target.value as
+                      | "SCHEDULED"
+                      | "CANCELLED"
+                      | "COMPLETED"
+                  )
+                }
+                className="mt-2 w-full rounded-xl border border-white/10 bg-[#111827] px-4 py-3 text-white outline-none focus:border-indigo-500"
+              >
+                <option value="SCHEDULED">Programmato</option>
+                <option value="CANCELLED">Cancellato</option>
+                <option value="COMPLETED">Completato</option>
+              </select>
+            </div>
+          </div>
+
+          <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-white/10 bg-[#111827] px-4 py-3">
+            <input
+              type="checkbox"
+              checked={registrationEnabled}
+              onChange={(e) => setRegistrationEnabled(e.target.checked)}
+              className="h-4 w-4 rounded border-white/20 bg-[#111827] accent-indigo-600"
+            />
+            <span>
+              <span className="block text-sm font-medium text-gray-200">
+                Iscrizioni abilitate
+              </span>
+              <span className="block text-xs text-gray-500">
+                I membri potranno iscriversi a questo evento.
+              </span>
+            </span>
+          </label>
+
+          <div className="grid gap-5 md:grid-cols-2">
+            <div>
+              <label
+                htmlFor="create-event-capacity"
+                className="text-sm font-medium text-gray-300"
+              >
+                Capienza massima
+              </label>
+              <input
+                id="create-event-capacity"
+                type="number"
+                min="1"
+                step="1"
+                value={capacity}
+                onChange={(e) => setCapacity(e.target.value)}
+                className="mt-2 w-full rounded-xl border border-white/10 bg-[#111827] px-4 py-3 text-white outline-none focus:border-indigo-500"
+                placeholder="Nessun limite"
+              />
+              <p className="mt-1 text-xs text-gray-500">
+                Lascia vuoto per non impostare un limite.
+              </p>
+            </div>
+
+            <div>
+              <label
+                htmlFor="create-event-status"
+                className="text-sm font-medium text-gray-300"
+              >
+                Stato
+              </label>
+              <select
+                id="create-event-status"
+                value={status}
+                onChange={(e) =>
+                  setStatus(
+                    e.target.value as
+                      | "SCHEDULED"
+                      | "CANCELLED"
+                      | "COMPLETED"
+                  )
+                }
+                className="mt-2 w-full rounded-xl border border-white/10 bg-[#111827] px-4 py-3 text-white outline-none focus:border-indigo-500"
+              >
+                <option value="SCHEDULED">Programmato</option>
+                <option value="CANCELLED">Cancellato</option>
+                <option value="COMPLETED">Completato</option>
+              </select>
+            </div>
+          </div>
+
+          <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-white/10 bg-[#111827] px-4 py-3">
+            <input
+              type="checkbox"
+              checked={registrationEnabled}
+              onChange={(e) => setRegistrationEnabled(e.target.checked)}
+              className="h-4 w-4 rounded border-white/20 bg-[#111827] accent-indigo-600"
+            />
+            <span>
+              <span className="block text-sm font-medium text-gray-200">
+                Iscrizioni abilitate
+              </span>
+              <span className="block text-xs text-gray-500">
+                I membri potranno iscriversi a questo evento.
+              </span>
+            </span>
+          </label>
+
           <div className="flex flex-col-reverse gap-3 pt-2 sm:flex-row sm:justify-end">
             <button
               type="button"
@@ -213,3 +355,4 @@ export default function CreateEventModal({
     </div>
   );
 }
+

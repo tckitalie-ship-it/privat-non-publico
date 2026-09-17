@@ -21,15 +21,19 @@ import DashboardSidebar from '@/components/dashboard-sidebar';
 type Association = {
   id: string;
   name: string;
-  description: string;
-  status: 'Attiva' | 'In pausa';
-  role: 'OWNER' | 'ADMIN' | 'MEMBER';
-  plan: 'Starter' | 'Pro' | 'Enterprise';
+  description?: string | null;
+  isActive: boolean;
   createdAt: string;
+  updatedAt: string;
+  slug?: string | null;
+  logoUrl?: string | null;
+  subscriptionStatus?: string | null;
 };
 
 type Membership = {
   id: string;
+  userId: string;
+  associationId: string;
   role: 'OWNER' | 'ADMIN' | 'MEMBER';
 };
 
@@ -45,6 +49,7 @@ type AssociationWithRelations = Association & {
 export default function AssociationsPage() {
   const [associations, setAssociations] = useState<AssociationWithRelations[]>([]);
   const [loading, setLoading] = useState(true);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
   const [showForm, setShowForm] = useState(false);
   const [name, setName] = useState('');
@@ -57,6 +62,19 @@ export default function AssociationsPage() {
 
 if (!token) {
   throw new Error("Sessione non disponibile");
+}
+
+const meRes = await fetch(`${API_URL}/auth/me`, {
+  headers: {
+    Accept: "application/json",
+    Authorization: `Bearer ${token}`,
+  },
+  cache: "no-store",
+});
+
+if (meRes.ok) {
+  const meData = await meRes.json();
+  setCurrentUserId(meData?.id ?? meData?.user?.id ?? null);
 }
 
 const res = await fetch(`${API_URL}/associations`, {
@@ -331,7 +349,7 @@ const res = await fetch(`${API_URL}/associations`, {
                     </div>
 
                     <span className="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1 text-sm text-emerald-300">
-                      {association.status}
+                      {association.isActive ? "Attiva" : "In pausa"}
                     </span>
                   </div>
 
@@ -339,21 +357,21 @@ const res = await fetch(`${API_URL}/associations`, {
                     <div className="rounded-2xl bg-[#111827] p-4">
                       <p className="text-sm text-gray-400">Ruolo</p>
                       <p className="mt-1 font-semibold">
-                        {association.role}
+                        {association.memberships?.find((membership) => membership.userId === currentUserId)?.role ?? "—"}
                       </p>
                     </div>
 
                     <div className="rounded-2xl bg-[#111827] p-4">
                       <p className="text-sm text-gray-400">Piano</p>
                       <p className="mt-1 font-semibold">
-                        {association.plan}
+                        {association.subscriptionStatus ?? "Non configurato"}
                       </p>
                     </div>
 
                     <div className="rounded-2xl bg-[#111827] p-4">
                       <p className="text-sm text-gray-400">Stato</p>
                       <p className="mt-1 font-semibold">
-                        Operativa
+                        {association.isActive ? "Operativa" : "In pausa"}
                       </p>
                     </div>
                   </div>
@@ -398,3 +416,4 @@ const res = await fetch(`${API_URL}/associations`, {
     </div>
   );
 }
+

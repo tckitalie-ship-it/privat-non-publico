@@ -1,5 +1,7 @@
 "use client";
 
+import { Download } from "lucide-react";
+
 type Transaction = {
   id: string;
   type: "INCOME" | "EXPENSE";
@@ -9,13 +11,38 @@ type Transaction = {
   date: string;
 };
 
+function escapeCSV(value: string) {
+  return `"${value
+    .replace(/"/g, '""')
+    .replace(/\r?\n/g, " ")}"`;
+}
+
+function formatDate(date: string) {
+  const parsed = new Date(date);
+
+  if (Number.isNaN(parsed.getTime())) {
+    return "";
+  }
+
+  return parsed.toLocaleDateString(
+    "it-IT",
+    {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    },
+  );
+}
+
 export default function FinanceExportCSV({
   transactions,
 }: {
   transactions: Transaction[];
 }) {
-  const exportCSV = () => {
-    if (!transactions.length) return;
+  function exportCSV() {
+    if (!transactions.length) {
+      return;
+    }
 
     const header = [
       "Data",
@@ -25,36 +52,76 @@ export default function FinanceExportCSV({
       "Importo (€)",
     ];
 
-    const rows = transactions.map((t) => [
-      new Date(t.date).toLocaleDateString(),
-      t.type === "INCOME" ? "Entrata" : "Uscita",
-      t.category ?? "",
-      t.description ?? "",
-      (t.amountCents / 100).toFixed(2),
-    ]);
+    const rows = transactions.map(
+      (transaction) => [
+        formatDate(transaction.date),
 
-    const csvContent =
-      [header, ...rows].map((row) => row.join(",")).join("\n");
+        transaction.type === "INCOME"
+          ? "Entrata"
+          : "Uscita",
 
-    const blob = new Blob([csvContent], {
-      type: "text/csv;charset=utf-8;",
-    });
+        transaction.category?.trim() ??
+          "",
 
-    const url = URL.createObjectURL(blob);
+        transaction.description?.trim() ??
+          "",
 
-    const link = document.createElement("a");
+        (transaction.amountCents / 100)
+          .toFixed(2)
+          .replace(".", ","),
+      ],
+    );
+
+    const csvContent = [
+      header,
+      ...rows,
+    ]
+      .map((row) =>
+        row
+          .map((value) =>
+            escapeCSV(value),
+          )
+          .join(";"),
+      )
+      .join("\r\n");
+
+    const blob = new Blob(
+      [
+        "\uFEFF",
+        csvContent,
+      ],
+      {
+        type: "text/csv;charset=utf-8;",
+      },
+    );
+
+    const url =
+      URL.createObjectURL(blob);
+
+    const link =
+      document.createElement("a");
+
     link.href = url;
-    link.download = "finanze.csv";
+    link.download =
+      `finanze-${new Date()
+        .toISOString()
+        .slice(0, 10)}.csv`;
+
+    document.body.appendChild(link);
     link.click();
+    link.remove();
 
     URL.revokeObjectURL(url);
-  };
+  }
 
   return (
     <button
+      type="button"
       onClick={exportCSV}
-      className="rounded-md bg-gray-800 px-4 py-2 text-white font-semibold hover:bg-gray-900"
+      disabled={!transactions.length}
+      className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-[#1e293b] px-4 py-2.5 font-semibold text-white transition hover:border-white/20 hover:bg-[#263449] disabled:cursor-not-allowed disabled:opacity-40"
     >
+      <Download size={17} />
       Esporta CSV
     </button>
   );

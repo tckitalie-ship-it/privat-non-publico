@@ -1,11 +1,11 @@
-"use client";
+﻿"use client";
 
 import { CalendarDays, Plus } from "lucide-react";
 
 interface EventsHeaderProps {
   eventsCount: number;
   upcomingCount: number;
-  onCreate: () => void;
+  onCreate?: () => void;
 }
 
 export default function EventsHeader({
@@ -53,14 +53,16 @@ export default function EventsHeader({
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={onCreate}
-            className="inline-flex items-center gap-2 rounded-2xl bg-indigo-600 px-6 py-4 font-semibold text-white transition hover:bg-indigo-500"
-          >
-            <Plus className="h-5 w-5" />
-            Nuovo evento
-          </button>
+          {onCreate && (
+            <button
+              type="button"
+              onClick={onCreate}
+              className="inline-flex items-center gap-2 rounded-2xl bg-indigo-600 px-6 py-4 font-semibold text-white transition hover:bg-indigo-500"
+            >
+              <Plus className="h-5 w-5" />
+              Nuovo evento
+            </button>
+          )}
         </div>
       </div>
     </section>

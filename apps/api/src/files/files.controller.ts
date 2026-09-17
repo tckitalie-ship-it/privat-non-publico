@@ -4,6 +4,7 @@ import {
   Controller,
   Delete,
   Get,
+  Headers,
   Param,
   Post,
   Res,
@@ -60,15 +61,21 @@ export class FilesController {
   @Get()
   async findAll(
     @CurrentUser() user: JwtUser,
+    @Headers("x-association-id")
+    associationId?: string,
   ) {
-    if (!user.associationId) {
+    const resolvedAssociationId =
+      associationId?.trim() ||
+      user.associationId?.trim();
+
+    if (!resolvedAssociationId) {
       throw new BadRequestException(
         "Nessuna associazione attiva selezionata",
       );
     }
 
     return this.filesService.getFilesForAssociation(
-      user.associationId,
+      resolvedAssociationId,
       user.id,
     );
   }
@@ -125,8 +132,14 @@ export class FilesController {
     @UploadedFile()
     file: UploadedDocument | undefined,
     @CurrentUser() user: JwtUser,
+    @Headers("x-association-id")
+    associationId?: string,
   ) {
-    if (!user.associationId) {
+    const resolvedAssociationId =
+      associationId?.trim() ||
+      user.associationId?.trim();
+
+    if (!resolvedAssociationId) {
       throw new BadRequestException(
         "Nessuna associazione attiva selezionata",
       );
@@ -144,13 +157,13 @@ export class FilesController {
       mimetype: file.mimetype,
       size: file.size,
       associationId:
-        user.associationId,
+        resolvedAssociationId,
       uploadedById: user.id,
     });
   }
 
   /**
-   * Registra un documento disponibile tramite URL.
+   * Registra un file disponibile tramite URL.
    *
    * POST /api/files
    */
@@ -158,6 +171,8 @@ export class FilesController {
   async createFromUrl(
     @Body() dto: CreateFileDto,
     @CurrentUser() user: JwtUser,
+    @Headers("x-association-id")
+    associationId?: string,
   ) {
     const name = dto.name?.trim();
     const url = dto.url?.trim();
@@ -174,11 +189,21 @@ export class FilesController {
       );
     }
 
+    const resolvedAssociationId =
+      associationId?.trim() ||
+      user.associationId?.trim();
+
+    if (!resolvedAssociationId) {
+      throw new BadRequestException(
+        "Nessuna associazione attiva selezionata",
+      );
+    }
+
     return this.filesService.uploadFile({
       name,
       url,
       associationId:
-        user.associationId ?? null,
+        resolvedAssociationId,
       uploadedById: user.id,
     });
   }

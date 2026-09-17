@@ -1,7 +1,8 @@
-"use client";
+﻿"use client";
 
 import {
   FormEvent,
+  useCallback,
   useEffect,
   useState,
 } from "react";
@@ -9,6 +10,7 @@ import {
   CalendarDays,
   CheckCircle2,
   Mail,
+  RefreshCw,
   Save,
   Shield,
   UserRound,
@@ -20,6 +22,27 @@ import {
   getAccessToken,
 } from "@/lib/api";
 
+async function authenticatedFetch(
+  path: string,
+  options: RequestInit = {},
+): Promise<Response> {
+  const token = getAccessToken();
+
+  if (!token) {
+    throw new Error("Sessione non disponibile. Effettua nuovamente il login.");
+  }
+
+  return fetch(`${API_URL}${path}`, {
+    ...options,
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+      ...options.headers,
+    },
+    cache: "no-store",
+  });
+}
 type Role =
   | "OWNER"
   | "ADMIN"
@@ -57,11 +80,11 @@ function roleLabel(role: Role) {
 function roleClasses(role: Role) {
   switch (role) {
     case "OWNER":
-      return "bg-amber-500/10 text-amber-300 border-amber-500/20";
+      return "border-amber-500/20 bg-amber-500/10 text-amber-300";
     case "ADMIN":
-      return "bg-violet-500/10 text-violet-300 border-violet-500/20";
+      return "border-violet-500/20 bg-violet-500/10 text-violet-300";
     default:
-      return "bg-blue-500/10 text-blue-300 border-blue-500/20";
+      return "border-blue-500/20 bg-blue-500/10 text-blue-300";
   }
 }
 
@@ -82,6 +105,33 @@ function formatDate(value: string) {
   ).format(date);
 }
 
+function getErrorMessage(
+  data: unknown,
+  fallback: string,
+) {
+  if (
+    typeof data === "object" &&
+    data !== null &&
+    "message" in data
+  ) {
+    const message = (
+      data as {
+        message?: string | string[];
+      }
+    ).message;
+
+    if (Array.isArray(message)) {
+      return message.join(", ");
+    }
+
+    if (typeof message === "string") {
+      return message;
+    }
+  }
+
+  return fallback;
+}
+
 export default function ProfilePage() {
   const [profile, setProfile] =
     useState<ProfileData | null>(null);
@@ -97,74 +147,69 @@ export default function ProfilePage() {
   const [error, setError] =
     useState<string | null>(null);
 
-  async function loadProfile() {
-    const token = getAccessToken();
+  const loadProfile = useCallback(
+    async () => {
+      try {
+        setLoading(true);
+        setError(null);
 
-    if (!token) {
-      setError(
-        "Sessione non disponibile.",
-      );
-      setLoading(false);
-      return;
-    }
-
-    try {
-      setError(null);
-
-      const response = await fetch(
-        `${API_URL}/users/me`,
-        {
-          headers: {
-            Accept:
-              "application/json",
-            Authorization:
-              `Bearer ${token}`,
-          },
-          cache: "no-store",
-        },
-      );
-
-      const data =
-        await response
-          .json()
-          .catch(() => null);
-
-      if (!response.ok) {
-        throw new Error(
-          data?.message ||
-            `Errore caricamento profilo (${response.status})`,
+        const response = await authenticatedFetch(
+          "/users/me",
         );
+
+        const data =
+          await response
+            .json()
+            .catch(() => null);
+
+        if (!response.ok) {
+          throw new Error(
+            getErrorMessage(
+              data,
+              `Errore caricamento profilo (${response.status})`,
+            ),
+          );
+        }
+
+        if (!data) {
+          throw new Error(
+            "Profilo utente non disponibile.",
+          );
+        }
+
+        const normalizedProfile =
+          data as ProfileData;
+
+        setProfile(normalizedProfile);
+        setEmail(
+          typeof normalizedProfile.email ===
+            "string"
+            ? normalizedProfile.email
+            : "",
+        );
+      } catch (error) {
+        console.error(
+          "Errore caricamento profilo:",
+          error,
+        );
+
+        const message =
+          error instanceof Error
+            ? error.message
+            : "Impossibile caricare il profilo.";
+
+        setProfile(null);
+        setError(message);
+      } finally {
+        setLoading(false);
       }
-
-      if (!data || typeof data !== "object") {
-        throw new Error("Profilo utente non disponibile.");
-      }
-
-      setProfile(data);
-      setEmail(
-        typeof data.email === "string"
-          ? data.email
-          : "",
-      );
-    } catch (error) {
-      console.error(
-        "Errore caricamento profilo:",
-        error,
-      );
-
-      setError(
-        error instanceof Error
-          ? error.message
-          : "Impossibile caricare il profilo.",
-      );
-    } finally {
-      setLoading(false);
-    }
-  }
+    },
+    [],
+  );
 
   useEffect(() => {
     void loadProfile();
-  }, []);
+  }, [loadProfile]);
 
   async function handleSubmit(
     event: FormEvent<HTMLFormElement>,
@@ -201,6 +246,13 @@ export default function ProfilePage() {
       return;
     }
 
+    if (cleanEmail.length > 255) {
+      toast.error(
+        "L'email non puÃ² superare 255 caratteri.",
+      );
+      return;
+    }
+
     try {
       setSaving(true);
 
@@ -209,12 +261,10 @@ export default function ProfilePage() {
         {
           method: "PATCH",
           headers: {
-            Accept:
-              "application/json",
+            Accept: "application/json",
             "Content-Type":
               "application/json",
-            Authorization:
-              `Bearer ${token}`,
+            Authorization: `Bearer ${token}`,
           },
           body: JSON.stringify({
             email: cleanEmail,
@@ -229,13 +279,36 @@ export default function ProfilePage() {
 
       if (!response.ok) {
         throw new Error(
-          data?.message ||
+          getErrorMessage(
+            data,
             `Errore aggiornamento profilo (${response.status})`,
+          ),
         );
       }
 
-      setProfile(data);
-      setEmail(data.email ?? cleanEmail);
+      if (
+        data &&
+        typeof data === "object"
+      ) {
+        const updatedProfile =
+          data as ProfileData;
+
+        setProfile(updatedProfile);
+
+        setEmail(
+          typeof updatedProfile.email ===
+            "string"
+            ? updatedProfile.email
+            : cleanEmail,
+        );
+      } else {
+        setEmail(cleanEmail);
+      }
+
+      localStorage.setItem(
+        "profileUpdated",
+        Date.now().toString(),
+      );
 
       toast.success(
         "Profilo aggiornato correttamente.",
@@ -269,7 +342,7 @@ export default function ProfilePage() {
           </h1>
         </div>
 
-        <div className="rounded-2xl border border-white/10 bg-[#0f172a] p-8">
+        <div className="rounded-3xl border border-white/10 bg-[#0f172a] p-8 shadow-xl">
           <div className="flex items-center gap-3 text-gray-400">
             <div className="h-5 w-5 animate-spin rounded-full border-2 border-white/10 border-t-blue-400" />
             Caricamento profilo...
@@ -292,7 +365,7 @@ export default function ProfilePage() {
           </h1>
         </div>
 
-        <div className="rounded-2xl border border-red-500/20 bg-red-500/10 p-6">
+        <div className="rounded-3xl border border-red-500/20 bg-red-500/10 p-6">
           <p className="font-medium text-red-300">
             {error ??
               "Profilo non disponibile."}
@@ -300,12 +373,12 @@ export default function ProfilePage() {
 
           <button
             type="button"
-            onClick={() => {
-              setLoading(true);
-              void loadProfile();
-            }}
-            className="mt-4 rounded-xl border border-red-400/20 px-4 py-2 text-sm font-medium text-red-200 transition hover:bg-red-500/10"
+            onClick={() =>
+              void loadProfile()
+            }
+            className="mt-4 inline-flex items-center gap-2 rounded-xl border border-red-400/20 px-4 py-2 text-sm font-medium text-red-200 transition hover:bg-red-500/10"
           >
+            <RefreshCw size={15} />
             Riprova
           </button>
         </div>
@@ -315,7 +388,7 @@ export default function ProfilePage() {
 
   return (
     <div className="space-y-8">
-      <div>
+      <header>
         <p className="text-xs font-semibold uppercase tracking-[0.25em] text-blue-400">
           Account
         </p>
@@ -325,14 +398,14 @@ export default function ProfilePage() {
         </h1>
 
         <p className="mt-2 max-w-2xl text-gray-400">
-          Gestisci i dati del tuo account e
-          visualizza le associazioni a cui
-          appartieni.
+          Gestisci i dati del tuo account
+          e visualizza le associazioni a
+          cui appartieni.
         </p>
-      </div>
+      </header>
 
       <section className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
-        <article className="rounded-2xl border border-white/10 bg-[#0f172a] p-6 shadow-xl">
+        <article className="rounded-3xl border border-white/10 bg-[#0f172a] p-6 shadow-xl">
           <div className="mb-6 flex items-center gap-3">
             <div className="rounded-xl bg-blue-500/10 p-3 text-blue-400">
               <UserRound size={22} />
@@ -379,6 +452,8 @@ export default function ProfilePage() {
                   }
                   disabled={saving}
                   autoComplete="email"
+                  maxLength={255}
+                  required
                   className="w-full rounded-xl border border-white/10 bg-slate-900 py-3 pl-11 pr-4 text-white outline-none transition placeholder:text-gray-600 focus:border-blue-500 disabled:cursor-not-allowed disabled:opacity-60"
                   placeholder="nome@email.it"
                 />
@@ -397,7 +472,7 @@ export default function ProfilePage() {
               </div>
             </div>
 
-            <div className="flex items-center justify-between gap-4 border-t border-white/10 pt-5">
+            <div className="flex flex-col gap-4 border-t border-white/10 pt-5 sm:flex-row sm:items-center sm:justify-between">
               <p className="text-xs text-gray-500">
                 Le modifiche vengono salvate
                 direttamente sul tuo account.
@@ -406,7 +481,7 @@ export default function ProfilePage() {
               <button
                 type="submit"
                 disabled={saving}
-                className="inline-flex shrink-0 items-center gap-2 rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
+                className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {saving ? (
                   <>
@@ -424,7 +499,7 @@ export default function ProfilePage() {
           </form>
         </article>
 
-        <article className="rounded-2xl border border-white/10 bg-[#0f172a] p-6 shadow-xl">
+        <article className="rounded-3xl border border-white/10 bg-[#0f172a] p-6 shadow-xl">
           <div className="mb-6 flex items-center gap-3">
             <div className="rounded-xl bg-violet-500/10 p-3 text-violet-400">
               <Shield size={22} />
@@ -482,13 +557,32 @@ export default function ProfilePage() {
                 </div>
               </div>
             </div>
+
+            <div className="rounded-xl border border-blue-500/10 bg-blue-500/5 p-4">
+              <p className="text-xs uppercase tracking-wide text-gray-500">
+                Associazioni
+              </p>
+
+              <p className="mt-1 text-2xl font-bold text-white">
+                {profile.memberships.length}
+              </p>
+
+              <p className="mt-1 text-xs text-gray-500">
+                associazioni collegate al tuo
+                account
+              </p>
+            </div>
           </div>
         </article>
       </section>
 
-      <section className="rounded-2xl border border-white/10 bg-[#0f172a] p-6 shadow-xl">
+      <section className="rounded-3xl border border-white/10 bg-[#0f172a] p-6 shadow-xl">
         <div className="mb-6">
-          <h2 className="text-xl font-semibold text-white">
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-blue-400">
+            Membership
+          </p>
+
+          <h2 className="mt-1 text-xl font-semibold text-white">
             Le tue associazioni
           </h2>
 
@@ -499,10 +593,14 @@ export default function ProfilePage() {
         </div>
 
         {profile.memberships.length === 0 ? (
-          <div className="rounded-xl border border-white/10 bg-slate-900 p-6 text-center">
-            <p className="text-gray-400">
-              Non appartieni ancora a nessuna
-              associazione.
+          <div className="rounded-2xl border border-white/10 bg-slate-900 p-8 text-center">
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-white/5 text-gray-500">
+              <UserRound size={22} />
+            </div>
+
+            <p className="mt-4 text-gray-400">
+              Non appartieni ancora a
+              nessuna associazione.
             </p>
           </div>
         ) : (
@@ -511,7 +609,7 @@ export default function ProfilePage() {
               (membership) => (
                 <article
                   key={membership.id}
-                  className="rounded-xl border border-white/10 bg-slate-900 p-5"
+                  className="rounded-2xl border border-white/10 bg-slate-900 p-5 transition hover:border-white/20"
                 >
                   <div className="flex items-start justify-between gap-4">
                     <div className="min-w-0">

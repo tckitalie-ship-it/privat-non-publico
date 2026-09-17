@@ -65,7 +65,9 @@ function calculateGrowth(
   );
 }
 
-function formatPercentage(value: number | null) {
+function formatPercentage(
+  value: number | null,
+) {
   if (value === null) {
     return "N/D";
   }
@@ -84,16 +86,30 @@ function formatDate(day: string | null) {
     .split("-")
     .map(Number);
 
-  if (!year || !month || !date) {
+  if (
+    !year ||
+    !month ||
+    !date
+  ) {
     return "Non disponibile";
   }
 
-  return new Intl.DateTimeFormat("it-IT", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  }).format(
-    new Date(Date.UTC(year, month - 1, date)),
+  return new Intl.DateTimeFormat(
+    "it-IT",
+    {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      timeZone: "UTC",
+    },
+  ).format(
+    new Date(
+      Date.UTC(
+        year,
+        month - 1,
+        date,
+      ),
+    ),
   );
 }
 
@@ -123,35 +139,59 @@ export default function FinanceKpis({
     let memberships = 0;
 
     for (const transaction of transactions) {
-      const date = new Date(transaction.date);
+      const date = new Date(
+        transaction.date,
+      );
 
-      if (Number.isNaN(date.getTime())) {
+      if (
+        Number.isNaN(date.getTime())
+      ) {
         continue;
       }
 
-      const monthKey = getMonthKey(date);
+      const amount = Number(
+        transaction.amountCents,
+      );
+
+      if (
+        !Number.isFinite(amount) ||
+        amount < 0
+      ) {
+        continue;
+      }
+
+      const monthKey =
+        getMonthKey(date);
+
       const dayKey = date
         .toISOString()
         .slice(0, 10);
 
-      monthlyTotals[monthKey] ??= {
-        income: 0,
-        expense: 0,
-      };
+      if (!monthlyTotals[monthKey]) {
+        monthlyTotals[monthKey] = {
+          income: 0,
+          expense: 0,
+        };
+      }
 
-      if (transaction.type === "INCOME") {
-        monthlyTotals[monthKey].income +=
-          transaction.amountCents;
+      if (
+        transaction.type ===
+        "INCOME"
+      ) {
+        monthlyTotals[
+          monthKey
+        ].income += amount;
 
-        totalIncome += transaction.amountCents;
+        totalIncome += amount;
       } else {
-        monthlyTotals[monthKey].expense +=
-          transaction.amountCents;
+        monthlyTotals[
+          monthKey
+        ].expense += amount;
       }
 
       dailyTotals[dayKey] =
         (dailyTotals[dayKey] ?? 0) +
-        transaction.amountCents;
+        amount;
 
       const category =
         transaction.category?.trim() ||
@@ -159,89 +199,128 @@ export default function FinanceKpis({
 
       categoryTotals[category] =
         (categoryTotals[category] ?? 0) +
-        transaction.amountCents;
+        amount;
 
-      if (transaction.type !== "INCOME") {
+      if (
+        transaction.type !==
+        "INCOME"
+      ) {
         continue;
       }
 
       const normalizedCategory =
-        category.toLocaleLowerCase("it-IT");
+        category.toLocaleLowerCase(
+          "it-IT",
+        );
 
       if (
         normalizedCategory.includes(
           "donazione",
         )
       ) {
-        donations += transaction.amountCents;
+        donations += amount;
       }
 
       if (
-        normalizedCategory.includes("quota") ||
+        normalizedCategory.includes(
+          "quota",
+        ) ||
         normalizedCategory.includes(
           "associativa",
         )
       ) {
-        memberships +=
-          transaction.amountCents;
+        memberships += amount;
       }
     }
 
-    const availableMonths = Object.keys(
-      monthlyTotals,
-    ).sort();
+    const availableMonths =
+      Object.keys(
+        monthlyTotals,
+      ).sort();
 
     const latestMonth =
-      availableMonths.at(-1) ?? null;
+      availableMonths.at(-1) ??
+      null;
 
-    const previousMonth = latestMonth
-      ? getPreviousMonthKey(latestMonth)
-      : null;
+    const previousMonth =
+      latestMonth
+        ? getPreviousMonthKey(
+            latestMonth,
+          )
+        : null;
 
-    const latestTotals = latestMonth
-      ? monthlyTotals[latestMonth]
-      : undefined;
+    const latestTotals =
+      latestMonth
+        ? monthlyTotals[
+            latestMonth
+          ]
+        : undefined;
 
-    const previousTotals = previousMonth
-      ? monthlyTotals[previousMonth]
-      : undefined;
+    const previousTotals =
+      previousMonth
+        ? monthlyTotals[
+            previousMonth
+          ]
+        : undefined;
 
-    const incomeGrowth = calculateGrowth(
-      latestTotals?.income ?? 0,
-      previousTotals?.income ?? 0,
-    );
+    const incomeGrowth =
+      calculateGrowth(
+        latestTotals?.income ?? 0,
+        previousTotals?.income ?? 0,
+      );
 
-    const expenseGrowth = calculateGrowth(
-      latestTotals?.expense ?? 0,
-      previousTotals?.expense ?? 0,
-    );
+    const expenseGrowth =
+      calculateGrowth(
+        latestTotals?.expense ?? 0,
+        previousTotals?.expense ?? 0,
+      );
 
     const donationPercentage =
       totalIncome > 0
-        ? (donations / totalIncome) * 100
+        ? (donations /
+            totalIncome) *
+          100
         : 0;
 
     const membershipPercentage =
       totalIncome > 0
-        ? (memberships / totalIncome) * 100
+        ? (memberships /
+            totalIncome) *
+          100
         : 0;
 
     const mostActiveDay =
-      Object.entries(dailyTotals).sort(
-        ([, firstTotal], [, secondTotal]) =>
-          secondTotal - firstTotal,
+      Object.entries(
+        dailyTotals,
+      ).sort(
+        (
+          [, firstTotal],
+          [, secondTotal],
+        ) =>
+          secondTotal -
+          firstTotal,
       )[0]?.[0] ?? null;
 
     const mostActiveCategory =
-      Object.entries(categoryTotals).sort(
-        ([, firstTotal], [, secondTotal]) =>
-          secondTotal - firstTotal,
-      )[0]?.[0] ?? "Non disponibile";
+      Object.entries(
+        categoryTotals,
+      ).sort(
+        (
+          [, firstTotal],
+          [, secondTotal],
+        ) =>
+          secondTotal -
+          firstTotal,
+      )[0]?.[0] ??
+      "Non disponibile";
 
     return [
       {
         label: "Crescita entrate",
-        value: formatPercentage(incomeGrowth),
+        value:
+          formatPercentage(
+            incomeGrowth,
+          ),
         description:
           "Rispetto al mese precedente",
         icon: ChartNoAxesCombined,
@@ -254,7 +333,10 @@ export default function FinanceKpis({
       },
       {
         label: "Crescita uscite",
-        value: formatPercentage(expenseGrowth),
+        value:
+          formatPercentage(
+            expenseGrowth,
+          ),
         description:
           "Rispetto al mese precedente",
         icon: CircleDollarSign,
@@ -267,49 +349,68 @@ export default function FinanceKpis({
       },
       {
         label: "Donazioni",
-        value: `${donationPercentage.toFixed(1)}%`,
+        value: `${donationPercentage.toFixed(
+          1,
+        )}%`,
         description:
           "Percentuale sulle entrate totali",
         icon: HandHeart,
+        valueClass:
+          "text-emerald-300",
       },
       {
         label: "Quote associative",
-        value: `${membershipPercentage.toFixed(1)}%`,
+        value: `${membershipPercentage.toFixed(
+          1,
+        )}%`,
         description:
           "Percentuale sulle entrate totali",
         icon: Users,
+        valueClass:
+          "text-blue-300",
       },
       {
         label: "Transazioni",
-        value: transactions.length.toLocaleString(
-          "it-IT",
-        ),
+        value:
+          transactions.length.toLocaleString(
+            "it-IT",
+          ),
         description:
           "Movimenti finanziari registrati",
         icon: ReceiptText,
+        valueClass:
+          "text-white",
       },
       {
         label: "Giorno più attivo",
-        value: formatDate(mostActiveDay),
+        value:
+          formatDate(
+            mostActiveDay,
+          ),
         description:
           "Giorno con il maggiore volume",
         icon: CalendarDays,
+        valueClass:
+          "text-white",
       },
       {
         label: "Categoria più attiva",
-        value: mostActiveCategory,
+        value:
+          mostActiveCategory,
         description:
           "Categoria con il maggiore volume",
         icon: Tags,
+        valueClass:
+          "text-white",
       },
     ];
   }, [transactions]);
 
   if (transactions.length === 0) {
     return (
-      <section className="rounded-2xl border border-white/10 bg-[#0f172a] p-6">
-        <div className="flex items-center gap-3">
-          <div className="rounded-xl bg-white/5 p-3">
+      <section className="rounded-3xl border border-white/10 bg-[#0f172a] p-6 shadow-xl">
+        <div className="flex items-center gap-4">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white/5">
             <ChartNoAxesCombined
               size={22}
               className="text-slate-400"
@@ -322,8 +423,10 @@ export default function FinanceKpis({
             </p>
 
             <p className="mt-1 text-sm text-slate-400">
-              Registra almeno una transazione
-              per visualizzare le statistiche.
+              Registra almeno una
+              transazione per
+              visualizzare le
+              statistiche finanziarie.
             </p>
           </div>
         </div>
@@ -333,14 +436,14 @@ export default function FinanceKpis({
 
   return (
     <section>
-      <div className="mb-4">
-        <h2 className="text-lg font-semibold text-white">
+      <div className="mb-5">
+        <h2 className="text-xl font-bold text-white">
           Indicatori finanziari
         </h2>
 
         <p className="mt-1 text-sm text-slate-400">
-          Analisi sintetica dei movimenti
-          registrati.
+          Analisi sintetica dei
+          movimenti registrati.
         </p>
       </div>
 
@@ -351,19 +454,16 @@ export default function FinanceKpis({
           return (
             <article
               key={kpi.label}
-              className="rounded-2xl border border-white/10 bg-[#0f172a] p-6 shadow-sm"
+              className="group rounded-3xl border border-white/10 bg-[#0f172a] p-5 shadow-xl transition hover:border-white/15 hover:bg-[#111c31] sm:p-6"
             >
               <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0">
-                  <p className="text-sm text-slate-400">
+                  <p className="text-sm font-semibold text-slate-400">
                     {kpi.label}
                   </p>
 
                   <p
-                    className={`mt-2 break-words text-2xl font-bold ${
-                      kpi.valueClass ??
-                      "text-white"
-                    }`}
+                    className={`mt-3 break-words text-2xl font-bold ${kpi.valueClass ?? "text-white"}`}
                   >
                     {kpi.value}
                   </p>
@@ -373,7 +473,7 @@ export default function FinanceKpis({
                   </p>
                 </div>
 
-                <div className="shrink-0 rounded-xl bg-white/5 p-3">
+                <div className="shrink-0 rounded-2xl bg-white/5 p-3">
                   <Icon
                     size={22}
                     className="text-blue-300"

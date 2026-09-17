@@ -13,6 +13,7 @@ type CreateNotificationInput = {
   message: string;
   associationId?: string | null;
   userId?: string | null;
+  reminderId?: string | null;
 };
 
 @Injectable()
@@ -110,8 +111,6 @@ export class NotificationsService {
   async createNotification(
     dto: CreateNotificationInput,
   ) {
-     console.log("=== CREATE NOTIFICATION ===");
-console.log(dto);
     const message = dto.message?.trim();
     const title = dto.title?.trim();
 
@@ -129,7 +128,7 @@ console.log(dto);
         "La notifica deve essere collegata a un utente o a un'associazione",
       );
     }
-      console.log("Saving notification...");
+
     return this.prisma.notification.create({
       data: {
         title: title || null,
@@ -137,7 +136,10 @@ console.log(dto);
         read: false,
         associationId:
           dto.associationId ?? null,
-        userId: dto.userId ?? null,
+        userId:
+          dto.userId ?? null,
+        reminderId:
+          dto.reminderId ?? null,
       },
     });
   }
@@ -187,6 +189,8 @@ console.log(dto);
       userId: dto.associationId
         ? dto.userId ?? null
         : destinationUserId,
+      reminderId:
+        dto.reminderId ?? null,
     });
   }
 

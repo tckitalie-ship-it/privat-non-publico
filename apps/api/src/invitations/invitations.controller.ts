@@ -3,6 +3,7 @@ import {
   Controller,
   Delete,
   Get,
+  Headers,
   Param,
   Post,
   UseGuards,
@@ -22,10 +23,13 @@ export class InvitationsController {
 
   @UseGuards(JwtAuthGuard)
   @Get()
-  async findAll(@CurrentUser() user: any) {
+  async findAll(
+    @CurrentUser() user: any,
+    @Headers("x-association-id") associationId?: string,
+  ) {
     return this.invitations.findAll(
       user.sub,
-      user.associationId,
+      associationId || user.associationId,
     );
   }
 
@@ -38,27 +42,18 @@ export class InvitationsController {
       email: string;
       role: string;
     },
+    @Headers("x-association-id") associationId?: string,
   ) {
-    console.log("=== CREATE INVITATION DEBUG ===");
-
-    console.log("USER:", {
-      sub: user?.sub,
-      id: user?.id,
-      email: user?.email,
-      role: user?.role,
-      associationId: user?.associationId,
-    });
-
-    console.log("BODY:", dto);
-
-    console.log("==============================");
+    const resolvedAssociationId =
+      associationId?.trim() ||
+      user.associationId?.trim();
 
     return this.invitations.createInvitation(
       user.sub,
       {
         email: dto.email,
-        role: dto.role as any,
-        associationId: user.associationId,
+        role: dto.role,
+        associationId: resolvedAssociationId,
       },
     );
   }

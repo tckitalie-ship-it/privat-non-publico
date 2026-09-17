@@ -92,32 +92,43 @@ model Invitation {
   @@index([status])
 }
 
+enum EventStatus {
+  SCHEDULED
+  CANCELLED
+  COMPLETED
+}
+
 model Event {
-  id            String              @id @default(cuid())
-  associationId String
-  title         String
-  description   String?
-  location      String?
-  startsAt      DateTime
-  endsAt        DateTime?
-  createdAt     DateTime            @default(now())
-  updatedAt     DateTime            @updatedAt
-  association   Association         @relation(fields: [associationId], references: [id], onDelete: Cascade)
-  registrations EventRegistration[]
+  id                  String              @id @default(cuid())
+  associationId       String
+  title               String
+  description         String?
+  location            String?
+  startsAt            DateTime
+  endsAt              DateTime?
+  capacity            Int?
+  registrationEnabled Boolean             @default(true)
+  status              EventStatus         @default(SCHEDULED)
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+  association         Association         @relation(fields: [associationId], references: [id], onDelete: Cascade)
+  registrations       EventRegistration[]
 
   @@index([associationId])
   @@index([startsAt])
+  @@index([status])
 }
 
 model EventRegistration {
-  id        String   @id @default(cuid())
-  eventId   String
-  userId    String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  status    String   @default("REGISTERED")
-  event     Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id          String    @id @default(cuid())
+  eventId     String
+  userId      String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  status      String    @default("REGISTERED")
+  checkedInAt DateTime?
+  event       Event     @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([eventId, userId])
   @@index([eventId])

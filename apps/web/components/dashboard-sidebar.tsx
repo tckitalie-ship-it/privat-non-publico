@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
@@ -6,10 +6,12 @@ import { usePathname } from "next/navigation";
 import {
   Bell,
   Calendar,
+  ClipboardList,
   Clock,
   Folder,
   LayoutDashboard,
   Settings,
+  User,
   Users,
   Wallet,
 } from "lucide-react";
@@ -19,7 +21,6 @@ import LogoutButton from "@/components/logout-button";
 import { NotificationBell } from "@/components/notification-bell";
 import ThemeToggle from "@/components/theme-toggle";
 import { cn } from "@/lib/utils";
-
 const navigation = [
   {
     label: "Dashboard",
@@ -42,19 +43,24 @@ const navigation = [
     icon: Wallet,
   },
   {
-    label: "Reminder",
+    label: "Promemoria",
     href: "/dashboard/reminders",
     icon: Clock,
   },
   {
     label: "Notifiche",
-    href: "/dashboard/notifications",
+    href: "/notifications",
     icon: Bell,
   },
   {
     label: "File",
     href: "/dashboard/files",
     icon: Folder,
+  },
+  {
+    label: "Audit Log",
+    href: "/dashboard/audit-log",
+    icon: ClipboardList,
   },
 ];
 
@@ -90,14 +96,11 @@ export default function DashboardSidebar() {
 
         setUser(data);
       } catch (error) {
-        console.error(
-          "Errore caricamento profilo:",
-          error,
-        );
+        console.error("Errore caricamento profilo:", error);
       }
     }
 
-    loadUser();
+    void loadUser();
   }, []);
 
   function isActive(href: string) {
@@ -105,7 +108,10 @@ export default function DashboardSidebar() {
       return pathname === "/dashboard";
     }
 
-    return pathname === href || pathname.startsWith(`${href}/`);
+    return (
+      pathname === href ||
+      pathname.startsWith(`${href}/`)
+    );
   }
 
   return (
@@ -127,7 +133,7 @@ export default function DashboardSidebar() {
       </section>
 
       {/* NAVIGATION */}
-      <nav className="min-h-0 flex-1 px-4 py-5">
+      <nav className="min-h-0 flex-1 overflow-y-auto px-4 py-5">
         <p className="mb-3 px-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-500">
           Navigazione
         </p>
@@ -148,9 +154,14 @@ export default function DashboardSidebar() {
                     : "text-gray-400 hover:bg-[#161b22] hover:text-white",
                 )}
               >
-                <Icon size={19} className="shrink-0" />
+                <Icon
+                  size={19}
+                  className="shrink-0"
+                />
 
-                <span className="truncate">{item.label}</span>
+                <span className="truncate">
+                  {item.label}
+                </span>
               </Link>
             );
           })}
@@ -163,6 +174,25 @@ export default function DashboardSidebar() {
         </p>
 
         <Link
+          href="/dashboard/profile"
+          className={cn(
+            "mb-1 flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition",
+            isActive("/dashboard/profile")
+              ? "bg-blue-600 text-white shadow-lg shadow-blue-950/30"
+              : "text-gray-400 hover:bg-[#161b22] hover:text-white",
+          )}
+        >
+          <User
+            size={19}
+            className="shrink-0"
+          />
+
+          <span className="truncate">
+            Profilo
+          </span>
+        </Link>
+
+        <Link
           href="/dashboard/settings"
           className={cn(
             "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition",
@@ -171,9 +201,14 @@ export default function DashboardSidebar() {
               : "text-gray-400 hover:bg-[#161b22] hover:text-white",
           )}
         >
-          <Settings size={19} className="shrink-0" />
+          <Settings
+            size={19}
+            className="shrink-0"
+          />
 
-          <span className="truncate">Impostazioni</span>
+          <span className="truncate">
+            Impostazioni
+          </span>
         </Link>
       </nav>
 
@@ -199,3 +234,9 @@ export default function DashboardSidebar() {
     </div>
   );
 }
+
+
+
+
+
+

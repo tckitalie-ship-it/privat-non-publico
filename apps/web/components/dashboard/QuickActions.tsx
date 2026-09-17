@@ -1,12 +1,14 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import {
+  Bell,
   CalendarPlus,
   UserPlus,
   Wallet,
   FolderPlus,
   MailPlus,
+  Clock3,
   ChevronRight,
 } from "lucide-react";
 
@@ -59,10 +61,7 @@ function readJwtPayload(token: string): JwtPayload | null {
 
     return JSON.parse(decoded) as JwtPayload;
   } catch (error) {
-    console.error(
-      "Errore lettura ruolo JWT:",
-      error,
-    );
+    console.error("Errore lettura ruolo JWT:", error);
 
     return null;
   }
@@ -108,6 +107,22 @@ const actions: Action[] = [
     icon: MailPlus,
     color: "bg-cyan-500",
     roles: ["OWNER", "ADMIN"],
+  },
+  {
+    title: "Notifiche",
+    description: "Visualizza le notifiche ricevute",
+    href: "/dashboard/notifications",
+    icon: Bell,
+    color: "bg-indigo-500",
+    roles: ["OWNER", "ADMIN", "MEMBER"],
+  },
+  {
+    title: "Promemoria",
+    description: "Gestisci i tuoi promemoria",
+    href: "/dashboard/reminders",
+    icon: Clock3,
+    color: "bg-pink-500",
+    roles: ["OWNER", "ADMIN", "MEMBER"],
   },
 ];
 
@@ -189,3 +204,4 @@ export default function QuickActions() {
     </section>
   );
 }
+

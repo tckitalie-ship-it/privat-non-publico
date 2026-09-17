@@ -1,4 +1,4 @@
-import { IsOptional, IsString, Length } from 'class-validator';
+import { IsOptional, IsString, Length } from "class-validator";
 
 export class UpdateAssociationDto {
   @IsOptional()
@@ -10,4 +10,14 @@ export class UpdateAssociationDto {
   @IsString()
   @Length(0, 500)
   description?: string;
+
+  @IsOptional()
+  @IsString()
+  @Length(0, 120)
+  slug?: string;
+
+  @IsOptional()
+  @IsString()
+  @Length(0, 500)
+  logoUrl?: string;
 }

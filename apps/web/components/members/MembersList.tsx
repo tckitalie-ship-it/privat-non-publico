@@ -1,10 +1,12 @@
-﻿"use client";
+"use client";
+
 import Image from "next/image";
 import { useState } from "react";
 import {
   ChevronDown,
   ChevronUp,
   Loader2,
+  Pencil,
   Trash2,
   UserRound,
 } from "lucide-react";
@@ -12,18 +14,23 @@ import { toast } from "sonner";
 
 import { API_URL, getAccessToken } from "@/lib/api";
 import { getActiveAssociationId } from "@/lib/association";
+
 type Role = "OWNER" | "ADMIN" | "MEMBER";
 
 type Member = {
   id: string;
   role: Role;
   memberNumber?: number | null;
+  firstName?: string | null;
+  lastName?: string | null;
+  birthDate?: string | null;
+  address?: string | null;
+  phone?: string | null;
   createdAt: string;
   user: {
     id: string;
     email: string;
     name?: string | null;
-    phone?: string | null;
     avatarUrl?: string | null;
   };
 };
@@ -36,7 +43,17 @@ interface MembersListProps {
 }
 
 function getDisplayName(member: Member) {
-  return member.user?.name?.trim() || member.user?.email || "Membro";
+  const fullName = [member.firstName, member.lastName]
+    .filter(Boolean)
+    .join(" ")
+    .trim();
+
+  return (
+    fullName ||
+    member.user?.name?.trim() ||
+    member.user?.email ||
+    "Membro"
+  );
 }
 
 function getCurrentUserId(): string | null {
@@ -103,6 +120,14 @@ function RoleBadge({ role }: { role: Role }) {
   );
 }
 
+function formatBirthDate(value?: string | null) {
+  if (!value) {
+    return "";
+  }
+
+  return value.slice(0, 10);
+}
+
 export default function MembersList({
   members,
   loading = false,
@@ -111,6 +136,13 @@ export default function MembersList({
 }: MembersListProps) {
   const [loadingId, setLoadingId] = useState<string | null>(null);
   const [confirmRemoveId, setConfirmRemoveId] = useState<string | null>(null);
+  const [editingMember, setEditingMember] = useState<Member | null>(null);
+
+  const [editFirstName, setEditFirstName] = useState("");
+  const [editLastName, setEditLastName] = useState("");
+  const [editBirthDate, setEditBirthDate] = useState("");
+  const [editAddress, setEditAddress] = useState("");
+  const [editPhone, setEditPhone] = useState("");
 
   const currentUserId = getCurrentUserId();
 
@@ -118,7 +150,95 @@ export default function MembersList({
     (member) => member.role === "OWNER",
   ).length;
 
-    async function updateRole(member: Member, newRole: Role) {
+  function openEdit(member: Member) {
+    setEditingMember(member);
+    setEditFirstName(member.firstName ?? "");
+    setEditLastName(member.lastName ?? "");
+    setEditBirthDate(formatBirthDate(member.birthDate));
+    setEditAddress(member.address ?? "");
+    setEditPhone(member.phone ?? "");
+  }
+
+  function closeEdit() {
+    if (loadingId) {
+      return;
+    }
+
+    setEditingMember(null);
+  }
+
+  async function saveEdit() {
+    if (!editingMember) {
+      return;
+    }
+
+    const firstName = editFirstName.trim();
+    const lastName = editLastName.trim();
+
+    if (!firstName || !lastName) {
+      toast.error("Nome e cognome sono obbligatori");
+      return;
+    }
+
+    const token = getAccessToken();
+    const associationId = getActiveAssociationId();
+
+    if (!token) {
+      toast.error("Sessione non disponibile");
+      return;
+    }
+
+    try {
+      setLoadingId(editingMember.id);
+
+      const response = await fetch(
+        `${API_URL}/memberships/${editingMember.id}`,
+        {
+          method: "PATCH",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+            "x-association-id": associationId ?? "",
+          },
+          body: JSON.stringify({
+            firstName,
+            lastName,
+            birthDate: editBirthDate || undefined,
+            address: editAddress.trim() || undefined,
+            phone: editPhone.trim() || undefined,
+          }),
+        },
+      );
+
+      const data = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        const message = Array.isArray(data?.message)
+          ? data.message.join(", ")
+          : data?.message;
+
+        throw new Error(
+          message || `Errore modifica socio (${response.status})`,
+        );
+      }
+
+      toast.success("Dati del socio aggiornati");
+      setEditingMember(null);
+      window.location.reload();
+    } catch (error) {
+      console.error("Errore modifica socio:", error);
+
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Impossibile modificare il socio",
+      );
+    } finally {
+      setLoadingId(null);
+    }
+  }
+
+  async function updateRole(member: Member, newRole: Role) {
     if (member.role === newRole) {
       return;
     }
@@ -188,14 +308,17 @@ export default function MembersList({
       return;
     }
 
-    toast.info("Il membro Ã¨ giÃ  Owner");
+    toast.info("Il membro è già Owner");
   }
 
   async function demoteMember(member: Member) {
-    const isOnlyOwner = member.role === "OWNER" && ownersCount === 1;
+    const isOnlyOwner =
+      member.role === "OWNER" && ownersCount === 1;
 
     if (isOnlyOwner) {
-      toast.error("Non puoi retrocedere lâ€™unico Owner dellâ€™associazione");
+      toast.error(
+        "Non puoi retrocedere l'unico Owner dell'associazione",
+      );
       return;
     }
 
@@ -209,7 +332,7 @@ export default function MembersList({
       return;
     }
 
-    toast.info("Il membro ha giÃ  il ruolo piÃ¹ basso");
+    toast.info("Il membro ha già il ruolo più basso");
   }
 
   async function confirmRemove() {
@@ -217,7 +340,9 @@ export default function MembersList({
       return;
     }
 
-    const member = members.find((item) => item.id === confirmRemoveId);
+    const member = members.find(
+      (item) => item.id === confirmRemoveId,
+    );
 
     if (!member) {
       toast.error("Membro non trovato");
@@ -226,7 +351,8 @@ export default function MembersList({
     }
 
     const isCurrentUser = member.user.id === currentUserId;
-    const isOnlyOwner = member.role === "OWNER" && ownersCount === 1;
+    const isOnlyOwner =
+      member.role === "OWNER" && ownersCount === 1;
 
     if (isCurrentUser) {
       toast.error("Non puoi rimuovere la tua membership");
@@ -235,7 +361,9 @@ export default function MembersList({
     }
 
     if (isOnlyOwner) {
-      toast.error("Non puoi rimuovere lâ€™unico Owner dellâ€™associazione");
+      toast.error(
+        "Non puoi rimuovere l'unico Owner dell'associazione",
+      );
       setConfirmRemoveId(null);
       return;
     }
@@ -289,7 +417,9 @@ export default function MembersList({
       <div className="space-y-1.5">
         {members.map((member) => {
           const name = getDisplayName(member);
-          const email = member.user?.email ?? "Email non disponibile";
+          const email =
+            member.user?.email ?? "Email non disponibile";
+
           const initial = (name || email)
             .replace("@", " ")
             .trim()
@@ -297,12 +427,18 @@ export default function MembersList({
             .toUpperCase();
 
           const isLoading = loadingId === member.id;
-          const isCurrentUser = member.user.id === currentUserId;
-          const isOnlyOwner = member.role === "OWNER" && ownersCount === 1;
+          const isCurrentUser =
+            member.user.id === currentUserId;
+
+          const isOnlyOwner =
+            member.role === "OWNER" && ownersCount === 1;
 
           const cannotPromote = member.role === "OWNER";
-          const cannotDemote = member.role === "MEMBER" || isOnlyOwner;
-          const cannotRemove = isCurrentUser || isOnlyOwner;
+          const cannotDemote =
+            member.role === "MEMBER" || isOnlyOwner;
+
+          const cannotRemove =
+            isCurrentUser || isOnlyOwner;
 
           return (
             <article
@@ -312,12 +448,12 @@ export default function MembersList({
             >
               {member.user?.avatarUrl ? (
                 <Image
-  src={member.user.avatarUrl}
-  alt={name}
-  width={40}
-  height={40}
-  className="h-10 w-10 shrink-0 rounded-full border border-white/10 object-cover"
-/>
+                  src={member.user.avatarUrl}
+                  alt={name}
+                  width={40}
+                  height={40}
+                  className="h-10 w-10 shrink-0 rounded-full border border-white/10 object-cover"
+                />
               ) : (
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-blue-400/20 bg-blue-500/10 text-sm font-bold text-blue-300">
                   {initial}
@@ -345,19 +481,36 @@ export default function MembersList({
                   type="button"
                   onClick={(event) => {
                     event.stopPropagation();
+                    openEdit(member);
+                  }}
+                  disabled={isLoading}
+                  title="Modifica socio"
+                  aria-label="Modifica socio"
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-cyan-400/20 bg-cyan-500/10 text-cyan-300 transition hover:bg-cyan-500/20 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  <Pencil size={15} />
+                </button>
+
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    event.stopPropagation();
                     void promoteMember(member);
                   }}
                   disabled={isLoading || cannotPromote}
                   title={
                     cannotPromote
-                      ? "Il membro Ã¨ giÃ  Owner"
+                      ? "Il membro è già Owner"
                       : "Promuovi il membro"
                   }
                   aria-label="Promuovi il membro"
                   className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-indigo-400/20 bg-indigo-500/10 text-indigo-300 transition hover:bg-indigo-500/20 disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   {isLoading ? (
-                    <Loader2 size={15} className="animate-spin" />
+                    <Loader2
+                      size={15}
+                      className="animate-spin"
+                    />
                   ) : (
                     <ChevronUp size={15} />
                   )}
@@ -372,16 +525,19 @@ export default function MembersList({
                   disabled={isLoading || cannotDemote}
                   title={
                     isOnlyOwner
-                      ? "Lâ€™unico Owner non puÃ² essere retrocesso"
+                      ? "L'unico Owner non può essere retrocesso"
                       : member.role === "MEMBER"
-                        ? "Il membro ha giÃ  il ruolo piÃ¹ basso"
+                        ? "Il membro ha già il ruolo più basso"
                         : "Retrocedi il membro"
                   }
                   aria-label="Retrocedi il membro"
                   className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-amber-400/20 bg-amber-500/10 text-amber-300 transition hover:bg-amber-500/20 disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   {isLoading ? (
-                    <Loader2 size={15} className="animate-spin" />
+                    <Loader2
+                      size={15}
+                      className="animate-spin"
+                    />
                   ) : (
                     <ChevronDown size={15} />
                   )}
@@ -393,17 +549,19 @@ export default function MembersList({
                     event.stopPropagation();
 
                     if (isCurrentUser) {
-                      toast.error("Non puoi rimuovere la tua membership");
+                      toast.error(
+                        "Non puoi rimuovere la tua membership",
+                      );
                       return;
                     }
 
                     if (isOnlyOwner) {
                       toast.error(
-                        "Non puoi rimuovere lâ€™unico Owner dellâ€™associazione",
+                        "Non puoi rimuovere l'unico Owner dell'associazione",
                       );
                       return;
                     }
-                    console.log("Trash clicked", member.id);
+
                     setConfirmRemoveId(member.id);
                   }}
                   disabled={isLoading || cannotRemove}
@@ -411,14 +569,17 @@ export default function MembersList({
                     isCurrentUser
                       ? "Non puoi rimuovere il tuo account"
                       : isOnlyOwner
-                        ? "Lâ€™unico Owner non puÃ² essere rimosso"
+                        ? "L'unico Owner non può essere rimosso"
                         : "Rimuovi il membro"
                   }
                   aria-label="Rimuovi il membro"
                   className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-red-400/20 bg-red-500/10 text-red-300 transition hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   {isLoading ? (
-                    <Loader2 size={15} className="animate-spin" />
+                    <Loader2
+                      size={15}
+                      className="animate-spin"
+                    />
                   ) : (
                     <Trash2 size={15} />
                   )}
@@ -429,6 +590,122 @@ export default function MembersList({
         })}
       </div>
 
+      {editingMember && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-lg rounded-2xl border border-white/10 bg-[#0f172a] p-6 shadow-2xl">
+            <div className="mb-6">
+              <h3 className="text-lg font-semibold text-white">
+                Modifica socio
+              </h3>
+
+              <p className="mt-1 text-sm text-gray-400">
+                Tessera n. {editingMember.memberNumber ?? "—"}
+              </p>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <label>
+                <span className="mb-1 block text-sm font-medium text-gray-300">
+                  Nome
+                </span>
+                <input
+                  value={editFirstName}
+                  onChange={(event) =>
+                    setEditFirstName(event.target.value)
+                  }
+                  disabled={loadingId === editingMember.id}
+                  className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-sm text-white outline-none focus:border-cyan-400/50"
+                />
+              </label>
+
+              <label>
+                <span className="mb-1 block text-sm font-medium text-gray-300">
+                  Cognome
+                </span>
+                <input
+                  value={editLastName}
+                  onChange={(event) =>
+                    setEditLastName(event.target.value)
+                  }
+                  disabled={loadingId === editingMember.id}
+                  className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-sm text-white outline-none focus:border-cyan-400/50"
+                />
+              </label>
+
+              <label>
+                <span className="mb-1 block text-sm font-medium text-gray-300">
+                  Data di nascita
+                </span>
+                <input
+                  type="date"
+                  value={editBirthDate}
+                  onChange={(event) =>
+                    setEditBirthDate(event.target.value)
+                  }
+                  disabled={loadingId === editingMember.id}
+                  className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-sm text-white outline-none focus:border-cyan-400/50"
+                />
+              </label>
+
+              <label>
+                <span className="mb-1 block text-sm font-medium text-gray-300">
+                  Telefono
+                </span>
+                <input
+                  type="tel"
+                  value={editPhone}
+                  onChange={(event) =>
+                    setEditPhone(event.target.value)
+                  }
+                  disabled={loadingId === editingMember.id}
+                  className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-sm text-white outline-none focus:border-cyan-400/50"
+                />
+              </label>
+
+              <label className="md:col-span-2">
+                <span className="mb-1 block text-sm font-medium text-gray-300">
+                  Indirizzo
+                </span>
+                <input
+                  value={editAddress}
+                  onChange={(event) =>
+                    setEditAddress(event.target.value)
+                  }
+                  disabled={loadingId === editingMember.id}
+                  className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-sm text-white outline-none focus:border-cyan-400/50"
+                />
+              </label>
+            </div>
+
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={closeEdit}
+                disabled={loadingId === editingMember.id}
+                className="rounded-xl border border-white/10 px-4 py-2.5 text-sm font-medium text-gray-300 transition hover:bg-white/10 disabled:opacity-50"
+              >
+                Annulla
+              </button>
+
+              <button
+                type="button"
+                onClick={() => void saveEdit()}
+                disabled={loadingId === editingMember.id}
+                className="inline-flex items-center gap-2 rounded-xl bg-cyan-600 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-cyan-500 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {loadingId === editingMember.id && (
+                  <Loader2
+                    size={16}
+                    className="animate-spin"
+                  />
+                )}
+                Salva modifiche
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {confirmRemoveId && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
           <div className="w-full max-w-md rounded-2xl border border-white/10 bg-[#0f172a] p-6 shadow-2xl">
@@ -437,7 +714,7 @@ export default function MembersList({
             </h3>
 
             <p className="mt-2 text-sm text-gray-400">
-              Il membro perderÃ  l&apos;accesso all&apos;associazione.
+              Il membro perderà l'accesso all'associazione.
             </p>
 
             <div className="mt-6 flex justify-end gap-3">
@@ -457,7 +734,10 @@ export default function MembersList({
                 className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-red-500 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {loadingId === confirmRemoveId && (
-                  <Loader2 size={16} className="animate-spin" />
+                  <Loader2
+                    size={16}
+                    className="animate-spin"
+                  />
                 )}
                 Conferma rimozione
               </button>

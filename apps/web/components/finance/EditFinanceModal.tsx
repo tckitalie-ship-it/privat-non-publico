@@ -1,7 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Loader2, X } from "lucide-react";
+import {
+  useEffect,
+  useState,
+} from "react";
+import {
+  ArrowDownCircle,
+  ArrowUpCircle,
+  Loader2,
+  X,
+} from "lucide-react";
 
 export type FinanceTransaction = {
   id: string;
@@ -41,7 +49,9 @@ export default function EditFinanceModal({
   onSave,
 }: EditFinanceModalProps) {
   const [type, setType] =
-    useState<"INCOME" | "EXPENSE">("INCOME");
+    useState<"INCOME" | "EXPENSE">(
+      "INCOME",
+    );
 
   const [description, setDescription] =
     useState("");
@@ -52,54 +62,154 @@ export default function EditFinanceModal({
   const [amount, setAmount] =
     useState("");
 
-   useEffect(() => {
-  if (!transaction) return;
+  useEffect(() => {
+    if (!transaction) {
+      return;
+    }
 
-  const timeoutId = window.setTimeout(() => {
-    setType(transaction.type);
-    setDescription(transaction.description ?? "");
-    setCategory(transaction.category ?? "");
-    setAmount(
-      (transaction.amountCents / 100).toString(),
-    );
-  }, 0);
+    const timeoutId =
+      window.setTimeout(() => {
+        setType(transaction.type);
 
-  return () => {
-    window.clearTimeout(timeoutId);
-  };
-}, [transaction]);
+        setDescription(
+          transaction.description ?? "",
+        );
+
+        setCategory(
+          transaction.category ?? "",
+        );
+
+        setAmount(
+          (
+            transaction.amountCents / 100
+          ).toFixed(2),
+        );
+      }, 0);
+
+    return () => {
+      window.clearTimeout(
+        timeoutId,
+      );
+    };
+  }, [transaction]);
 
   if (!open || !transaction) {
     return null;
   }
 
+  const isIncome = type === "INCOME";
+
   async function handleSubmit(
-    e: React.FormEvent,
+    event: React.FormEvent<HTMLFormElement>,
   ) {
-    e.preventDefault();
+    event.preventDefault();
+
+    const cleanDescription =
+      description.trim();
+
+    const cleanCategory =
+      category.trim();
+
+    const normalizedAmount =
+      amount
+        .replace(",", ".")
+        .trim();
+
+    const numericAmount =
+      Number(normalizedAmount);
+
+    if (!cleanDescription) {
+      return;
+    }
+
+    if (!cleanCategory) {
+      return;
+    }
+
+    if (
+      !Number.isFinite(
+        numericAmount,
+      ) ||
+      numericAmount <= 0
+    ) {
+      return;
+    }
+
+    const amountCents =
+      Math.round(
+        numericAmount * 100,
+      );
+
+    if (amountCents <= 0) {
+      return;
+    }
 
     await onSave({
       type,
-      description,
-      category,
-      amountCents: Math.round(
-        Number(amount) * 100,
-      ),
+      description:
+        cleanDescription,
+      category: cleanCategory,
+      amountCents,
     });
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-      <div className="w-full max-w-xl rounded-3xl border border-white/10 bg-[#0f172a] p-6 shadow-2xl">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
+      onMouseDown={(event) => {
+        if (
+          event.target ===
+            event.currentTarget &&
+          !loading
+        ) {
+          onClose();
+        }
+      }}
+    >
+      <div
+        className="w-full max-w-xl rounded-3xl border border-white/10 bg-[#0f172a] p-5 shadow-2xl sm:p-6"
+        onMouseDown={(event) =>
+          event.stopPropagation()
+        }
+      >
+        <div className="mb-6 flex items-start justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div
+              className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${
+                isIncome
+                  ? "bg-emerald-500/15 text-emerald-300"
+                  : "bg-red-500/15 text-red-300"
+              }`}
+            >
+              {isIncome ? (
+                <ArrowUpCircle
+                  size={22}
+                />
+              ) : (
+                <ArrowDownCircle
+                  size={22}
+                />
+              )}
+            </div>
 
-        <div className="mb-6 flex items-center justify-between">
-          <h2 className="text-2xl font-bold text-white">
-            Modifica transazione
-          </h2>
+            <div>
+              <h2 className="text-xl font-bold text-white sm:text-2xl">
+                Modifica transazione
+              </h2>
+
+              <p className="mt-1 text-sm text-gray-500">
+                Aggiorna i dati del
+                movimento finanziario.
+              </p>
+            </div>
+          </div>
 
           <button
+            type="button"
+            disabled={loading}
             onClick={onClose}
-            className="rounded-xl p-2 text-gray-400 hover:bg-white/10 hover:text-white"
+            className="rounded-xl p-2 text-gray-400 transition hover:bg-white/5 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+            aria-label="Chiudi"
           >
             <X size={20} />
           </button>
@@ -110,20 +220,26 @@ export default function EditFinanceModal({
           className="space-y-5"
         >
           <div>
-            <label className="mb-2 block text-sm text-gray-300">
+            <label
+              htmlFor="edit-transaction-type"
+              className="mb-2 block text-sm font-semibold text-gray-300"
+            >
               Tipo
             </label>
 
             <select
+              id="edit-transaction-type"
               value={type}
-              onChange={(e) =>
+              disabled={loading}
+              onChange={(event) =>
                 setType(
-                  e.target.value as
+                  event.target
+                    .value as
                     | "INCOME"
                     | "EXPENSE",
                 )
               }
-              className="w-full rounded-xl border border-white/10 bg-[#1e293b] p-3 text-white"
+              className="w-full rounded-xl border border-white/10 bg-[#1e293b] px-4 py-3 text-white outline-none transition focus:border-blue-500/60 focus:ring-2 focus:ring-blue-500/20 disabled:cursor-not-allowed disabled:opacity-60"
             >
               <option value="INCOME">
                 Entrata
@@ -136,66 +252,113 @@ export default function EditFinanceModal({
           </div>
 
           <div>
-            <label className="mb-2 block text-sm text-gray-300">
+            <label
+              htmlFor="edit-transaction-category"
+              className="mb-2 block text-sm font-semibold text-gray-300"
+            >
               Categoria
             </label>
 
             <select
+              id="edit-transaction-category"
               value={category}
-              onChange={(e) =>
-                setCategory(e.target.value)
+              disabled={loading}
+              required
+              onChange={(event) =>
+                setCategory(
+                  event.target.value,
+                )
               }
-              className="w-full rounded-xl border border-white/10 bg-[#1e293b] p-3 text-white"
+              className="w-full rounded-xl border border-white/10 bg-[#1e293b] px-4 py-3 text-white outline-none transition focus:border-blue-500/60 focus:ring-2 focus:ring-blue-500/20 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {categories.map((item) => (
-                <option
-                  key={item}
-                  value={item}
-                >
-                  {item}
-                </option>
-              ))}
+              <option value="">
+                Seleziona categoria
+              </option>
+
+              {categories.map(
+                (item) => (
+                  <option
+                    key={item}
+                    value={item}
+                  >
+                    {item}
+                  </option>
+                ),
+              )}
             </select>
           </div>
 
           <div>
-            <label className="mb-2 block text-sm text-gray-300">
+            <label
+              htmlFor="edit-transaction-description"
+              className="mb-2 block text-sm font-semibold text-gray-300"
+            >
               Descrizione
             </label>
 
             <input
+              id="edit-transaction-description"
+              type="text"
               value={description}
-              onChange={(e) =>
+              disabled={loading}
+              required
+              minLength={2}
+              maxLength={200}
+              autoComplete="off"
+              onChange={(event) =>
                 setDescription(
-                  e.target.value,
+                  event.target.value,
                 )
               }
-              className="w-full rounded-xl border border-white/10 bg-[#1e293b] p-3 text-white"
+              className="w-full rounded-xl border border-white/10 bg-[#1e293b] px-4 py-3 text-white placeholder:text-gray-600 outline-none transition focus:border-blue-500/60 focus:ring-2 focus:ring-blue-500/20 disabled:cursor-not-allowed disabled:opacity-60"
+              placeholder="Es. Donazione evento"
             />
+
+            <p className="mt-1.5 text-xs text-gray-600">
+              {description.length}/200
+            </p>
           </div>
 
           <div>
-            <label className="mb-2 block text-sm text-gray-300">
+            <label
+              htmlFor="edit-transaction-amount"
+              className="mb-2 block text-sm font-semibold text-gray-300"
+            >
               Importo (€)
             </label>
 
-            <input
-              type="number"
-              step="0.01"
-              value={amount}
-              onChange={(e) =>
-                setAmount(e.target.value)
-              }
-              className="w-full rounded-xl border border-white/10 bg-[#1e293b] p-3 text-white"
-            />
+            <div className="relative">
+              <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-sm font-semibold text-gray-500">
+                €
+              </span>
+
+              <input
+                id="edit-transaction-amount"
+                type="number"
+                min="0.01"
+                max="999999999"
+                step="0.01"
+                inputMode="decimal"
+                value={amount}
+                disabled={loading}
+                required
+                onChange={(event) =>
+                  setAmount(
+                    event.target.value,
+                  )
+                }
+                className="w-full rounded-xl border border-white/10 bg-[#1e293b] py-3 pl-9 pr-4 text-white placeholder:text-gray-600 outline-none transition focus:border-blue-500/60 focus:ring-2 focus:ring-blue-500/20 disabled:cursor-not-allowed disabled:opacity-60"
+                placeholder="0,00"
+              />
+            </div>
           </div>
 
-          <div className="flex justify-end gap-3">
-
+          <div className="flex flex-col-reverse gap-3 pt-2 sm:flex-row sm:justify-end">
             <button
               type="button"
+              disabled={loading}
               onClick={onClose}
-              className="rounded-xl border border-white/10 px-5 py-3 text-gray-300"
+              className="rounded-xl border border-white/10 px-5 py-3 font-medium text-gray-300 transition hover:bg-white/5 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
             >
               Annulla
             </button>
@@ -203,18 +366,24 @@ export default function EditFinanceModal({
             <button
               type="submit"
               disabled={loading}
-              className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-3 font-semibold text-white"
+              className={`inline-flex items-center justify-center gap-2 rounded-xl px-5 py-3 font-semibold text-white transition disabled:cursor-not-allowed disabled:opacity-60 ${
+                isIncome
+                  ? "bg-emerald-600 hover:bg-emerald-500"
+                  : "bg-red-600 hover:bg-red-500"
+              }`}
             >
               {loading && (
-                <Loader2 className="h-4 w-4 animate-spin" />
+                <Loader2
+                  className="h-4 w-4 animate-spin"
+                />
               )}
 
-              Salva modifiche
+              {loading
+                ? "Salvataggio..."
+                : "Salva modifiche"}
             </button>
-
           </div>
         </form>
-
       </div>
     </div>
   );

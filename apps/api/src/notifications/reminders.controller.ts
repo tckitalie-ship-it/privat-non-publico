@@ -1,4 +1,4 @@
-import {
+﻿import {
   Body,
   Controller,
   Delete,
@@ -65,6 +65,30 @@ export class RemindersController {
         message: body.message,
         remindAt: new Date(body.remindAt),
         associationId: body.associationId,
+      },
+    );
+  }
+
+  @Patch(":id")
+  async updateReminder(
+    @Req() request: AuthenticatedRequest,
+    @Param("id") reminderId: string,
+    @Body()
+    body: {
+      title?: string | null;
+      message?: string;
+      remindAt?: string;
+    },
+  ) {
+    return this.remindersService.updateReminder(
+      reminderId,
+      getUserId(request),
+      {
+        title: body.title,
+        message: body.message,
+        remindAt: body.remindAt
+          ? new Date(body.remindAt)
+          : undefined,
       },
     );
   }

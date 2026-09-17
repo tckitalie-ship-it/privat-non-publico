@@ -21,6 +21,9 @@ type EditableEvent = {
   location?: string | null;
   startsAt: string;
   endsAt?: string | null;
+  capacity?: number | null;
+  registrationEnabled?: boolean;
+  status?: "SCHEDULED" | "CANCELLED" | "COMPLETED";
 };
 
 type EditEventModalProps = {
@@ -68,6 +71,9 @@ export default function EditEventModal({
     useState("");
   const [endsAt, setEndsAt] =
     useState("");
+  const [capacity, setCapacity] = useState("");
+  const [registrationEnabled, setRegistrationEnabled] = useState(true);
+  const [status, setStatus] = useState<"SCHEDULED" | "CANCELLED" | "COMPLETED">("SCHEDULED");
   const [loading, setLoading] =
     useState(false);
 
@@ -85,6 +91,13 @@ export default function EditEventModal({
     setEndsAt(
       toDateTimeLocal(event.endsAt),
     );
+    setCapacity(
+      event.capacity !== null && event.capacity !== undefined
+        ? String(event.capacity)
+        : "",
+    );
+    setRegistrationEnabled(event.registrationEnabled ?? true);
+    setStatus(event.status ?? "SCHEDULED");
   }, [event, open]);
 
   if (!open || !event) {
@@ -159,6 +172,16 @@ export default function EditEventModal({
       return;
     }
 
+    const parsedCapacity = capacity.trim() ? Number(capacity) : null;
+
+    if (
+      parsedCapacity !== null &&
+      (!Number.isInteger(parsedCapacity) || parsedCapacity < 1)
+    ) {
+      toast.error("La capienza deve essere un numero intero maggiore di zero");
+      return;
+    }
+
     const token = getAccessToken();
 
     if (!token) {
@@ -199,6 +222,9 @@ export default function EditEventModal({
           endsAt: endDate
             ? endDate.toISOString()
             : null,
+          capacity: parsedCapacity,
+          registrationEnabled,
+          status,
         }),
         cache: "no-store",
       });
@@ -398,6 +424,73 @@ export default function EditEventModal({
               />
             </div>
           </div>
+
+          <div className="grid gap-5 md:grid-cols-2">
+            <div>
+              <label
+                htmlFor="edit-event-capacity"
+                className="text-sm font-medium text-gray-300"
+              >
+                Capienza massima
+              </label>
+              <input
+                id="edit-event-capacity"
+                type="number"
+                min="1"
+                step="1"
+                value={capacity}
+                onChange={(e) => setCapacity(e.target.value)}
+                className="mt-2 w-full rounded-xl border border-white/10 bg-[#111827] px-4 py-3 text-white outline-none focus:border-indigo-500"
+                placeholder="Nessun limite"
+              />
+              <p className="mt-1 text-xs text-gray-500">
+                Lascia vuoto per non impostare un limite.
+              </p>
+            </div>
+
+            <div>
+              <label
+                htmlFor="edit-event-status"
+                className="text-sm font-medium text-gray-300"
+              >
+                Stato
+              </label>
+              <select
+                id="edit-event-status"
+                value={status}
+                onChange={(e) =>
+                  setStatus(
+                    e.target.value as
+                      | "SCHEDULED"
+                      | "CANCELLED"
+                      | "COMPLETED"
+                  )
+                }
+                className="mt-2 w-full rounded-xl border border-white/10 bg-[#111827] px-4 py-3 text-white outline-none focus:border-indigo-500"
+              >
+                <option value="SCHEDULED">Programmato</option>
+                <option value="CANCELLED">Cancellato</option>
+                <option value="COMPLETED">Completato</option>
+              </select>
+            </div>
+          </div>
+
+          <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-white/10 bg-[#111827] px-4 py-3">
+            <input
+              type="checkbox"
+              checked={registrationEnabled}
+              onChange={(e) => setRegistrationEnabled(e.target.checked)}
+              className="h-4 w-4 rounded border-white/20 bg-[#111827] accent-indigo-600"
+            />
+            <span>
+              <span className="block text-sm font-medium text-gray-200">
+                Iscrizioni abilitate
+              </span>
+              <span className="block text-xs text-gray-500">
+                I membri potranno iscriversi a questo evento.
+              </span>
+            </span>
+          </label>
 
           <div className="flex flex-col-reverse gap-3 pt-2 sm:flex-row sm:justify-end">
             <button

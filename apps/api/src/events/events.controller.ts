@@ -1,33 +1,57 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
   Get,
-  Headers,
   Param,
   Patch,
   Post,
   Req,
   UseGuards,
 } from "@nestjs/common";
-import { Request } from "express";
 
 import { JwtAuthGuard } from "../auth/jwt-auth.guard";
 import { EventsService } from "./events.service";
 
-type AuthenticatedRequest = Request & {
-  user: {
-    id?: string;
+interface AuthenticatedRequest extends Request {
+  user?: {
     sub?: string;
+    id?: string;
+    userId?: string;
   };
-};
+}
 
-type ImportedEvent = {
+interface CreateEventDto {
+  associationId: string;
   title: string;
   description?: string | null;
-  startsAt: string;
-  endsAt?: string | null;
-};
+  location?: string | null;
+  startsAt: string | Date;
+  endsAt?: string | Date | null;
+}
+
+interface UpdateEventDto {
+  title?: string;
+  description?: string | null;
+  location?: string | null;
+  startsAt?: string | Date;
+  endsAt?: string | Date | null;
+  capacity?: number | null;
+  registrationEnabled?: boolean;
+  status?: "SCHEDULED" | "CANCELLED" | "COMPLETED";
+}
+
+interface ImportEventDto {
+  associationId: string;
+  events: Array<{
+    title: string;
+    description?: string | null;
+    location?: string | null;
+    startsAt: string | Date;
+    endsAt?: string | Date | null;
+  }>;
+}
 
 @Controller("events")
 @UseGuards(JwtAuthGuard)
@@ -40,12 +64,13 @@ export class EventsController {
     request: AuthenticatedRequest,
   ): string {
     const userId =
+      request.user?.sub ??
       request.user?.id ??
-      request.user?.sub;
+      request.user?.userId;
 
     if (!userId) {
-      throw new Error(
-        "Utente autenticato non valido",
+      throw new BadRequestException(
+        "Utente non autenticato",
       );
     }
 
@@ -54,13 +79,10 @@ export class EventsController {
 
   @Get("association/:associationId")
   async findAllByAssociation(
-    @Param("associationId")
-    associationId: string,
-    @Req()
-    request: AuthenticatedRequest,
+    @Param("associationId") associationId: string,
+    @Req() request: AuthenticatedRequest,
   ) {
-    const userId =
-      this.getUserId(request);
+    const userId = this.getUserId(request);
 
     return this.eventsService.findAll(
       associationId,
@@ -71,11 +93,9 @@ export class EventsController {
   @Get(":id")
   async findOne(
     @Param("id") id: string,
-    @Req()
-    request: AuthenticatedRequest,
+    @Req() request: AuthenticatedRequest,
   ) {
-    const userId =
-      this.getUserId(request);
+    const userId = this.getUserId(request);
 
     return this.eventsService.findOne(
       id,
@@ -84,144 +104,183 @@ export class EventsController {
   }
 
   @Post()
-  async create(
-    @Body()
-    body: {
-      associationId?: string;
-      title: string;
-      description?: string | null;
-      location?: string | null;
-      startsAt: string;
-      endsAt?: string | null;
-    },
-    @Headers("x-association-id")
-    headerAssociationId: string | undefined,
-    @Req()
-    request: AuthenticatedRequest,
+  async createEvent(
+    @Body() dto: CreateEventDto,
+    @Req() request: AuthenticatedRequest,
   ) {
-    const userId =
-      this.getUserId(request);
+    const userId = this.getUserId(request);
 
-    const associationId =
-      body.associationId ??
-      headerAssociationId;
+    const startsAt = new Date(dto.startsAt);
 
-    if (!associationId) {
-      throw new Error(
-        "Association ID mancante",
+    if (Number.isNaN(startsAt.getTime())) {
+      throw new BadRequestException(
+        "La data di inizio non è valida",
+      );
+    }
+
+    const endsAt =
+      dto.endsAt !== undefined &&
+      dto.endsAt !== null
+        ? new Date(dto.endsAt)
+        : null;
+
+    if (
+      endsAt &&
+      Number.isNaN(endsAt.getTime())
+    ) {
+      throw new BadRequestException(
+        "La data di fine non è valida",
       );
     }
 
     return this.eventsService.createEvent(
       userId,
       {
-        associationId,
-        title: body.title,
-        description:
-          body.description ?? null,
-        location:
-          body.location ?? null,
-        startsAt:
-          new Date(body.startsAt),
-        endsAt:
-          body.endsAt
-            ? new Date(body.endsAt)
-            : null,
+        associationId: dto.associationId,
+        title: dto.title,
+        description: dto.description ?? null,
+        location: dto.location ?? null,
+        startsAt,
+        endsAt,
       },
     );
   }
 
   @Post("import")
   async importEvents(
-    @Body()
-    body: ImportedEvent[],
-    @Headers("x-association-id")
-    headerAssociationId: string | undefined,
-    @Req()
-    request: AuthenticatedRequest,
+    @Body() dto: ImportEventDto,
+    @Req() request: AuthenticatedRequest,
   ) {
-    const userId =
-      this.getUserId(request);
+    const userId = this.getUserId(request);
 
-    const associationId =
-      headerAssociationId;
-
-    if (!associationId) {
-      throw new Error(
-        "Association ID mancante",
+    if (!Array.isArray(dto.events)) {
+      throw new BadRequestException(
+        "È necessario fornire un array di eventi",
       );
     }
 
+    const events = dto.events.map((event) => {
+      const startsAt = new Date(
+        event.startsAt,
+      );
+
+      if (Number.isNaN(startsAt.getTime())) {
+        throw new BadRequestException(
+          `Data di inizio non valida per l'evento "${event.title}"`,
+        );
+      }
+
+      const endsAt =
+        event.endsAt !== undefined &&
+        event.endsAt !== null
+          ? new Date(event.endsAt)
+          : null;
+
+      if (
+        endsAt &&
+        Number.isNaN(endsAt.getTime())
+      ) {
+        throw new BadRequestException(
+          `Data di fine non valida per l'evento "${event.title}"`,
+        );
+      }
+
+      return {
+        title: event.title,
+        description: event.description ?? null,
+        location: event.location ?? null,
+        startsAt,
+        endsAt,
+      };
+    });
+
     return this.eventsService.importEvents(
       userId,
-      associationId,
-      body,
+      dto.associationId,
+      events,
     );
   }
 
   @Patch(":id")
-  async update(
+  async updateEvent(
     @Param("id") id: string,
-    @Body()
-    body: {
-      title?: string;
-      description?: string | null;
-      location?: string | null;
-      startsAt?: string;
-      endsAt?: string | null;
-    },
-    @Req()
-    request: AuthenticatedRequest,
+    @Body() dto: UpdateEventDto,
+    @Req() request: AuthenticatedRequest,
   ) {
-    const userId =
-      this.getUserId(request);
+    const userId = this.getUserId(request);
+
+    let startsAt: Date | undefined;
+
+    if (dto.startsAt !== undefined) {
+      startsAt = new Date(dto.startsAt);
+
+      if (Number.isNaN(startsAt.getTime())) {
+        throw new BadRequestException(
+          "La data di inizio non è valida",
+        );
+      }
+    }
+
+    let endsAt: Date | null | undefined;
+
+    if (dto.endsAt !== undefined) {
+      endsAt =
+        dto.endsAt === null
+          ? null
+          : new Date(dto.endsAt);
+
+      if (
+        endsAt &&
+        Number.isNaN(endsAt.getTime())
+      ) {
+        throw new BadRequestException(
+          "La data di fine non è valida",
+        );
+      }
+    }
 
     return this.eventsService.updateEvent(
       id,
       userId,
       {
-        ...(body.title !== undefined
-          ? { title: body.title }
+        ...(dto.title !== undefined
+          ? { title: dto.title }
           : {}),
-        ...(body.description !== undefined
+        ...(dto.description !== undefined
           ? {
-              description:
-                body.description,
+              description: dto.description,
             }
           : {}),
-        ...(body.location !== undefined
+        ...(dto.location !== undefined
           ? {
-              location:
-                body.location,
+              location: dto.location,
             }
           : {}),
-        ...(body.startsAt !== undefined
-          ? {
-              startsAt: new Date(
-                body.startsAt,
-              ),
-            }
+        ...(startsAt !== undefined
+          ? { startsAt }
           : {}),
-        ...(body.endsAt !== undefined
-          ? {
-              endsAt:
-                body.endsAt
-                  ? new Date(body.endsAt)
-                  : null,
-            }
+        ...(endsAt !== undefined
+          ? { endsAt }
+          : {}),
+        ...(dto.capacity !== undefined
+          ? { capacity: dto.capacity }
+          : {}),
+        ...(dto.registrationEnabled !== undefined
+          ? { registrationEnabled: dto.registrationEnabled }
+          : {}),
+        ...(dto.status !== undefined
+          ? { status: dto.status }
           : {}),
       },
     );
   }
 
   @Delete(":id")
-  async remove(
+  async deleteEvent(
     @Param("id") id: string,
-    @Req()
-    request: AuthenticatedRequest,
+    @Req() request: AuthenticatedRequest,
   ) {
-    const userId =
-      this.getUserId(request);
+    const userId = this.getUserId(request);
 
     return this.eventsService.deleteEvent(
       id,
@@ -232,51 +291,22 @@ export class EventsController {
   @Post(":id/register")
   async register(
     @Param("id") id: string,
-    @Req()
-    request: AuthenticatedRequest,
+    @Req() request: AuthenticatedRequest,
   ) {
-    try {
-      const userId =
-        this.getUserId(request);
+    const userId = this.getUserId(request);
 
-      console.log(
-        "[EVENT REGISTER] richiesta ricevuta",
-        {
-          eventId: id,
-          userId,
-        },
-      );
-
-      const result =
-        await this.eventsService.registerToEvent(
-          id,
-          userId,
-        );
-
-      console.log(
-        "[EVENT REGISTER] successo",
-        result,
-      );
-
-      return result;
-    } catch (error) {
-      console.error(
-        "[EVENT REGISTER] ERRORE COMPLETO:",
-        error,
-      );
-
-      throw error;
-    }
+    return this.eventsService.registerToEvent(
+      id,
+      userId,
+    );
   }
 
   @Get(":id/registrations")
   async getRegistrations(
     @Param("id") id: string,
-    @Req()
-    request: AuthenticatedRequest,
+    @Req() request: AuthenticatedRequest,
   ) {
-    const userId =
-      this.getUserId(request);
+    const userId = this.getUserId(request);
 
     return this.eventsService.getRegistrations(
       id,
@@ -284,14 +314,75 @@ export class EventsController {
     );
   }
 
+  @Delete(
+    ":id/registrations/:participantUserId",
+  )
+  async removeParticipant(
+    @Param("id") id: string,
+    @Param("participantUserId")
+    participantUserId: string,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    const userId = this.getUserId(request);
+
+    return this.eventsService.removeParticipant(
+      id,
+      participantUserId,
+      userId,
+    );
+  }
+
+  @Post(":id/registrations/:participantUserId/promote")
+  async promoteParticipant(
+    @Param("id") id: string,
+    @Param("participantUserId") participantUserId: string,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    const userId = this.getUserId(request);
+
+    return this.eventsService.promoteParticipant(
+      id,
+      participantUserId,
+      userId,
+    );
+  }
+
+  @Post(":id/registrations/:participantUserId/check-in")
+  async checkInParticipant(
+    @Param("id") id: string,
+    @Param("participantUserId") participantUserId: string,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    const userId = this.getUserId(request);
+
+    return this.eventsService.checkInParticipant(
+      id,
+      participantUserId,
+      userId,
+    );
+  }
+
+  @Delete(":id/registrations/:participantUserId/check-in")
+  async undoCheckInParticipant(
+    @Param("id") id: string,
+    @Param("participantUserId") participantUserId: string,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    const userId = this.getUserId(request);
+
+    return this.eventsService.undoCheckInParticipant(
+      id,
+      participantUserId,
+      userId,
+    );
+  }
+
   @Delete(":id/register")
   async unregister(
     @Param("id") id: string,
-    @Req()
-    request: AuthenticatedRequest,
+    @Req() request: AuthenticatedRequest,
   ) {
-    const userId =
-      this.getUserId(request);
+    const userId = this.getUserId(request);
 
     return this.eventsService.unregisterFromEvent(
       id,
@@ -299,3 +390,7 @@ export class EventsController {
     );
   }
 }
+
+
+
+

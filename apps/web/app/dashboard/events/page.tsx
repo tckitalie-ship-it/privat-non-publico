@@ -15,6 +15,9 @@ import EventsList from "@/components/events/EventsList";
 import EventsStats from "@/components/events/EventsStats";
 import CreateEventModal from "@/components/events/CreateEventModal";
 import EditEventModal from "@/components/events/EditEventModal";
+import EventParticipantsModal from "@/components/events/EventParticipantsModal";
+import EventDetailModal from "@/components/events/EventDetailModal";
+
 
 import type { EventItem } from "@/components/events/EventCard";
 
@@ -28,6 +31,9 @@ type DashboardEvent = {
   location?: string | null;
   startsAt: string;
   endsAt?: string | null;
+  capacity?: number | null;
+  registrationEnabled?: boolean;
+  status?: "SCHEDULED" | "CANCELLED" | "COMPLETED";
   createdAt: string;
   updatedAt?: string;
   registrations?: {
@@ -254,8 +260,25 @@ export default function DashboardEventsPage() {
   const [editEvent, setEditEvent] =
     useState<DashboardEvent | null>(null);
 
+  const [participantsOpen, setParticipantsOpen] =
+    useState(false);
+
+  const [participantsEvent, setParticipantsEvent] =
+    useState<DashboardEvent | null>(null);
+
+  const [detailEvent, setDetailEvent] =
+    useState<DashboardEvent | null>(null);
+  const [detailOpen, setDetailOpen] = useState(false);
+
   const currentUserId =
     getCurrentUserId();
+
+  const [currentUserRole, setCurrentUserRole] =
+    useState<string | null>(null);
+
+  const canManageEvents =
+    currentUserRole === "OWNER" ||
+    currentUserRole === "ADMIN";
 
   const loadEvents = useCallback(
     async () => {
@@ -271,6 +294,18 @@ export default function DashboardEventsPage() {
           result.associationId,
         );
         setEvents(result.events);
+
+        setDetailEvent((currentDetail) => {
+          if (!currentDetail) {
+            return currentDetail;
+          }
+
+          return (
+            result.events.find(
+              (event) => event.id === currentDetail.id,
+            ) ?? null
+          );
+        });
       } catch (error) {
         console.error(
           "Errore caricamento eventi:",
@@ -332,6 +367,62 @@ export default function DashboardEventsPage() {
     }
 
     void initializeEvents();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadCurrentUserRole() {
+      const token = getAccessToken();
+
+      if (!token) {
+        return;
+      }
+
+      try {
+        const response = await fetch(
+          `${API_URL}/memberships/me`,
+          {
+            method: "GET",
+            headers: {
+              Accept: "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            cache: "no-store",
+          },
+        );
+
+        if (!response.ok) {
+          console.error(
+            "Errore recupero membership:",
+            response.status,
+          );
+          return;
+        }
+
+        const data =
+          (await response.json()) as MembershipResponse;
+
+        if (!cancelled) {
+          setCurrentUserRole(
+            typeof data.role === "string"
+              ? data.role.toUpperCase()
+              : null,
+          );
+        }
+      } catch (error) {
+        console.error(
+          "Errore recupero ruolo utente:",
+          error,
+        );
+      }
+    }
+
+    void loadCurrentUserRole();
 
     return () => {
       cancelled = true;
@@ -623,13 +714,29 @@ export default function DashboardEventsPage() {
           "Luogo non specificato",
         startAt: event.startsAt,
         participants:
-          registrations.length,
+            registrations.filter(
+              (registration) =>
+                registration.status === "REGISTERED",
+            ).length,
+        capacity:
+          event.capacity ?? null,
+        registrationEnabled:
+          event.registrationEnabled ?? true,
+        status:
+          event.status ?? "SCHEDULED",
         isRegistered:
           Boolean(currentUserId) &&
           registrations.some(
             (registration) =>
-              registration.userId ===
-              currentUserId,
+              registration.userId === currentUserId &&
+              registration.status === "REGISTERED",
+          ),
+        isWaitlisted:
+          Boolean(currentUserId) &&
+          registrations.some(
+            (registration) =>
+              registration.userId === currentUserId &&
+              registration.status === "WAITLISTED",
           ),
       };
     });
@@ -661,10 +768,78 @@ export default function DashboardEventsPage() {
         (Array.isArray(
           event.registrations,
         )
-          ? event.registrations.length
+          ? event.registrations.filter(
+                (registration) =>
+                  registration.status === "REGISTERED",
+              ).length
           : 0),
       0,
     );
+
+  const completedEvents = events.filter(
+    (event) =>
+      event.status === "COMPLETED" ||
+      (event.status === "SCHEDULED" &&
+        new Date(event.startsAt).getTime() < Date.now()),
+  ).length;
+
+  const capacityParticipants = events.reduce(
+    (total, event) => {
+      if (
+        event.capacity === null ||
+        event.capacity === undefined
+      ) {
+        return total;
+      }
+
+      const registered = Array.isArray(
+        event.registrations,
+      )
+        ? event.registrations.filter(
+            (registration) =>
+              registration.status === "REGISTERED",
+          ).length
+        : 0;
+
+      return total + registered;
+    },
+    0,
+  );
+const eventsWithCapacity = events.filter(
+  (event) =>
+    event.capacity !== null &&
+    event.capacity !== undefined,
+);
+
+const openRegistrations = events.filter(
+    (event) =>
+      event.registrationEnabled !== false &&
+      event.status !== "CANCELLED" &&
+      event.status !== "COMPLETED",
+  ).length;
+
+const availablePlaces = events.reduce(
+    (total, event) => {
+      if (
+        event.capacity === null ||
+        event.capacity === undefined
+      ) {
+        return total;
+      }
+
+      const registered = Array.isArray(
+        event.registrations,
+      )
+        ? event.registrations.filter(
+            (registration) =>
+              registration.status === "REGISTERED",
+          ).length
+        : 0;
+      return total +
+        Math.max(event.capacity - registered, 0);
+    },
+    0,
+  );
 
   return (
     <div className="min-w-0 space-y-8">
@@ -673,9 +848,13 @@ export default function DashboardEventsPage() {
         upcomingCount={
           upcomingEvents
         }
-        onCreate={() => {
-          setCreateOpen(true);
-        }}
+        onCreate={
+          canManageEvents
+            ? () => {
+                setCreateOpen(true);
+              }
+            : undefined
+        }
       />
 
       <EventsStats
@@ -683,10 +862,22 @@ export default function DashboardEventsPage() {
         upcomingEvents={
           upcomingEvents
         }
+        completedEvents={
+          completedEvents
+        }
         participants={
           totalParticipants
         }
+        capacityParticipants={
+          capacityParticipants
+        }        availablePlaces={
+          eventsWithCapacity.length > 0
+            ? availablePlaces
+            : null
+        }
         locations={locationsCount}
+        eventsWithCapacity={eventsWithCapacity.length}
+        openRegistrations={openRegistrations}
       />
 
       <EventFilters
@@ -702,10 +893,175 @@ export default function DashboardEventsPage() {
           )
         }
       />
-
       <EventCalendar
         events={calendarEvents}
+        onEventClick={(id) => {
+          const event = events.find(
+            (item) => item.id === id,
+          );
+
+          if (!event) {
+            toast.error("Evento non trovato");
+            return;
+          }
+
+          setDetailEvent(events.find((item) => item.id === event.id) ?? event);
+          setDetailOpen(true);
+        }}
       />
+
+      <section className="rounded-3xl border border-white/10 bg-[#1a1f2e] p-6 shadow-xl">
+        <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="text-xl font-bold text-white">
+              Tabellino giornaliero
+            </h2>
+            <p className="text-sm text-gray-400">
+              Agenda operativa degli eventi in ordine cronologico.
+            </p>
+          </div>
+
+          <span className="text-sm text-gray-400">
+            {filteredEvents.length}{" "}
+            {filteredEvents.length === 1 ? "evento" : "eventi"}
+          </span>
+        </div>
+
+        {filteredEvents.length === 0 ? (
+          <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-6 text-center text-sm text-gray-500">
+            Nessun evento corrisponde ai filtri selezionati.
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {[...filteredEvents]
+              .sort(
+                (a, b) =>
+                  new Date(a.startsAt).getTime() -
+                  new Date(b.startsAt).getTime(),
+              )
+              .map((event) => {
+                const registrations = Array.isArray(event.registrations)
+                  ? event.registrations
+                  : [];
+
+                const participants = registrations.filter(
+                    (registration) =>
+                      registration.status === "REGISTERED",
+                  ).length;
+                const capacity = event.capacity ?? null;
+                const eventDate = new Date(event.startsAt);
+
+                const timeLabel = Number.isNaN(eventDate.getTime())
+                  ? "--:--"
+                  : eventDate.toLocaleTimeString("it-IT", {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    });
+
+                const dateLabel = Number.isNaN(eventDate.getTime())
+                  ? "Data non disponibile"
+                  : eventDate.toLocaleDateString("it-IT", {
+                      weekday: "short",
+                      day: "2-digit",
+                      month: "short",
+                    });
+
+                const statusLabel =
+                  event.status === "CANCELLED"
+                    ? "Cancellato"
+                    : event.status === "COMPLETED"
+                      ? "Completato"
+                      : "Programmato";
+
+                const statusClass =
+                  event.status === "CANCELLED"
+                    ? "border-red-500/20 bg-red-500/10 text-red-300"
+                    : event.status === "COMPLETED"
+                      ? "border-gray-500/20 bg-gray-500/10 text-gray-300"
+                      : "border-emerald-500/20 bg-emerald-500/10 text-emerald-300";
+
+                return (
+                  <div
+                    key={event.id}
+                    className="grid gap-4 rounded-2xl border border-white/10 bg-white/[0.03] p-4 lg:grid-cols-[110px_minmax(0,1fr)_170px]"
+                  >
+                    <div className="flex flex-row gap-3 lg:flex-col lg:gap-1">
+                      <span className="text-sm font-semibold capitalize text-indigo-300">
+                        {dateLabel}
+                      </span>
+
+                      <span className="text-lg font-bold text-white">
+                        {timeLabel}
+                      </span>
+                    </div>
+
+                    <div className="min-w-0">
+                      <h3 className="truncate font-semibold text-white">
+                        {event.title}
+                      </h3>
+
+                      <div className="mt-2 flex flex-wrap gap-3 text-xs text-gray-400">
+                        <span>
+                          📍 {event.location?.trim() || "Luogo non specificato"}
+                        </span>
+
+                        <span>
+                          👥 {participants}
+                          {capacity !== null ? ` / ${capacity}` : ""}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col items-stretch gap-2 lg:items-end">
+                      <span
+                        className={`w-fit rounded-lg border px-3 py-1.5 text-xs font-medium ${statusClass}`}
+                      >
+                        {statusLabel}
+                      </span>
+
+                      <div className="flex flex-wrap gap-2 lg:justify-end">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setDetailEvent(events.find((item) => item.id === event.id) ?? event);
+                            setDetailOpen(true);
+                          }}
+                          className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs font-medium text-gray-200 transition hover:bg-white/[0.08]"
+                        >
+                          Dettagli
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setParticipantsEvent(event);
+                            setParticipantsOpen(true);
+                          }}
+                          className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs font-medium text-gray-200 transition hover:bg-white/[0.08]"
+                        >
+                          Partecipanti
+                        </button>
+
+                        {canManageEvents && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditEvent(event);
+                              setEditOpen(true);
+                            }}
+                            className="rounded-lg border border-indigo-500/20 bg-indigo-500/10 px-3 py-1.5 text-xs font-medium text-indigo-300 transition hover:bg-indigo-500/20"
+                          >
+                            Modifica
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+          </div>
+        )}
+      </section>
 
       {deletingId && (
         <div className="rounded-xl border border-amber-500/20 bg-amber-500/10 p-4 text-sm text-amber-300">
@@ -743,6 +1099,128 @@ export default function DashboardEventsPage() {
         onDelete={(id) => {
           void deleteEvent(id);
         }}
+        onViewParticipants={(id) => {
+          const event = events.find(
+            (item) => item.id === id,
+          );
+
+          if (!event) {
+            toast.error("Evento non trovato");
+            return;
+          }
+
+          setParticipantsEvent(event);
+          setParticipantsOpen(true);
+        }}
+        onViewDetail={(id) => {
+          const event = events.find(
+            (item) => item.id === id,
+          );
+
+          if (!event) {
+            toast.error("Evento non trovato");
+            return;
+          }
+
+          setDetailEvent(events.find((item) => item.id === event.id) ?? event);
+          setDetailOpen(true);
+        }}
+        canManageEvents={canManageEvents}
+      />
+
+      <EventDetailModal
+        open={detailOpen}
+        event={
+          detailEvent
+            ? {
+                id: detailEvent.id,
+                title: detailEvent.title,
+                description: detailEvent.description,
+                location: detailEvent.location,
+                startAt: detailEvent.startsAt,
+                participants: detailEvent.registrations?.filter(
+                  (registration) =>
+                    registration.status === "REGISTERED",
+                ).length ?? 0,
+                capacity: detailEvent.capacity,
+                registrationEnabled: detailEvent.registrationEnabled,
+                status: detailEvent.status,
+                isRegistered:
+                  detailEvent.registrations?.some(
+                    (registration) =>
+                      registration.userId === currentUserId &&
+                      registration.status === "REGISTERED",
+                  ) ?? false,
+                isWaitlisted:
+                  detailEvent.registrations?.some(
+                    (registration) =>
+                      registration.userId === currentUserId &&
+                      registration.status === "WAITLISTED",
+                  ) ?? false,
+              }
+            : null
+        }
+        onClose={() => {
+          setDetailOpen(false);
+          setDetailEvent(null);
+        }}
+        onRegister={(id) => {
+          void registerToEvent(id);
+        }}
+        onUnregister={(id) => {
+          void unregisterFromEvent(id);
+        }}
+        onEdit={(id) => {
+          const event = events.find(
+            (item) => item.id === id,
+          );
+
+          if (!event) {
+            toast.error("Evento non trovato");
+            return;
+          }
+
+          setDetailOpen(false);
+          setDetailEvent(null);
+          setEditEvent(event);
+          setEditOpen(true);
+        }}
+        onViewParticipants={(id) => {
+          const event = events.find(
+            (item) => item.id === id,
+          );
+
+          if (!event) {
+            toast.error("Evento non trovato");
+            return;
+          }
+
+          setDetailOpen(false);
+          setDetailEvent(null);
+          setParticipantsEvent(event);
+          setParticipantsOpen(true);
+        }}
+        onDelete={(id) => {
+          setDetailOpen(false);
+          setDetailEvent(null);
+          void deleteEvent(id);
+        }}
+        registrationLoading={
+          detailEvent
+            ? registrationLoadingId === detailEvent.id
+            : false
+        }
+        canManageEvents={canManageEvents}
+      />
+
+      <EventParticipantsModal
+        open={participantsOpen}
+        eventId={participantsEvent?.id ?? null}
+        eventTitle={participantsEvent?.title}
+        onClose={() => {
+          setParticipantsOpen(false);
+          setParticipantsEvent(null);
+        }}
       />
 
       <CreateEventModal
@@ -774,3 +1252,21 @@ export default function DashboardEventsPage() {
     </div>
   );
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

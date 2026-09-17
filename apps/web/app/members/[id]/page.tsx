@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
@@ -31,6 +31,7 @@ export default function MemberPage({
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
 
+  const [memberNumber, setMemberNumber] = useState("");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [birthDate, setBirthDate] = useState("");
