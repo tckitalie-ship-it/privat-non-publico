@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
@@ -221,7 +221,7 @@ export default function DashboardSidebar() {
 
         <div className="mb-3 rounded-xl border border-[#30363d] bg-[#161b22] px-4 py-3">
           <p className="text-sm font-semibold text-white">
-            {user?.name || "Amministratore"}
+            {user?.name || "Profilo utente"}
           </p>
 
           <p className="mt-1 text-xs text-gray-400">
@@ -234,6 +234,7 @@ export default function DashboardSidebar() {
     </div>
   );
 }
+
 
 
 
