@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { API_URL, getAccessToken } from "@/lib/api";
+
 
 export type NotificationItem = {
   id: string;
@@ -17,12 +17,8 @@ export function useNotifications() {
 
   const loadNotifications = useCallback(async () => {
     try {
-      const token = getAccessToken();
-
-      const res = await fetch(`${API_URL}/notifications`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+      const res = await fetch("/api/notifications", {
+        cache: "no-store",
       });
 
       if (!res.ok) return;
@@ -47,15 +43,11 @@ export function useNotifications() {
 
   const markAsRead = useCallback(async (id: string) => {
     try {
-      const token = getAccessToken();
-
       const res = await fetch(
-        `${API_URL}/notifications/${id}/read`,
+        `/api/notifications/${id}/read`,
         {
           method: "PATCH",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+          cache: "no-store",
         }
       );
 
@@ -83,3 +75,5 @@ export function useNotifications() {
     markAsRead,
   };
 }
+
+
