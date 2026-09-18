@@ -260,7 +260,7 @@ export default function MembersPage() {
 
     try {
       const response = await fetch(
-        `${API_URL}/memberships`,
+        "/api/memberships",
         {
           method: "GET",
           headers,

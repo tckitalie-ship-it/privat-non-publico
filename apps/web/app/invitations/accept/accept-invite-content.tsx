@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import {
   FormEvent,
@@ -179,7 +179,7 @@ export default function AcceptInviteContent({
         );
         setError(false);
         setMessage(
-          "Crea il tuo account per accettare l’invito.",
+          "Crea il tuo account per accettare lâ€™invito.",
         );
       } catch (err) {
         if (cancelled) {
@@ -190,7 +190,7 @@ export default function AcceptInviteContent({
         setMessage(
           err instanceof Error
             ? err.message
-            : "Errore durante la verifica dell’invito.",
+            : "Errore durante la verifica dellâ€™invito.",
         );
       } finally {
         if (!cancelled) {
@@ -359,7 +359,20 @@ export default function AcceptInviteContent({
   }
 
   function goToLogin() {
-    router.push("/login");
+    if (!token) {
+      router.push("/login");
+      return;
+    }
+
+    const params = new URLSearchParams({
+      inviteToken: token,
+    });
+
+    if (email) {
+      params.set("inviteEmail", email);
+    }
+
+    router.push(`/login?${params.toString()}`);
   }
 
   return (
@@ -572,7 +585,7 @@ export default function AcceptInviteContent({
                 disabled={submitting}
                 className="w-full rounded-2xl border border-white/10 px-6 py-3 font-semibold text-gray-200 transition hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                Ho già un account
+                Ho giÃ  un account
               </button>
             </form>
           </>

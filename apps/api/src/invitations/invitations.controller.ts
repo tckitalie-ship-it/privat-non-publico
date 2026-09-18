@@ -1,4 +1,4 @@
-import {
+﻿import {
   Body,
   Controller,
   Delete,
@@ -59,6 +59,16 @@ export class InvitationsController {
   }
 
   @UseGuards(JwtAuthGuard)
+  @Post(":id/resend")
+  async resend(
+    @CurrentUser() user: any,
+    @Param("id") invitationId: string,
+  ) {
+    return this.invitations.resendInvitation(
+      invitationId,
+      user.sub,
+    );
+  }
   @Delete(":id")
   async remove(
     @CurrentUser() user: any,

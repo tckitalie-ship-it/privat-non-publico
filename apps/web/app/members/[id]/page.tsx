@@ -2,11 +2,45 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Pencil, Printer, Save, X } from "lucide-react";
+import { ArrowLeft, CalendarDays, CheckCircle2, Clock3, MapPin, Pencil, Printer, Save, Users, X } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { getAccessToken } from "@/lib/api";
 import { getActiveAssociationId } from "@/lib/association";
 
+type MemberHistory = {
+  member: {
+    id: string;
+    userId: string;
+    memberNumber?: number | null;
+    firstName?: string | null;
+    lastName?: string | null;
+    role: string;
+    email?: string | null;
+  };
+  stats: {
+    totalEvents: number;
+    registered: number;
+    waitlisted: number;
+    checkedIn: number;
+  };
+  events: Array<{
+    registrationId: string;
+    status: string;
+    registeredAt: string;
+    updatedAt: string;
+    checkedInAt?: string | null;
+    event: {
+      id: string;
+      title: string;
+      description?: string | null;
+      location?: string | null;
+      startsAt: string;
+      endsAt?: string | null;
+      capacity?: number | null;
+      status: "SCHEDULED" | "CANCELLED" | "COMPLETED";
+    };
+  }>;
+};
 type Member = {
   id: string;
   role?: string | null;
@@ -27,6 +61,9 @@ export default function MemberPage({
   params: Promise<{ id: string }>;
 }) {
   const [member, setMember] = useState<Member | null>(null);
+  const [history, setHistory] = useState<MemberHistory | null>(null);
+  const [historyLoading, setHistoryLoading] = useState(true);
+  const [historyError, setHistoryError] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -442,7 +479,189 @@ export default function MemberPage({
             </div>
           </section>
 
-          <section
+                    <section className="mt-6 space-y-4">
+            <div>
+              <h2 className="text-lg font-semibold text-white">
+                Attività del socio
+              </h2>
+              <p className="mt-1 text-sm text-white/50">
+                Partecipazione agli eventi e storico delle presenze.
+              </p>
+            </div>
+
+            {historyLoading ? (
+              <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-6 text-sm text-white/50">
+                Caricamento attività...
+              </div>
+            ) : historyError ? (
+              <div className="rounded-2xl border border-red-400/20 bg-red-500/5 p-6 text-sm text-red-300">
+                {historyError}
+              </div>
+            ) : history ? (
+              <>
+                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                  <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-white/50">Eventi</span>
+                      <CalendarDays size={17} className="text-white/40" />
+                    </div>
+                    <div className="mt-2 text-2xl font-semibold text-white">
+                      {history.stats.totalEvents}
+                    </div>
+                  </div>
+
+                  <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-white/50">Registrati</span>
+                      <Users size={17} className="text-white/40" />
+                    </div>
+                    <div className="mt-2 text-2xl font-semibold text-white">
+                      {history.stats.registered}
+                    </div>
+                  </div>
+
+                  <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-white/50">
+                        Lista d'attesa
+                      </span>
+                      <Clock3 size={17} className="text-white/40" />
+                    </div>
+                    <div className="mt-2 text-2xl font-semibold text-white">
+                      {history.stats.waitlisted}
+                    </div>
+                  </div>
+
+                  <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-white/50">Presenze</span>
+                      <CheckCircle2 size={17} className="text-white/40" />
+                    </div>
+                    <div className="mt-2 text-2xl font-semibold text-white">
+                      {history.stats.checkedIn}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03]">
+                  <div className="border-b border-white/10 px-5 py-4">
+                    <h3 className="font-semibold text-white">
+                      Storico eventi
+                    </h3>
+                  </div>
+
+                  {history.events.length === 0 ? (
+                    <div className="px-5 py-8 text-sm text-white/45">
+                      Nessuna attività registrata.
+                    </div>
+                  ) : (
+                    <div className="divide-y divide-white/10">
+                      {history.events.map((registration) => {
+                        const event = registration.event;
+                        const isWaitlisted =
+                          registration.status === "WAITLISTED";
+                        const isCheckedIn =
+                          Boolean(registration.checkedInAt);
+
+                        const eventStatus =
+                          event.status === "CANCELLED"
+                            ? "Cancellato"
+                            : event.status === "COMPLETED"
+                              ? "Completato"
+                              : "Programmato";
+
+                        return (
+                          <div
+                            key={registration.registrationId}
+                            className="px-5 py-4"
+                          >
+                            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                              <div className="min-w-0">
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <h4 className="font-medium text-white">
+                                    {event.title}
+                                  </h4>
+
+                                  <span
+                                    className={
+                                      isWaitlisted
+                                        ? "rounded-full border border-amber-400/20 bg-amber-400/10 px-2 py-0.5 text-[11px] text-amber-300"
+                                        : isCheckedIn
+                                          ? "rounded-full border border-emerald-400/20 bg-emerald-400/10 px-2 py-0.5 text-[11px] text-emerald-300"
+                                          : "rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[11px] text-white/50"
+                                    }
+                                  >
+                                    {isWaitlisted
+                                      ? "Lista d'attesa"
+                                      : isCheckedIn
+                                        ? "Presente"
+                                        : "Registrato"}
+                                  </span>
+
+                                  <span className="rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[11px] text-white/45">
+                                    {eventStatus}
+                                  </span>
+                                </div>
+
+                                <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-white/45">
+                                  <span className="inline-flex items-center gap-1.5">
+                                    <CalendarDays size={13} />
+                                    {new Date(
+                                      event.startsAt,
+                                    ).toLocaleDateString("it-IT", {
+                                      day: "2-digit",
+                                      month: "2-digit",
+                                      year: "numeric",
+                                    })}
+                                  </span>
+
+                                  <span className="inline-flex items-center gap-1.5">
+                                    <Clock3 size={13} />
+                                    {new Date(
+                                      event.startsAt,
+                                    ).toLocaleTimeString("it-IT", {
+                                      hour: "2-digit",
+                                      minute: "2-digit",
+                                    })}
+                                  </span>
+
+                                  {event.location && (
+                                    <span className="inline-flex items-center gap-1.5">
+                                      <MapPin size={13} />
+                                      {event.location}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+
+                              <div className="shrink-0 text-xs text-white/40 lg:text-right">
+                                <div>
+                                  Iscritto il{" "}
+                                  {new Date(
+                                    registration.registeredAt,
+                                  ).toLocaleDateString("it-IT")}
+                                </div>
+
+                                {registration.checkedInAt && (
+                                  <div className="mt-1 text-emerald-300/70">
+                                    Check-in{" "}
+                                    {new Date(
+                                      registration.checkedInAt,
+                                    ).toLocaleDateString("it-IT")}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </>
+            ) : null}
+          </section>
+<section
             aria-hidden="true"
             className="member-print-card hidden"
           >

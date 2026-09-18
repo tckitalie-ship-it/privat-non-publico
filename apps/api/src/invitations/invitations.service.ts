@@ -1,4 +1,4 @@
-﻿import {
+import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
@@ -639,6 +639,123 @@ export class InvitationsService {
     };
   }
 
+  async resendInvitation(
+    invitationId: string,
+    userId: string,
+  ) {
+    if (!invitationId) {
+      throw new BadRequestException(
+        "ID invito mancante.",
+      );
+    }
+
+    if (!userId) {
+      throw new BadRequestException(
+        "Utente non valido.",
+      );
+    }
+
+    const invitation =
+      await this.prisma.invitation.findUnique({
+        where: {
+          id: invitationId,
+        },
+        include: {
+          association: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+        },
+      });
+
+    if (!invitation) {
+      throw new NotFoundException(
+        "Invito non trovato.",
+      );
+    }
+
+    const requesterMembership =
+      await this.prisma.membership.findFirst({
+        where: {
+          userId,
+          associationId:
+            invitation.associationId,
+        },
+      });
+
+    if (!requesterMembership) {
+      throw new ForbiddenException(
+        "Non appartieni a questa associazione.",
+      );
+    }
+
+    const requesterRole = String(
+      requesterMembership.role,
+    )
+      .trim()
+      .toUpperCase();
+
+    if (
+      requesterRole !== "OWNER" &&
+      requesterRole !== "ADMIN"
+    ) {
+      throw new ForbiddenException(
+        "Non hai il permesso di reinviare questo invito.",
+      );
+    }
+
+    const token = randomUUID();
+
+    const updated =
+      await this.prisma.invitation.update({
+        where: {
+          id: invitationId,
+        },
+        data: {
+          token,
+          status: "PENDING",
+          acceptedAt: null,
+          expiresAt: new Date(
+            Date.now() +
+              7 * 24 * 60 * 60 * 1000,
+          ),
+        },
+        include: {
+          association: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+        },
+      });
+
+    const existingUser =
+      await this.prisma.user.findUnique({
+        where: {
+          email: invitation.email,
+        },
+        select: {
+          id: true,
+        },
+      });
+
+    if (
+      existingUser &&
+      existingUser.id !== userId
+    ) {
+      await this.notify(
+        existingUser.id,
+        invitation.associationId,
+        "Invito nuovamente disponibile",
+        `L'invito a partecipare all'associazione "${updated.association?.name ?? "associazione"}" è stato rinnovato.`,
+      );
+    }
+
+    return updated;
+  }
   async removeInvitation(
     invitationId: string,
     userId: string,

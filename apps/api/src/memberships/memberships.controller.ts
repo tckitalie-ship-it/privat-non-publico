@@ -57,6 +57,18 @@ export class MembershipsController {
     return this.membershipsService.create(dto, user.id);
   }
 
+  @Get(":id/history")
+  history(
+    @Param("id") membershipId: string,
+    @CurrentUser() user: JwtUser,
+    @Headers("x-association-id") associationId?: string,
+  ) {
+    return this.membershipsService.getMemberHistory(
+      membershipId,
+      user.id,
+      associationId,
+    );
+  }
   @Patch(":id")
   update(
     @Param("id") membershipId: string,

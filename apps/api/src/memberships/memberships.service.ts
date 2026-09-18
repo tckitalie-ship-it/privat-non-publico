@@ -198,6 +198,135 @@ export class MembershipsService {
   }
 
   /**
+   * Storico attività di un membro dell'associazione attiva.
+   */
+  async getMemberHistory(
+    membershipId: string,
+    userId: string,
+    associationId?: string | null,
+  ) {
+    const resolvedAssociationId =
+      await this.resolveAssociationId(
+        userId,
+        associationId,
+      );
+
+    const requester =
+      await this.prisma.membership.findFirst({
+        where: {
+          userId,
+          associationId: resolvedAssociationId,
+        },
+      });
+
+    if (!requester) {
+      throw new ForbiddenException(
+        "Non sei membro di questa associazione",
+      );
+    }
+
+    const membership =
+      await this.prisma.membership.findFirst({
+        where: {
+          id: membershipId,
+          associationId: resolvedAssociationId,
+        },
+        include: {
+          user: {
+            select: {
+              id: true,
+              email: true,
+            },
+          },
+        },
+      });
+
+    if (!membership) {
+      throw new NotFoundException(
+        "Membro non trovato",
+      );
+    }
+
+    if (
+      requester.id !== membership.id &&
+      requester.role !== Role.OWNER &&
+      requester.role !== Role.ADMIN
+    ) {
+      throw new ForbiddenException(
+        "Non hai i permessi per consultare lo storico di questo membro",
+      );
+    }
+
+    const registrations =
+      await this.prisma.eventRegistration.findMany({
+        where: {
+          userId: membership.userId,
+          event: {
+            associationId: resolvedAssociationId,
+          },
+        },
+        include: {
+          event: {
+            select: {
+              id: true,
+              title: true,
+              description: true,
+              location: true,
+              startsAt: true,
+              endsAt: true,
+              capacity: true,
+              status: true,
+            },
+          },
+        },
+        orderBy: {
+          createdAt: "desc",
+        },
+      });
+
+    const registeredCount = registrations.filter(
+      (registration) =>
+        registration.status === "REGISTERED",
+    ).length;
+
+    const waitlistedCount = registrations.filter(
+      (registration) =>
+        registration.status === "WAITLISTED",
+    ).length;
+
+    const checkedInCount = registrations.filter(
+      (registration) =>
+        registration.status === "REGISTERED" &&
+        Boolean(registration.checkedInAt),
+    ).length;
+
+    return {
+      member: {
+        id: membership.id,
+        userId: membership.userId,
+        memberNumber: membership.memberNumber,
+        firstName: membership.firstName,
+        lastName: membership.lastName,
+        role: membership.role,
+        email: membership.user.email,
+      },
+      stats: {
+        totalEvents: registrations.length,
+        registered: registeredCount,
+        waitlisted: waitlistedCount,
+        checkedIn: checkedInCount,
+      },
+      events: registrations.map((registration) => ({
+        registrationId: registration.id,
+        status: registration.status,
+        registeredAt: registration.createdAt,
+        updatedAt: registration.updatedAt,
+        checkedInAt: registration.checkedInAt,
+        event: registration.event,
+      })),
+    };
+  }
+  /**
    * Membership dell'utente autenticato.
    */
   async me(
