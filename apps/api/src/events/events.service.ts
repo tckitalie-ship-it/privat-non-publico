@@ -203,8 +203,8 @@ export class EventsService {
 
     const message = [
       isWaitlisted
-        ? `${participantName} � entrato nella lista d'attesa dell'evento "${event.title}".`
-        : `${participantName} si � registrato all'evento "${event.title}".`,
+        ? `${participantName} è entrato nella lista d'attesa dell'evento "${event.title}".`
+        : `${participantName} si è registrato all'evento "${event.title}".`,
       `Data: ${date}.`,
       event.location ? `Luogo: ${event.location}.` : null,
     ]
@@ -836,13 +836,13 @@ export class EventsService {
 
     if (event.status === EventStatus.CANCELLED) {
       throw new BadRequestException(
-        "Non � possibile iscriversi a un evento cancellato",
+        "Non è possibile iscriversi a un evento cancellato",
       );
     }
 
     if (event.status === EventStatus.COMPLETED) {
       throw new BadRequestException(
-        "Non � possibile iscriversi a un evento completato",
+        "Non è possibile iscriversi a un evento completato",
       );
     }
 
@@ -858,7 +858,7 @@ export class EventsService {
 
     if (existingRegistration) {
       throw new BadRequestException(
-        "Sei gi� registrato a questo evento",
+        "Sei già registrato a questo evento",
       );
     }
 
@@ -897,7 +897,7 @@ export class EventsService {
         error.code === "P2002"
       ) {
         throw new BadRequestException(
-          "Sei gi� registrato a questo evento",
+          "Sei già registrato a questo evento",
         );
       }
 
