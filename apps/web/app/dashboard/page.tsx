@@ -432,7 +432,7 @@ function DashboardRemindersPanel() {
           <div>
             <h2 className="font-semibold">Promemoria</h2>
             <p className="text-sm text-muted-foreground">
-              AttivitÃƒÆ’Ã‚Â  da ricordare
+              Attività da ricordare
             </p>
           </div>
         </div>
@@ -464,7 +464,7 @@ function DashboardRemindersPanel() {
             <Clock3 className="mb-3 h-8 w-8 text-muted-foreground" />
             <p className="font-medium">Nessun promemoria</p>
             <p className="mt-1 text-sm text-muted-foreground">
-              Non hai attivitÃƒÆ’Ã‚Â  in sospeso.
+              Non hai attività in sospeso.
             </p>
 
             <a
@@ -547,7 +547,7 @@ export default function DashboardPage() {
 
         if (!cancelled) {
           setChartError(
-            "Non ÃƒÆ’Ã‚Â¨ stato possibile caricare i dati dei grafici.",
+            "Non è stato possibile caricare i dati dei grafici.",
           );
         }
       } finally {
@@ -614,7 +614,7 @@ export default function DashboardPage() {
       {/* AZIONI RAPIDE */}
       <QuickActions />
 
-      {/* ATTIVITÃƒÆ’Ã¢â€šÂ¬ + EVENTI */}
+      {/* ATTIVITÀ + EVENTI */}
       <div className="grid gap-6 xl:grid-cols-2">
         <RecentActivity />
         <UpcomingEvents />
