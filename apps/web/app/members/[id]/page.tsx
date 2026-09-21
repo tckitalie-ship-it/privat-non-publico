@@ -67,6 +67,8 @@ export default function MemberPage({
   const [error, setError] = useState("");
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
+  const [loadingRole, setLoadingRole] = useState(true);
 
   const [memberNumber, setMemberNumber] = useState("");
   const [firstName, setFirstName] = useState("");
@@ -74,6 +76,58 @@ export default function MemberPage({
   const [birthDate, setBirthDate] = useState("");
   const [address, setAddress] = useState("");
   const [phone, setPhone] = useState("");
+
+  useEffect(() => {
+    async function loadCurrentUserRole() {
+      try {
+        const token = getAccessToken();
+        const associationId = getActiveAssociationId();
+
+        if (!token) {
+          setCurrentUserRole(null);
+          return;
+        }
+
+        const response = await fetch("/api/memberships/me", {
+          method: "GET",
+          headers: {
+            Accept: "application/json",
+            Authorization: `Bearer ${token}`,
+            ...(associationId
+              ? { "x-association-id": associationId }
+              : {}),
+          },
+          cache: "no-store",
+        });
+
+        const data = await response.json().catch(() => null);
+
+        if (!response.ok) {
+          setCurrentUserRole(null);
+          return;
+        }
+
+        const returnedRole = data?.role;
+
+        if (
+          returnedRole === "OWNER" ||
+          returnedRole === "ADMIN" ||
+          returnedRole === "MEMBER"
+        ) {
+          setCurrentUserRole(returnedRole);
+        } else {
+          setCurrentUserRole(null);
+        }
+      } catch (err) {
+        console.error("Errore caricamento ruolo corrente:", err);
+        setCurrentUserRole(null);
+      } finally {
+        setLoadingRole(false);
+      }
+    }
+
+    void loadCurrentUserRole();
+  }, []);
 
   useEffect(() => {
     async function loadMember() {
@@ -231,6 +285,11 @@ export default function MemberPage({
     member.user?.email ||
     "Membro";
 
+  const canManageMembers =
+    !loadingRole &&
+    (currentUserRole === "OWNER" ||
+      currentUserRole === "ADMIN");
+
   return (
     <>
       <style jsx global>{`
@@ -316,7 +375,7 @@ export default function MemberPage({
               Torna ai membri
             </Link>
 
-            {!editing && (
+            {!editing && canManageMembers && (
               <div className="flex flex-wrap items-center justify-end gap-2">
                 <button
                   type="button"
