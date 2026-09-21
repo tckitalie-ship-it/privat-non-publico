@@ -317,12 +317,23 @@ export class NotificationsService {
    */
   async markAllAsRead(
     userId: string,
+    associationId?: string | null,
   ) {
     const result =
       await this.prisma.notification.updateMany({
         where: {
           userId,
           read: false,
+          ...(associationId
+            ? {
+                OR: [
+                  { associationId: null },
+                  { associationId },
+                ],
+              }
+            : {
+                associationId: null,
+              }),
         },
         data: {
           read: true,
@@ -338,7 +349,6 @@ export class NotificationsService {
           : `${result.count} notifiche segnate come lette`,
     };
   }
-
   /**
    * Elimina una notifica.
    */

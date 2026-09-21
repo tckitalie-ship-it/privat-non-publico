@@ -69,7 +69,7 @@ export class NotificationsController {
   async markAllAsRead(
     @CurrentUser() user: JwtUser,
   ) {
-    return this.notifications.markAllAsRead(user.id);
+    return this.notifications.markAllAsRead(user.id, user.associationId);
   }
 
   @Patch(":id/read")
