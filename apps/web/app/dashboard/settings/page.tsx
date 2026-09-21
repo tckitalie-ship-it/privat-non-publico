@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import ChangePasswordModal from "@/components/settings/ChangePasswordModal";
 import {
@@ -332,6 +332,104 @@ export default function SettingsPage() {
     void loadSettings();
   }, [loadSettings]);
 
+  async function toggleAssociationStatus() {
+    if (!associationId || !association) {
+      toast.error("Nessuna associazione selezionata");
+      return;
+    }
+
+    if (!canEditAssociation) {
+      toast.error(
+        "Non hai i permessi per modificare lo stato dell'associazione",
+      );
+      return;
+    }
+
+    const nextStatus = !association.isActive;
+
+    const confirmed = window.confirm(
+      nextStatus
+        ? "Vuoi riattivare questa associazione?"
+        : "Vuoi disattivare questa associazione?",
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    const token = getAccessToken();
+
+    if (!token) {
+      toast.error("Sessione non disponibile");
+      return;
+    }
+
+    try {
+      setSaving(true);
+
+      const response = await fetch(
+        `${API_URL}/platform/associations/${associationId}/status`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            isActive: nextStatus,
+          }),
+        },
+      );
+
+      const data = (await response
+        .json()
+        .catch(() => null)) as Association | {
+        message?: string | string[];
+      } | null;
+
+      if (!response.ok) {
+        throw new Error(
+          getErrorMessage(
+            data,
+            `Errore aggiornamento stato (${response.status})`,
+          ),
+        );
+      }
+
+      if (data && "id" in data) {
+        setAssociation(data as Association);
+      } else {
+        setAssociation((current) =>
+          current
+            ? {
+                ...current,
+                isActive: nextStatus,
+              }
+            : current,
+        );
+      }
+
+      toast.success(
+        nextStatus
+          ? "Associazione riattivata"
+          : "Associazione disattivata",
+      );
+    } catch (error) {
+      console.error(
+        "Errore aggiornamento stato associazione:",
+        error,
+      );
+
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Impossibile aggiornare lo stato dell'associazione",
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
   async function saveAssociation(
     event: FormEvent<HTMLFormElement>,
   ) {
@@ -644,7 +742,7 @@ export default function SettingsPage() {
                 rows={5}
                 maxLength={500}
                 className="mt-2 w-full resize-none rounded-xl border border-white/10 bg-[#111827] px-4 py-3 text-white outline-none transition placeholder:text-gray-500 focus:border-blue-500"
-                placeholder="Descrivi lo scopo e le attività dell'associazione..."
+                placeholder="Descrivi lo scopo e le attivitÃ  dell'associazione..."
               />
 
               <p className="mt-1 text-right text-xs text-gray-500">
@@ -857,7 +955,29 @@ export default function SettingsPage() {
                 {association?.isActive
                   ? "La piattaforma è disponibile per i membri."
                   : "L'associazione risulta disattivata."}
-              </p>
+              </p>              
+              {canEditAssociation && association && (
+                <button
+                  type="button"
+                  onClick={() => void toggleAssociationStatus()}
+                  disabled={saving}
+                  className="mt-4 inline-flex items-center justify-center rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {saving ? (
+                    <>
+                      <Loader2
+                        size={16}
+                        className="mr-2 animate-spin"
+                      />
+                      Aggiornamento...
+                    </>
+                  ) : association.isActive ? (
+                    "Disattiva associazione"
+                  ) : (
+                    "Riattiva associazione"
+                  )}
+                </button>
+              )}
             </div>
           </article>
         </div>
@@ -1015,3 +1135,7 @@ export default function SettingsPage() {
     </div>
   );
 }
+
+
+
+
