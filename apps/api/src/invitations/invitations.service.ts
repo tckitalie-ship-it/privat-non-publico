@@ -147,6 +147,7 @@ export class InvitationsService {
     return this.prisma.invitation.findMany({
       where: {
         associationId,
+      acceptedAt: null,
       },
       orderBy: {
         createdAt: "desc",
@@ -827,5 +828,6 @@ export class InvitationsService {
     };
   }
 }
+
 
 
