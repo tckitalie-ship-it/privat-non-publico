@@ -50,6 +50,7 @@ export default function AssociationsPage() {
   const [associations, setAssociations] = useState<AssociationWithRelations[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [currentUserRole, setCurrentUserRole] = useState<"OWNER" | "ADMIN" | "MEMBER" | null>(null);
 
   const [showForm, setShowForm] = useState(false);
   const [name, setName] = useState('');
@@ -59,6 +60,16 @@ export default function AssociationsPage() {
     async function load() {
       try {
         const token = getAccessToken();
+
+        if (token) {
+          try {
+            const payload = JSON.parse(atob(token.split(".")[1]));
+            const role = payload?.role;
+            if (role === "OWNER" || role === "ADMIN" || role === "MEMBER") {
+              setCurrentUserRole(role);
+            }
+          } catch {}
+        }
 
 if (!token) {
   throw new Error("Sessione non disponibile");
@@ -106,7 +117,10 @@ const res = await fetch(`${API_URL}/associations`, {
     load();
   }, []);
 
-   async function handleCreate(
+   const canCreateAssociation = currentUserRole === "OWNER" || currentUserRole === "ADMIN";
+  const canDeleteAssociation = currentUserRole === "OWNER";
+
+  async function handleCreate(
   e: FormEvent<HTMLFormElement>,
 ) {
   e.preventDefault();
@@ -214,7 +228,7 @@ const res = await fetch(`${API_URL}/associations`, {
   if (loading) {
     return (
       <div className="p-8 text-white">
-        Caricamento associazioni…
+        Caricamento associazioniâ€¦
       </div>
     );
   }
@@ -230,7 +244,7 @@ const res = await fetch(`${API_URL}/associations`, {
               href="/dashboard"
               className="rounded-xl border border-white/10 px-4 py-2 text-sm transition hover:bg-white/5"
             >
-              ← Dashboard
+              â† Dashboard
             </Link>
           </div>
 
@@ -245,10 +259,11 @@ const res = await fetch(`${API_URL}/associations`, {
               </h1>
 
               <p className="mt-3 max-w-2xl text-gray-400">
-                Gestisci le associazioni, i membri collegati e le attività principali della piattaforma.
+                Gestisci le associazioni, i membri collegati e le attivitÃ  principali della piattaforma.
               </p>
             </div>
 
+            {canCreateAssociation && (
             <button
               type="button"
               onClick={() => setShowForm((value) => !value)}
@@ -257,6 +272,7 @@ const res = await fetch(`${API_URL}/associations`, {
               <Plus size={18} />
               {showForm ? 'Chiudi' : 'Nuova associazione'}
             </button>
+            )}
           </div>
 
           {showForm && (
@@ -357,7 +373,7 @@ const res = await fetch(`${API_URL}/associations`, {
                     <div className="rounded-2xl bg-[#111827] p-4">
                       <p className="text-sm text-gray-400">Ruolo</p>
                       <p className="mt-1 font-semibold">
-                        {association.memberships?.find((membership) => membership.userId === currentUserId)?.role ?? "—"}
+                        {association.memberships?.find((membership) => membership.userId === currentUserId)?.role ?? "â€”"}
                       </p>
                     </div>
 
@@ -398,6 +414,7 @@ const res = await fetch(`${API_URL}/associations`, {
 >
   Eventi
 </Link>
+                    {canDeleteAssociation && (
                     <button
                       type="button"
                       onClick={() => deleteAssociation(association.id)}
@@ -406,6 +423,7 @@ const res = await fetch(`${API_URL}/associations`, {
                       <Trash2 size={16} />
                       Elimina
                     </button>
+                    )}
                   </div>
                 </div>
               ))
@@ -416,4 +434,3 @@ const res = await fetch(`${API_URL}/associations`, {
     </div>
   );
 }
-
