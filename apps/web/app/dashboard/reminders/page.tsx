@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useCallback, useEffect, useState } from "react";
 import {
@@ -312,6 +312,16 @@ export default function RemindersPage() {
 
         const data =
           (await response.json()) as Reminder[];
+
+        console.log(
+          "[REMINDERS PAGE]",
+          "status:",
+          response.status,
+          "count:",
+          Array.isArray(data) ? data.length : "not-array",
+          "data:",
+          data,
+        );
 
         setReminders(
           Array.isArray(data)
@@ -1271,8 +1281,3 @@ export default function RemindersPage() {
     </div>
   );
 }
-
-
-
-
-

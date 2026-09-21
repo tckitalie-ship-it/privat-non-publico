@@ -8,6 +8,7 @@ import { AuthService } from "./auth.service";
 
 import { JwtStrategy } from "./jwt.strategy";
 import { JwtAuthGuard } from "./jwt-auth.guard";
+import { PlatformOwnerGuard } from "./platform-owner.guard";
 
 import { UsersModule } from "../users/users.module";
 import { PrismaModule } from "../prisma/prisma.module";

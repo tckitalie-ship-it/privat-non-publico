@@ -1,4 +1,4 @@
-import { Module } from "@nestjs/common";
+﻿import { Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
 import { ScheduleModule } from "@nestjs/schedule";
 
@@ -18,18 +18,17 @@ import { NotificationsModule } from "./notifications/notifications.module";
 import { FilesModule } from "./files/files.module";
 import { ChatModule } from "./modules/chat/chat.module";
 import { AuditLogModule } from "./audit-log/audit-log.module";
+import { PlatformModule } from "./platform/platform.module";
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
     }),
-
-    AssistantModule,
     ScheduleModule.forRoot(),
 
     PrismaModule,
-
+    AssistantModule,
     AuthModule,
     UsersModule,
     AssociationsModule,
@@ -43,6 +42,7 @@ import { AuditLogModule } from "./audit-log/audit-log.module";
     FilesModule,
     ChatModule,
     AuditLogModule,
+    PlatformModule,
   ],
 })
 export class AppModule {}

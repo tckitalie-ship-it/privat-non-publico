@@ -116,7 +116,7 @@ export class NotificationsService {
 
     if (!message) {
       throw new BadRequestException(
-        "Il messaggio della notifica è obbligatorio",
+        "Il messaggio della notifica ÃƒÂ¨ obbligatorio",
       );
     }
 
@@ -166,6 +166,22 @@ export class NotificationsService {
           "Non hai i permessi per creare notifiche per l'associazione",
         );
       }
+
+      if (dto.userId) {
+        const destinationMembership =
+          await this.prisma.membership.findFirst({
+            where: {
+              userId: dto.userId,
+              associationId: dto.associationId,
+            },
+          });
+
+        if (!destinationMembership) {
+          throw new ForbiddenException(
+            "Il destinatario non appartiene a questa associazione",
+          );
+        }
+      }
     }
 
     const destinationUserId =
@@ -193,16 +209,26 @@ export class NotificationsService {
         dto.reminderId ?? null,
     });
   }
-
   /**
    * Notifiche personali dell'utente.
    */
   async findUserNotifications(
     userId: string,
+    associationId?: string | null,
   ) {
     return this.prisma.notification.findMany({
       where: {
         userId,
+        ...(associationId
+          ? {
+              OR: [
+                { associationId: null },
+                { associationId },
+              ],
+            }
+          : {
+              associationId: null,
+            }),
       },
       orderBy: {
         createdAt: "desc",
@@ -212,9 +238,11 @@ export class NotificationsService {
 
   async getUserNotifications(
     userId: string,
+    associationId?: string | null,
   ) {
     return this.findUserNotifications(
       userId,
+      associationId,
     );
   }
 

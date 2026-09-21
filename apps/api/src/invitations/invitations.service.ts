@@ -489,7 +489,7 @@ export class InvitationsService {
     await this.notifyManagers(
       invitation.associationId,
       "Invito accettato",
-      `${user.email} ha accettato l'invito ed Ã¨ entrato nell'associazione "${invitation.association?.name ?? "associazione"}" con ruolo ${invitation.role}.`,
+      `${user.email} ha accettato l'invito ed è entrato nell'associazione "${invitation.association?.name ?? "associazione"}" con ruolo ${invitation.role}.`,
       userId,
     );
 
@@ -627,7 +627,7 @@ export class InvitationsService {
     await this.notifyManagers(
       result.associationId,
       "Nuovo membro",
-      `${email} ha accettato l'invito ed Ã¨ entrato nell'associazione "${invitation.association?.name ?? "associazione"}" con ruolo ${invitation.role}.`,
+      `${email} ha accettato l'invito ed è entrato nell'associazione "${invitation.association?.name ?? "associazione"}" con ruolo ${invitation.role}.`,
       result.userId,
     );
 

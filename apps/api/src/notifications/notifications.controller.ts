@@ -19,34 +19,23 @@ import { NotificationsService } from "./notifications.service";
 @UseGuards(JwtAuthGuard)
 export class NotificationsController {
   constructor(
-    private readonly notifications:
-      NotificationsService,
+    private readonly notifications: NotificationsService,
   ) {}
 
-  /**
-   * Notifiche personali dell'utente.
-   *
-   * GET /api/notifications/me
-   */
   @Get("me")
   async getMyNotifications(
     @CurrentUser() user: JwtUser,
   ) {
     return this.notifications.getUserNotifications(
       user.id,
+      user.associationId,
     );
   }
 
-  /**
-   * Notifiche dell'associazione.
-   *
-   * GET /api/notifications/association/:associationId
-   */
   @Get("association/:associationId")
   async getAssociationNotifications(
     @CurrentUser() user: JwtUser,
-    @Param("associationId")
-    associationId: string,
+    @Param("associationId") associationId: string,
   ) {
     return this.notifications.getAssociationNotifications(
       associationId,
@@ -54,11 +43,6 @@ export class NotificationsController {
     );
   }
 
-  /**
-   * Crea una notifica.
-   *
-   * POST /api/notifications
-   */
   @Post()
   async create(
     @CurrentUser() user: JwtUser,
@@ -75,72 +59,40 @@ export class NotificationsController {
       {
         title: dto.title ?? null,
         message: dto.message,
-        associationId:
-          dto.associationId ?? null,
+        associationId: dto.associationId ?? null,
         userId: dto.userId ?? null,
       },
     );
   }
 
-  /**
-   * Segna tutte le notifiche personali come lette.
-   *
-   * PATCH /api/notifications/read-all
-   */
   @Patch("read-all")
   async markAllAsRead(
     @CurrentUser() user: JwtUser,
   ) {
-    return this.notifications.markAllAsRead(
-      user.id,
-    );
+    return this.notifications.markAllAsRead(user.id);
   }
 
-  /**
-   * Segna una notifica come letta.
-   *
-   * PATCH /api/notifications/:id/read
-   */
   @Patch(":id/read")
   async markAsRead(
     @CurrentUser() user: JwtUser,
     @Param("id") id: string,
   ) {
-    return this.notifications.markAsRead(
-      id,
-      user.id,
-    );
+    return this.notifications.markAsRead(id, user.id);
   }
 
-  /**
-   * Dettaglio notifica.
-   *
-   * GET /api/notifications/:id
-   */
   @Get(":id")
   async findOne(
     @CurrentUser() user: JwtUser,
     @Param("id") id: string,
   ) {
-    return this.notifications.findOne(
-      id,
-      user.id,
-    );
+    return this.notifications.findOne(id, user.id);
   }
 
-  /**
-   * Elimina una notifica.
-   *
-   * DELETE /api/notifications/:id
-   */
   @Delete(":id")
   async delete(
     @CurrentUser() user: JwtUser,
     @Param("id") id: string,
   ) {
-    return this.notifications.deleteNotification(
-      id,
-      user.id,
-    );
+    return this.notifications.deleteNotification(id, user.id);
   }
 }

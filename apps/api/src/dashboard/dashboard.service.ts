@@ -26,6 +26,18 @@ export class DashboardService {
 
     const now = new Date();
 
+    const startOfMonth = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      1,
+    );
+
+    const startOfNextMonth = new Date(
+      now.getFullYear(),
+      now.getMonth() + 1,
+      1,
+    );
+
     const [totalMembers, pendingInvitations, activeEvents, transactions] =
       await Promise.all([
         this.prisma.membership.count({
@@ -53,6 +65,10 @@ export class DashboardService {
         this.prisma.transaction.findMany({
           where: {
             associationId,
+            date: {
+              gte: startOfMonth,
+              lt: startOfNextMonth,
+            },
           },
           select: {
             type: true,
@@ -262,9 +278,3 @@ export class DashboardService {
       .slice(0, 10);
   }
 }
-
-
-
-
-
-

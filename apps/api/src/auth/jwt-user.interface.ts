@@ -5,12 +5,14 @@ export interface JwtUser {
   /** Alias standard JWT (uguale a id) */
   sub: string;
 
-  /** Email dell’utente */
+  /** Email dellÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢utente */
   email: string;
 
-  /** Ruolo dell’utente: MEMBER | ADMIN | OWNER */
+  /** Ruolo dellÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢utente: MEMBER | ADMIN | OWNER */
   role: string;
 
-  /** Associazione attiva dell’utente */
+  /** Associazione attiva dellÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢utente */
   associationId: string | null;
+
+  platformRole: string;
 }

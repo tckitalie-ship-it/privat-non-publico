@@ -1,25 +1,65 @@
-import { Body, Controller, Post } from "@nestjs/common";
+﻿import {
+  BadRequestException,
+  Body,
+  Controller,
+  NotFoundException,
+  Post,
+  UseGuards,
+  ForbiddenException,
+} from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
+import { JwtAuthGuard } from "../auth/jwt-auth.guard";
+import { CurrentUser } from "../auth/current-user.decorator";
+import type { JwtUser } from "../auth/jwt-user.interface";
 import Stripe from "stripe";
 
 @Controller("billing")
 export class BillingController {
   private stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: "2025-02-24.acacia",
+    apiVersion: "2025-02-24.acacia",
   });
 
   constructor(private prisma: PrismaService) {}
 
   @Post("checkout")
-  async createCheckout(@Body() body: any) {
+  @UseGuards(JwtAuthGuard)
+  async createCheckout(
+    @Body() body: { associationId?: string; priceId?: string },
+    @CurrentUser() user: JwtUser,
+  ) {
     const { associationId, priceId } = body;
 
     if (!associationId) {
-      throw new Error("associationId mancante");
+      throw new BadRequestException("associationId mancante");
     }
 
     if (!priceId) {
-      throw new Error("priceId mancante");
+      throw new BadRequestException("priceId mancante");
+    }
+
+    const membership = await this.prisma.membership.findFirst({
+      where: {
+        associationId,
+        userId: user.id,
+      },
+      select: {
+        role: true,
+      },
+    });
+
+    if (!membership) {
+      throw new ForbiddenException(
+        "Non sei membro di questa associazione",
+      );
+    }
+
+    if (
+      membership.role !== "OWNER" &&
+      membership.role !== "ADMIN"
+    ) {
+      throw new ForbiddenException(
+        "Non hai i permessi per gestire l'abbonamento",
+      );
     }
 
     const association = await this.prisma.association.findUnique({
@@ -29,7 +69,7 @@ export class BillingController {
     });
 
     if (!association) {
-      throw new Error("Associazione non trovata");
+      throw new NotFoundException("Associazione non trovata");
     }
 
     let customerId = association.stripeCustomerId;

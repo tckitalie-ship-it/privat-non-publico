@@ -1,4 +1,4 @@
-﻿import {
+import {
   BadRequestException,
   ForbiddenException,
   Injectable,
@@ -23,6 +23,29 @@ export class RemindersService {
   async findUserReminders(userId: string) {
     return this.prisma.reminder.findMany({
       where: { userId },
+      orderBy: { remindAt: "asc" },
+    });
+  }
+
+  async findAssociationReminders(
+    userId: string,
+    associationId: string,
+  ) {
+    const membership = await this.prisma.membership.findFirst({
+      where: {
+        userId,
+        associationId,
+      },
+    });
+
+    if (!membership) {
+      throw new ForbiddenException(
+        "Non sei membro di questa associazione",
+      );
+    }
+
+    return this.prisma.reminder.findMany({
+      where: { associationId },
       orderBy: { remindAt: "asc" },
     });
   }

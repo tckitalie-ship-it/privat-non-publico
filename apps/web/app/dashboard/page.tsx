@@ -1,6 +1,6 @@
 "use client";
 
-import { getAccessToken } from "@/lib/api";
+import { API_URL, getAccessToken } from "@/lib/api";
 
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -218,15 +218,42 @@ function DashboardNotificationsPanel() {
     let cancelled = false;
 
     async function load() {
-      const associationId = getAssociationId();
-
       try {
-        const result =
-          await fetchDashboardCollection<DashboardNotification>(
-            "/api/notifications",
-            associationId,
-            ["notifications", "items", "data"],
-          );
+        const token = getAccessToken();
+
+        console.log("[Dashboard notifications] token presente:", Boolean(token));
+
+        if (!token) {
+          throw new Error("Sessione non disponibile");
+        }
+
+        const response = await fetch(
+          `${API_URL}/notifications/me`,
+          {
+            method: "GET",
+            headers: {
+              Accept: "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            cache: "no-store",
+          },
+        );
+
+        if (!response.ok) {
+          throw new Error("Errore caricamento notifiche");
+        }
+
+        const payload = await response.json();
+        const result: DashboardNotification[] =
+          Array.isArray(payload)
+            ? payload
+            : Array.isArray(payload?.notifications)
+              ? payload.notifications
+              : Array.isArray(payload?.items)
+                ? payload.items
+                : Array.isArray(payload?.data)
+                  ? payload.data
+                  : [];
 
         if (!cancelled) {
           const sorted = [...result]
@@ -379,12 +406,53 @@ function DashboardRemindersPanel() {
       const associationId = getAssociationId();
 
       try {
-        const result =
-          await fetchDashboardCollection<DashboardReminder>(
-            "/api/reminders",
-            associationId,
-            ["reminders", "items", "data"],
+        const token = getAccessToken();
+
+        if (!token) {
+          throw new Error(
+            "Sessione non disponibile. Effettua nuovamente il login.",
           );
+        }
+
+        const response = await fetch(
+          `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api"}/reminders?associationId=${encodeURIComponent(associationId)}`,
+          {
+            method: "GET",
+            headers: {
+              Accept: "application/json",
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            cache: "no-store",
+          },
+        );
+
+        if (!response.ok) {
+          throw new Error(
+            `Errore caricamento reminder: ${response.status}`,
+          );
+        }
+
+        const payload = await response.json();
+
+        console.log(
+          "[DASHBOARD REMINDERS]",
+          "status:",
+          response.status,
+          "payload:",
+          payload,
+        );
+
+        const result: DashboardReminder[] =
+          Array.isArray(payload)
+            ? payload
+            : Array.isArray(payload?.reminders)
+              ? payload.reminders
+              : Array.isArray(payload?.items)
+                ? payload.items
+                : Array.isArray(payload?.data)
+                  ? payload.data
+                  : [];
 
         if (!cancelled) {
           const activeReminders = result
@@ -432,7 +500,7 @@ function DashboardRemindersPanel() {
           <div>
             <h2 className="font-semibold">Promemoria</h2>
             <p className="text-sm text-muted-foreground">
-              Attività da ricordare
+              AttivitÃ  da ricordare
             </p>
           </div>
         </div>
@@ -464,7 +532,7 @@ function DashboardRemindersPanel() {
             <Clock3 className="mb-3 h-8 w-8 text-muted-foreground" />
             <p className="font-medium">Nessun promemoria</p>
             <p className="mt-1 text-sm text-muted-foreground">
-              Non hai attività in sospeso.
+              Non hai attivitÃ  in sospeso.
             </p>
 
             <a
@@ -547,7 +615,7 @@ export default function DashboardPage() {
 
         if (!cancelled) {
           setChartError(
-            "Non è stato possibile caricare i dati dei grafici.",
+            "Non Ã¨ stato possibile caricare i dati dei grafici.",
           );
         }
       } finally {
@@ -614,7 +682,7 @@ export default function DashboardPage() {
       {/* AZIONI RAPIDE */}
       <QuickActions />
 
-      {/* ATTIVITÀ + EVENTI */}
+      {/* ATTIVITÃ€ + EVENTI */}
       <div className="grid gap-6 xl:grid-cols-2">
         <RecentActivity />
         <UpcomingEvents />
@@ -628,6 +696,3 @@ export default function DashboardPage() {
     </main>
   );
 }
-
-
-

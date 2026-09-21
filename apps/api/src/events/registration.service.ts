@@ -40,7 +40,7 @@ export class EventRegistrationService {
     });
 
     if (existing) {
-      throw new BadRequestException("Sei già registrato a questo evento");
+      throw new BadRequestException("Sei giÃ  registrato a questo evento");
     }
 
     return this.prisma.eventRegistration.create({
@@ -83,6 +83,28 @@ export class EventRegistrationService {
    * Rimuove una registrazione
    */
   async unregister(eventId: string, userId: string) {
+    const event = await this.prisma.event.findUnique({
+      where: { id: eventId },
+      select: { associationId: true },
+    });
+
+    if (!event) {
+      throw new NotFoundException("Evento non trovato");
+    }
+
+    const membership = await this.prisma.membership.findFirst({
+      where: {
+        userId,
+        associationId: event.associationId,
+      },
+    });
+
+    if (!membership) {
+      throw new ForbiddenException(
+        "Non sei membro di questa associazione",
+      );
+    }
+
     const registration = await this.prisma.eventRegistration.findUnique({
       where: {
         eventId_userId: {

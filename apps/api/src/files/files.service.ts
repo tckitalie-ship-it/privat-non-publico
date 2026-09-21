@@ -178,32 +178,24 @@ export class FilesService {
   async uploadFile(dto: {
     url: string;
     name: string;
-    associationId?: string | null;
-    uploadedById?: string | null;
+    associationId: string;
+    uploadedById: string;
   }) {
-    if (
-      dto.associationId &&
-      dto.uploadedById
-    ) {
-      await this.ensureCanManageFiles(
-        dto.uploadedById,
-        dto.associationId,
-      );
-    }
+    await this.ensureCanManageFiles(
+      dto.uploadedById,
+      dto.associationId,
+    );
 
     return this.prisma.file.create({
       data: {
         url: dto.url,
         name: dto.name,
         originalName: dto.name,
-        associationId:
-          dto.associationId ?? null,
-        uploadedById:
-          dto.uploadedById ?? null,
+        associationId: dto.associationId,
+        uploadedById: dto.uploadedById,
       },
     });
   }
-
   /**
    * Elenco file di un'associazione.
    */
@@ -318,7 +310,7 @@ export class FilesService {
 
     if (!file.path) {
       throw new NotFoundException(
-        "Il file fisico non è disponibile",
+        "Il file fisico non Ã¨ disponibile",
       );
     }
 
@@ -326,7 +318,7 @@ export class FilesService {
       await access(file.path);
     } catch {
       throw new NotFoundException(
-        "Il file fisico non è stato trovato",
+        "Il file fisico non Ã¨ stato trovato",
       );
     }
 

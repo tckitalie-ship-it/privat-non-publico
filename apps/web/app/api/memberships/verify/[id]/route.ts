@@ -7,11 +7,9 @@ export async function GET(
   const { id } = await params;
 
   const configuredUrl = "https://privat-non-publico-6kjd.onrender.com";
-
   const apiUrl = configuredUrl.replace(/\/+$/, "");
-  const endpoint = apiUrl.endsWith("/api")
-    ? `${apiUrl}/memberships/verify/${encodeURIComponent(id)}`
-    : `${apiUrl}/api/memberships/verify/${encodeURIComponent(id)}`;
+
+  const endpoint = `${apiUrl}/api/public/membership-verification/${encodeURIComponent(id)}`;
 
   try {
     const response = await fetch(endpoint, {

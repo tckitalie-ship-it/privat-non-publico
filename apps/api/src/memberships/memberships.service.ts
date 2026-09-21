@@ -19,7 +19,7 @@ export class MembershipsService {
 
   /**
    * Recupera l'associazione attiva.
-   * Se non Ã¨ presente, usa la prima membership dell'utente.
+   * Se non ÃƒÂ¨ presente, usa la prima membership dell'utente.
    */
   private async resolveAssociationId(
     userId: string,
@@ -37,9 +37,13 @@ export class MembershipsService {
           },
         });
 
-      if (membership) {
-        return membership.associationId;
+      if (!membership) {
+        throw new ForbiddenException(
+          "Non appartieni a questa associazione",
+        );
       }
+
+      return membership.associationId;
     }
 
     const firstMembership =
@@ -101,9 +105,9 @@ export class MembershipsService {
   /**
    * Crea una notifica privata associata a una specifica associazione.
    *
-   * Usiamo direttamente Prisma perchÃ© questo metodo viene usato
+   * Usiamo direttamente Prisma perchÃƒÂ© questo metodo viene usato
    * anche durante la rimozione di una membership: in quel momento
-   * l'utente non appartiene piÃ¹ all'associazione e il normale
+   * l'utente non appartiene piÃƒÂ¹ all'associazione e il normale
    * NotificationsService potrebbe rifiutare la notifica.
    */
   private async notifyUser(
@@ -198,7 +202,7 @@ export class MembershipsService {
   }
 
   /**
-   * Storico attività di un membro dell'associazione attiva.
+   * Storico attivitÃ  di un membro dell'associazione attiva.
    */
   async getMemberHistory(
     membershipId: string,
@@ -410,10 +414,10 @@ export class MembershipsService {
       );
 
     /*
-     * Un ADMIN puÃ² gestire i membri,
-     * ma non puÃ² assegnare il ruolo OWNER.
+     * Un ADMIN puÃƒÂ² gestire i membri,
+     * ma non puÃƒÂ² assegnare il ruolo OWNER.
      *
-     * Solo un OWNER puÃ² creare/promuovere
+     * Solo un OWNER puÃƒÂ² creare/promuovere
      * un altro OWNER.
      */
     if (
@@ -421,12 +425,12 @@ export class MembershipsService {
       requester.role !== Role.OWNER
     ) {
       throw new ForbiddenException(
-        "Solo il proprietario puÃ² assegnare il ruolo OWNER",
+        "Solo il proprietario puÃƒÂ² assegnare il ruolo OWNER",
       );
     }
 
     /*
-     * Nessuno puÃ² modificare la propria membership.
+     * Nessuno puÃƒÂ² modificare la propria membership.
      */
     if (target.userId === currentUserId) {
       throw new BadRequestException(
@@ -435,14 +439,14 @@ export class MembershipsService {
     }
 
     /*
-     * Un ADMIN non puÃ² modificare un OWNER.
+     * Un ADMIN non puÃƒÂ² modificare un OWNER.
      */
     if (
       requester.role === Role.ADMIN &&
       target.role === Role.OWNER
     ) {
       throw new ForbiddenException(
-        "Un ADMIN non puÃ² modificare il ruolo del proprietario",
+        "Un ADMIN non puÃƒÂ² modificare il ruolo del proprietario",
       );
     }
 
@@ -450,7 +454,7 @@ export class MembershipsService {
     const oldRole = target.role;
 
     /*
-     * Se il ruolo Ã¨ giÃ  quello richiesto,
+     * Se il ruolo ÃƒÂ¨ giÃƒÂ  quello richiesto,
      * non eseguiamo update e non generiamo notifiche.
      */
     if (oldRole === newRole) {
@@ -484,7 +488,7 @@ export class MembershipsService {
       target.userId,
       target.associationId,
       "Ruolo aggiornato",
-      `Il tuo ruolo nell'associazione "${associationName}" Ã¨ stato modificato da ${oldRole} a ${newRole}.`,
+      `Il tuo ruolo nell'associazione "${associationName}" ÃƒÂ¨ stato modificato da ${oldRole} a ${newRole}.`,
     );
 
     return toMembershipDto(updated);
@@ -494,7 +498,7 @@ export class MembershipsService {
    * Rimuove un membro.
    *
    * La notifica viene creata prima della cancellazione della membership,
-   * cosÃ¬ il messaggio resta correttamente associato all'associazione.
+   * cosÃƒÂ¬ il messaggio resta correttamente associato all'associazione.
    */
   async remove(
     membershipId: string,
@@ -534,7 +538,7 @@ export class MembershipsService {
     }
 
     /*
-     * Un ADMIN non puÃ² rimuovere un OWNER.
+     * Un ADMIN non puÃƒÂ² rimuovere un OWNER.
      * Manteniamo la stessa protezione usata per la modifica ruolo.
      */
     if (
@@ -542,7 +546,7 @@ export class MembershipsService {
       target.role === Role.OWNER
     ) {
       throw new ForbiddenException(
-        "Un ADMIN non puÃ² rimuovere il proprietario",
+        "Un ADMIN non puÃƒÂ² rimuovere il proprietario",
       );
     }
 
@@ -653,7 +657,7 @@ export class MembershipsService {
 
     if (existing) {
       throw new BadRequestException(
-        "L'utente è già membro di questa associazione",
+        "L'utente Ã¨ giÃ  membro di questa associazione",
       );
     }
 
@@ -680,7 +684,7 @@ export class MembershipsService {
 
     if (duplicateNumber) {
       throw new BadRequestException(
-        "Il numero carta membro è già utilizzato",
+        "Il numero carta membro Ã¨ giÃ  utilizzato",
       );
     }
 
@@ -753,7 +757,7 @@ export class MembershipsService {
 
       if (duplicate) {
         throw new BadRequestException(
-          "Il numero carta membro è già utilizzato",
+          "Il numero carta membro Ã¨ giÃ  utilizzato",
         );
       }
     }
@@ -771,14 +775,14 @@ export class MembershipsService {
 
     if (dto.firstName !== undefined) {
       if (!dto.firstName.trim()) {
-        throw new BadRequestException("Il nome è obbligatorio");
+        throw new BadRequestException("Il nome Ã¨ obbligatorio");
       }
       data.firstName = dto.firstName.trim();
     }
 
     if (dto.lastName !== undefined) {
       if (!dto.lastName.trim()) {
-        throw new BadRequestException("Il cognome è obbligatorio");
+        throw new BadRequestException("Il cognome Ã¨ obbligatorio");
       }
       data.lastName = dto.lastName.trim();
     }

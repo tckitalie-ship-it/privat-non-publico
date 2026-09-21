@@ -16,13 +16,14 @@ export const CurrentUser = createParamDecorator(
     const user = request.user;
 
     if (!user) {
-      // Nessun utente presente → ritorno un oggetto vuoto tipato
+      // Nessun utente presente â†’ ritorno un oggetto vuoto tipato
       return {
         id: '',
         sub: '',
         email: '',
         role: '',
         associationId: null,
+        platformRole: '',
       };
     }
 

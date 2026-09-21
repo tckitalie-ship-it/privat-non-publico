@@ -15,6 +15,7 @@ model User {
   updatedAt          DateTime            @updatedAt
   failedAttempts     Int                 @default(0)
   lockUntil          DateTime?
+  platformRole       PlatformRole        @default(USER)
   actorAuditLogs     AuditLog[]          @relation("ActorAuditLogs")
   auditLogs          AuditLog[]          @relation("UserAuditLogs")
   eventRegistrations EventRegistration[]
@@ -92,12 +93,6 @@ model Invitation {
   @@index([status])
 }
 
-enum EventStatus {
-  SCHEDULED
-  CANCELLED
-  COMPLETED
-}
-
 model Event {
   id                  String              @id @default(cuid())
   associationId       String
@@ -106,11 +101,11 @@ model Event {
   location            String?
   startsAt            DateTime
   endsAt              DateTime?
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
   capacity            Int?
   registrationEnabled Boolean             @default(true)
   status              EventStatus         @default(SCHEDULED)
-  createdAt           DateTime            @default(now())
-  updatedAt           DateTime            @updatedAt
   association         Association         @relation(fields: [associationId], references: [id], onDelete: Cascade)
   registrations       EventRegistration[]
 
@@ -233,6 +228,17 @@ model AuditLog {
   @@index([associationId])
   @@index([createdAt])
   @@index([category])
+}
+
+enum EventStatus {
+  SCHEDULED
+  CANCELLED
+  COMPLETED
+}
+
+enum PlatformRole {
+  USER
+  PLATFORM_OWNER
 }
 
 enum Role {

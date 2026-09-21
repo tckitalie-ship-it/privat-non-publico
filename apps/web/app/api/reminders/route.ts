@@ -4,7 +4,10 @@ import { NextResponse } from "next/server";
 export async function GET(request: Request) {
   try {
     const authorization = request.headers.get("authorization");
-
+         console.log(
+      "[REMINDERS GET] authorization presente:",
+      Boolean(authorization),
+    );
     const response = await fetch(
       getBackendApiUrl("reminders"),
       {
@@ -21,7 +24,12 @@ export async function GET(request: Request) {
 
     const data =
       await response.json().catch(() => null);
-
+           console.log(
+      "[REMINDERS GET] backend status:",
+      response.status,
+      "data:",
+      data,
+    );
     return NextResponse.json(data, {
       status: response.status,
     });

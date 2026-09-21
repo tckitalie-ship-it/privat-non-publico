@@ -108,47 +108,134 @@ export class UsersController {
   }
 
   /**
-   * Profilo di un utente.
+   * Profilo di un utente appartenente ad almeno una
+   * associazione condivisa con l'utente autenticato.
    */
   @Get(":id")
   async findOne(
+    @CurrentUser() user: any,
     @Param("id") id: string,
   ) {
-    return this.prisma.user.findUnique({
-      where: {
-        id,
-      },
-      select: {
-        id: true,
-        email: true,
-        createdAt: true,
-        memberships: {
-          select: {
-            associationId: true,
-            role: true,
-            association: {
-              select: {
-                id: true,
-                name: true,
-                slug: true,
+    const requesterMemberships =
+      await this.prisma.membership.findMany({
+        where: {
+          userId: user.sub,
+        },
+        select: {
+          associationId: true,
+        },
+      });
+
+    const associationIds =
+      requesterMemberships.map(
+        (membership) => membership.associationId,
+      );
+
+    if (associationIds.length === 0) {
+      throw new BadRequestException(
+        "Nessuna associazione collegata all'utente autenticato",
+      );
+    }
+
+    const profile =
+      await this.prisma.user.findUnique({
+        where: {
+          id,
+        },
+        select: {
+          id: true,
+          email: true,
+          createdAt: true,
+          memberships: {
+            where: {
+              associationId: {
+                in: associationIds,
+              },
+            },
+            select: {
+              associationId: true,
+              role: true,
+              association: {
+                select: {
+                  id: true,
+                  name: true,
+                  slug: true,
+                },
               },
             },
           },
         },
-      },
-    });
+      });
+
+    if (!profile || profile.memberships.length === 0) {
+      throw new BadRequestException(
+        "Utente non appartenente a un'associazione accessibile",
+      );
+    }
+
+    return profile;
   }
 
   /**
-   * File caricati da un utente.
+   * File caricati da un utente appartenente ad almeno una
+   * associazione condivisa con l'utente autenticato.
    */
   @Get(":id/uploaded-files")
   async getUploadedFiles(
+    @CurrentUser() user: any,
     @Param("id") id: string,
   ) {
+    const requesterMemberships =
+      await this.prisma.membership.findMany({
+        where: {
+          userId: user.sub,
+        },
+        select: {
+          associationId: true,
+        },
+      });
+
+    const associationIds =
+      requesterMemberships.map(
+        (membership) => membership.associationId,
+      );
+
+    if (associationIds.length === 0) {
+      throw new BadRequestException(
+        "Nessuna associazione collegata all'utente autenticato",
+      );
+    }
+
+    const targetMemberships =
+      await this.prisma.membership.findMany({
+        where: {
+          userId: id,
+          associationId: {
+            in: associationIds,
+          },
+        },
+        select: {
+          associationId: true,
+        },
+      });
+
+    const sharedAssociationIds =
+      targetMemberships.map(
+        (membership) => membership.associationId,
+      );
+
+    if (sharedAssociationIds.length === 0) {
+      throw new BadRequestException(
+        "Utente non appartenente a un'associazione accessibile",
+      );
+    }
+
     return this.prisma.file.findMany({
       where: {
         uploadedById: id,
+        associationId: {
+          in: sharedAssociationIds,
+        },
       },
       orderBy: {
         createdAt: "desc",
@@ -176,7 +263,7 @@ export class UsersController {
 
     if (!email) {
       throw new BadRequestException(
-        "L'email è obbligatoria",
+        "L'email Ã¨ obbligatoria",
       );
     }
 
@@ -203,7 +290,7 @@ export class UsersController {
 
     if (existing) {
       throw new BadRequestException(
-        "Questa email è già utilizzata da un altro account",
+        "Questa email Ã¨ giÃ  utilizzata da un altro account",
       );
     }
 

@@ -1,4 +1,4 @@
-﻿import {
+import {
   Body,
   Controller,
   Delete,
@@ -69,6 +69,7 @@ export class InvitationsController {
       user.sub,
     );
   }
+  @UseGuards(JwtAuthGuard)
   @Delete(":id")
   async remove(
     @CurrentUser() user: any,
@@ -79,7 +80,6 @@ export class InvitationsController {
       user.sub,
     );
   }
-
   @Public()
   @Get("check/:token")
   async check(

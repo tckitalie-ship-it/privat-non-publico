@@ -52,7 +52,7 @@ export class AuthService {
     });
 
     if (existingUser) {
-      throw new ConflictException("Esiste già un account con questa email");
+      throw new ConflictException("Esiste giÃƒÂ  un account con questa email");
     }
 
     const passwordHash = await bcrypt.hash(password, 12);
@@ -106,7 +106,7 @@ export class AuthService {
 
     if (user.lockUntil && user.lockUntil > new Date()) {
       throw new UnauthorizedException(
-        "Account temporaneamente bloccato. Riprova più tardi"
+        "Account temporaneamente bloccato. Riprova piÃƒÂ¹ tardi"
       );
     }
 
@@ -147,6 +147,7 @@ export class AuthService {
       email: user.email,
       associationId: firstMembership?.associationId,
       role: firstMembership?.role,
+      platformRole: user.platformRole,
     });
 
     return {
@@ -254,6 +255,7 @@ export class AuthService {
           select: {
             id: true,
             email: true,
+            platformRole: true,
           },
         },
         association: true,
@@ -271,6 +273,7 @@ export class AuthService {
       email: membership.user.email,
       associationId: membership.associationId,
       role: membership.role,
+      platformRole: membership.user.platformRole,
     });
 
     return {

@@ -1,9 +1,10 @@
-﻿import {
+import {
   Body,
   Controller,
   Delete,
   Get,
   Param,
+  Query,
   Patch,
   Post,
   Req,
@@ -41,10 +42,18 @@ export class RemindersController {
   @Get()
   async findMyReminders(
     @Req() request: AuthenticatedRequest,
+    @Query("associationId") associationId?: string,
   ) {
-    return this.remindersService.findUserReminders(
-      getUserId(request),
-    );
+    const userId = getUserId(request);
+
+    if (associationId) {
+      return this.remindersService.findAssociationReminders(
+        userId,
+        associationId,
+      );
+    }
+
+    return this.remindersService.findUserReminders(userId);
   }
 
   @Post()
