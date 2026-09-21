@@ -40,6 +40,7 @@ interface MembersListProps {
   loading?: boolean;
   onRemove: (id: string) => void | Promise<void>;
   onSelectMember?: (member: Member) => void;
+  canManageMembers?: boolean;
 }
 
 function getDisplayName(member: Member) {
@@ -133,6 +134,7 @@ export default function MembersList({
   loading = false,
   onRemove,
   onSelectMember,
+  canManageMembers = false,
 }: MembersListProps) {
   const [loadingId, setLoadingId] = useState<string | null>(null);
   const [confirmRemoveId, setConfirmRemoveId] = useState<string | null>(null);
@@ -476,7 +478,8 @@ export default function MembersList({
                 )}
               </div>
 
-              <div className="flex shrink-0 items-center gap-1.5">
+              {canManageMembers && (
+                <div className="flex shrink-0 items-center gap-1.5">
                 <button
                   type="button"
                   onClick={(event) => {
@@ -584,7 +587,8 @@ export default function MembersList({
                     <Trash2 size={15} />
                   )}
                 </button>
-              </div>
+                </div>
+              )}
             </article>
           );
         })}
@@ -748,3 +752,4 @@ export default function MembersList({
     </>
   );
 }
+

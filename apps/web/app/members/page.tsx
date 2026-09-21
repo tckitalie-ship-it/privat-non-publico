@@ -366,7 +366,6 @@ export default function MembersPage() {
       await Promise.all([
         fetchCurrentMembership(),
         fetchMembers(),
-        fetchInvitations(),
       ]);
     },
     [
@@ -376,9 +375,31 @@ export default function MembersPage() {
     ],
   );
 
+  const canManageMembers =
+    !loadingRole &&
+    (currentUserRole === "OWNER" ||
+      currentUserRole === "ADMIN");
+
   useEffect(() => {
     void refreshMembersData();
   }, [refreshMembersData]);
+
+  useEffect(() => {
+    if (loadingRole) {
+      return;
+    }
+
+    if (canManageMembers) {
+      void fetchInvitations();
+    } else {
+      setInvitations([]);
+      setLoadingInvitations(false);
+    }
+  }, [
+    loadingRole,
+    canManageMembers,
+    fetchInvitations,
+  ]);
 
   async function handleRegistration(data: {
     userId: string;
@@ -719,11 +740,6 @@ export default function MembersPage() {
     });
   }, [members, roleFilter, search]);
 
-  const canManageMembers =
-    !loadingRole &&
-    (currentUserRole === "OWNER" ||
-      currentUserRole === "ADMIN");
-
   const membersCount = members.length;
   const invitationsCount =
     invitations.length;
@@ -817,12 +833,14 @@ export default function MembersPage() {
         onRemove={removeMember}
         onSelectMember={(member) => { window.location.href = '/members/' + member.id; }}
       />
-      <MembersPendingInvitations
-        invitations={invitations}
-        loading={loadingInvitations}
-        canManageMembers={canManageMembers}
-        onRemove={removeInvitation}
-      />
+      {canManageMembers && (
+        <MembersPendingInvitations
+          invitations={invitations}
+          loading={loadingInvitations}
+          canManageMembers={canManageMembers}
+          onRemove={removeInvitation}
+        />
+      )}
     </div>
   );
 }
