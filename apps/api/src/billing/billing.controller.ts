@@ -1,11 +1,11 @@
-﻿import {
+import {
   BadRequestException,
   Body,
   Controller,
+  ForbiddenException,
   NotFoundException,
   Post,
   UseGuards,
-  ForbiddenException,
 } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 import { JwtAuthGuard } from "../auth/jwt-auth.guard";
@@ -24,17 +24,21 @@ export class BillingController {
   @Post("checkout")
   @UseGuards(JwtAuthGuard)
   async createCheckout(
-    @Body() body: { associationId?: string; priceId?: string },
+    @Body() body: { associationId?: string },
     @CurrentUser() user: JwtUser,
   ) {
-    const { associationId, priceId } = body;
+    const { associationId } = body;
 
     if (!associationId) {
       throw new BadRequestException("associationId mancante");
     }
 
+    const priceId = process.env.STRIPE_PRICE_ID;
+
     if (!priceId) {
-      throw new BadRequestException("priceId mancante");
+      throw new BadRequestException(
+        "STRIPE_PRICE_ID non configurato",
+      );
     }
 
     const membership = await this.prisma.membership.findFirst({
@@ -70,6 +74,12 @@ export class BillingController {
 
     if (!association) {
       throw new NotFoundException("Associazione non trovata");
+    }
+
+    if (!association.isActive) {
+      throw new ForbiddenException(
+        "L'associazione non è attiva",
+      );
     }
 
     let customerId = association.stripeCustomerId;

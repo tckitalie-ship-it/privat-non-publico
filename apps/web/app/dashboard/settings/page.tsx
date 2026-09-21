@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import ChangePasswordModal from "@/components/settings/ChangePasswordModal";
 import {
@@ -25,6 +25,7 @@ import {
   API_URL,
   getAccessToken,
 } from "@/lib/api";
+import { getActiveAssociationId } from "@/lib/association";
 
 type Role =
   | "OWNER"
@@ -175,8 +176,13 @@ export default function SettingsPage() {
 
       const payload = decodeToken(token);
 
+      const activeAssociationId =
+        getActiveAssociationId()?.trim() || null;
+
       const resolvedAssociationId =
-        payload?.associationId?.trim() || null;
+        activeAssociationId ||
+        payload?.associationId?.trim() ||
+        null;
 
       setAssociationId(
         resolvedAssociationId,
@@ -464,28 +470,28 @@ export default function SettingsPage() {
 
     if (cleanName.length > 120) {
       toast.error(
-        "Il nome dell'associazione non può superare 120 caratteri",
+        "Il nome dell'associazione non puÃ² superare 120 caratteri",
       );
       return;
     }
 
     if (cleanDescription.length > 500) {
       toast.error(
-        "La descrizione non può superare 500 caratteri",
+        "La descrizione non puÃ² superare 500 caratteri",
       );
       return;
     }
 
     if (cleanSlug.length > 120) {
       toast.error(
-        "Lo slug non può superare 120 caratteri",
+        "Lo slug non puÃ² superare 120 caratteri",
       );
       return;
     }
 
     if (cleanLogoUrl.length > 500) {
       toast.error(
-        "L'URL del logo non può superare 500 caratteri",
+        "L'URL del logo non puÃ² superare 500 caratteri",
       );
       return;
     }
@@ -742,7 +748,7 @@ export default function SettingsPage() {
                 rows={5}
                 maxLength={500}
                 className="mt-2 w-full resize-none rounded-xl border border-white/10 bg-[#111827] px-4 py-3 text-white outline-none transition placeholder:text-gray-500 focus:border-blue-500"
-                placeholder="Descrivi lo scopo e le attivitÃ  dell'associazione..."
+                placeholder="Descrivi lo scopo e le attivitÃƒÂ  dell'associazione..."
               />
 
               <p className="mt-1 text-right text-xs text-gray-500">
@@ -953,7 +959,7 @@ export default function SettingsPage() {
 
               <p className="mt-1 text-sm opacity-80">
                 {association?.isActive
-                  ? "La piattaforma è disponibile per i membri."
+                  ? "La piattaforma Ã¨ disponibile per i membri."
                   : "L'associazione risulta disattivata."}
               </p>              
               {canEditAssociation && association && (
