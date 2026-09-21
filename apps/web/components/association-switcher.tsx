@@ -1,5 +1,7 @@
 "use client";
 
+import { setActiveAssociationId, clearActiveAssociationId } from "@/lib/association";
+
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronDown, Loader2 } from "lucide-react";
@@ -121,6 +123,9 @@ export default function AssociationSwitcher() {
         // 🔥 LOGICA CORRETTA
          if (tokenAssociationExists) {
   setCurrentAssociation(tokenAssociationId);
+          if (tokenAssociationId) {
+            setActiveAssociationId(tokenAssociationId);
+          }
 } else {
   setCurrentAssociation(null);
 }
@@ -186,6 +191,7 @@ export default function AssociationSwitcher() {
 
        setAccessToken(newToken);
 setCurrentAssociation(associationId);
+        setActiveAssociationId(associationId);
 setOpen(false);
 
 // Forza Next.js a ricaricare i dati della pagina
