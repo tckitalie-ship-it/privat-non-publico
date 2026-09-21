@@ -22,7 +22,10 @@ export class RemindersService {
 
   async findUserReminders(userId: string) {
     return this.prisma.reminder.findMany({
-      where: { userId },
+      where: {
+        userId,
+        associationId: null,
+      },
       orderBy: { remindAt: "asc" },
     });
   }
@@ -64,13 +67,13 @@ export class RemindersService {
 
     if (!message) {
       throw new BadRequestException(
-        "Il messaggio del reminder Ã¨ obbligatorio",
+        "Il messaggio del reminder è obbligatorio",
       );
     }
 
     if (Number.isNaN(dto.remindAt.getTime())) {
       throw new BadRequestException(
-        "La data del reminder non Ã¨ valida",
+        "La data del reminder non è valida",
       );
     }
 
@@ -100,14 +103,9 @@ export class RemindersService {
     });
   }
 
-  async updateReminder(
+  private async ensureReminderAccess(
     reminderId: string,
     userId: string,
-    dto: {
-      title?: string | null;
-      message?: string;
-      remindAt?: Date;
-    },
   ) {
     const reminder = await this.prisma.reminder.findUnique({
       where: { id: reminderId },
@@ -122,6 +120,38 @@ export class RemindersService {
         "Non hai accesso a questo reminder",
       );
     }
+
+    if (reminder.associationId) {
+      const membership = await this.prisma.membership.findFirst({
+        where: {
+          userId,
+          associationId: reminder.associationId,
+        },
+      });
+
+      if (!membership) {
+        throw new ForbiddenException(
+          "Non hai accesso a questo reminder",
+        );
+      }
+    }
+
+    return reminder;
+  }
+
+  async updateReminder(
+    reminderId: string,
+    userId: string,
+    dto: {
+      title?: string | null;
+      message?: string;
+      remindAt?: Date;
+    },
+  ) {
+    const reminder = await this.ensureReminderAccess(
+      reminderId,
+      userId,
+    );
 
     const message =
       dto.message !== undefined
@@ -157,20 +187,12 @@ export class RemindersService {
       },
     });
   }
-  async completeReminder(reminderId: string, userId: string) {
-    const reminder = await this.prisma.reminder.findUnique({
-      where: { id: reminderId },
-    });
 
-    if (!reminder) {
-      throw new NotFoundException("Reminder non trovato");
-    }
-
-    if (reminder.userId !== userId) {
-      throw new ForbiddenException(
-        "Non hai accesso a questo reminder",
-      );
-    }
+  async completeReminder(
+    reminderId: string,
+    userId: string,
+  ) {
+    await this.ensureReminderAccess(reminderId, userId);
 
     return this.prisma.reminder.update({
       where: { id: reminderId },
@@ -178,20 +200,11 @@ export class RemindersService {
     });
   }
 
-  async deleteReminder(reminderId: string, userId: string) {
-    const reminder = await this.prisma.reminder.findUnique({
-      where: { id: reminderId },
-    });
-
-    if (!reminder) {
-      throw new NotFoundException("Reminder non trovato");
-    }
-
-    if (reminder.userId !== userId) {
-      throw new ForbiddenException(
-        "Non hai accesso a questo reminder",
-      );
-    }
+  async deleteReminder(
+    reminderId: string,
+    userId: string,
+  ) {
+    await this.ensureReminderAccess(reminderId, userId);
 
     await this.prisma.reminder.delete({
       where: { id: reminderId },
