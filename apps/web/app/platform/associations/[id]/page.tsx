@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { FormEvent, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
@@ -412,7 +412,7 @@ export default function PlatformAssociationDetailPage() {
                 ? "Salvataggio..."
                 : association.isActive
                   ? "Disattiva associazione"
-                  : "Attiva associazione"}
+                  : "Riattiva associazione"}
             </button>
 
             <button
@@ -824,6 +824,7 @@ export default function PlatformAssociationDetailPage() {
     </main>
   );
 }
+
 
 
 
