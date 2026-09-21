@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -21,51 +21,119 @@ import LogoutButton from "@/components/logout-button";
 import { NotificationBell } from "@/components/notification-bell";
 import ThemeToggle from "@/components/theme-toggle";
 import { cn } from "@/lib/utils";
-const navigation = [
+import { getAccessToken } from "@/lib/api";
+
+type Role = "OWNER" | "ADMIN" | "MEMBER";
+
+type JwtPayload = {
+  role?: string | null;
+};
+
+type NavigationItem = {
+  label: string;
+  href: string;
+  icon: typeof LayoutDashboard;
+  roles: Role[];
+};
+
+const navigation: NavigationItem[] = [
   {
     label: "Dashboard",
     href: "/dashboard",
     icon: LayoutDashboard,
+    roles: ["OWNER", "ADMIN", "MEMBER"],
   },
   {
     label: "Eventi",
     href: "/dashboard/events",
     icon: Calendar,
+    roles: ["OWNER", "ADMIN", "MEMBER"],
   },
   {
     label: "Membri",
     href: "/members",
     icon: Users,
+    roles: ["OWNER", "ADMIN", "MEMBER"],
   },
   {
     label: "Finanze",
     href: "/dashboard/finance",
     icon: Wallet,
+    roles: ["OWNER", "ADMIN"],
   },
   {
     label: "Promemoria",
     href: "/dashboard/reminders",
     icon: Clock,
+    roles: ["OWNER", "ADMIN", "MEMBER"],
   },
   {
     label: "Notifiche",
     href: "/notifications",
     icon: Bell,
+    roles: ["OWNER", "ADMIN", "MEMBER"],
   },
   {
     label: "File",
     href: "/dashboard/files",
     icon: Folder,
+    roles: ["OWNER", "ADMIN", "MEMBER"],
   },
   {
     label: "Audit Log",
     href: "/dashboard/audit-log",
     icon: ClipboardList,
+    roles: ["OWNER", "ADMIN"],
   },
 ];
 
+function readJwtRole(token: string): Role | null {
+  try {
+    const payload = token.split(".")[1];
+
+    if (!payload) {
+      return null;
+    }
+
+    const normalized = payload
+      .replace(/-/g, "+")
+      .replace(/_/g, "/");
+
+    const padded =
+      normalized +
+      "=".repeat((4 - (normalized.length % 4)) % 4);
+
+    const decoded = decodeURIComponent(
+      window
+        .atob(padded)
+        .split("")
+        .map(
+          (character) =>
+            `%${character.charCodeAt(0).toString(16).padStart(2, "0")}`,
+        )
+        .join(""),
+    );
+
+    const data = JSON.parse(decoded) as JwtPayload;
+
+    if (
+      data.role === "OWNER" ||
+      data.role === "ADMIN" ||
+      data.role === "MEMBER"
+    ) {
+      return data.role;
+    }
+
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 export default function DashboardSidebar() {
   const pathname = usePathname();
+
+  const [role, setRole] = useState<Role | null>(null);
 
   const [user, setUser] = useState<{
     name?: string | null;
@@ -73,10 +141,14 @@ export default function DashboardSidebar() {
   } | null>(null);
 
   useEffect(() => {
+    const token = getAccessToken();
+
+    if (token) {
+      setRole(readJwtRole(token));
+    }
+
     async function loadUser() {
       try {
-        const token = localStorage.getItem("access_token");
-
         if (!token) {
           return;
         }
@@ -102,6 +174,16 @@ export default function DashboardSidebar() {
 
     void loadUser();
   }, []);
+
+  const visibleNavigation = useMemo(() => {
+    if (!role) {
+      return navigation;
+    }
+
+    return navigation.filter((item) =>
+      item.roles.includes(role),
+    );
+  }, [role]);
 
   function isActive(href: string) {
     if (href === "/dashboard") {
@@ -139,7 +221,7 @@ export default function DashboardSidebar() {
         </p>
 
         <div className="space-y-1">
-          {navigation.map((item) => {
+          {visibleNavigation.map((item) => {
             const Icon = item.icon;
             const active = isActive(item.href);
 
@@ -234,10 +316,3 @@ export default function DashboardSidebar() {
     </div>
   );
 }
-
-
-
-
-
-
-
