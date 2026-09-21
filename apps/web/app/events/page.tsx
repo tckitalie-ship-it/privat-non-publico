@@ -525,23 +525,21 @@ export default function EventsPage() {
             )}
           </div>
 
-          <button
-            type="button"
-            onClick={() =>
-              setShowForm(!showForm)
-            }
-            disabled={
-              !canManageEvents ||
-              !associationId
-            }
-            className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-3 font-medium transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            <Plus className="h-5 w-5" />
+          {canManageEvents && associationId && (
+            <button
+              type="button"
+              onClick={() =>
+                setShowForm(!showForm)
+              }
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-3 font-medium transition hover:bg-blue-500"
+            >
+              <Plus className="h-5 w-5" />
 
-            {showForm
-              ? "Chiudi"
-              : "Nuovo evento"}
-          </button>
+              {showForm
+                ? "Chiudi"
+                : "Nuovo evento"}
+            </button>
+          )}
         </div>
 
         <div className="mb-8 grid gap-4 md:grid-cols-4">
@@ -871,11 +869,10 @@ export default function EventsPage() {
             href="/dashboard"
             className="text-sm text-gray-400 hover:text-white"
           >
-            ← Dashboard
+            â†Â Dashboard
           </Link>
         </div>
       </main>
     </div>
   );
 }
-
