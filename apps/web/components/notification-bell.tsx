@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useState } from "react";
 import {
@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 
 import { API_URL, getAccessToken } from "@/lib/api";
+import { getActiveAssociationId } from "@/lib/association";
 import { getSocket } from "@/lib/socket";
 
 type Notification = {
@@ -19,6 +20,7 @@ type Notification = {
   read: boolean;
   createdAt: string;
   reminderId?: string | null;
+  associationId?: string | null;
 };
 
 export function NotificationBell() {
@@ -26,6 +28,8 @@ export function NotificationBell() {
     useState<Notification[]>([]);
 
   const [open, setOpen] = useState(false);
+  const [activeAssociationId, setActiveAssociationId] =
+    useState<string | null>(getActiveAssociationId());
 
   const [completingReminderId, setCompletingReminderId] =
     useState<string | null>(null);
@@ -33,7 +37,9 @@ export function NotificationBell() {
   useEffect(() => {
     let mounted = true;
 
-    async function loadNotifications() {
+    async function loadNotifications(
+      associationId: string | null,
+    ) {
       try {
         const token = getAccessToken();
 
@@ -62,11 +68,19 @@ export function NotificationBell() {
         const data =
           (await response.json()) as Notification[];
 
-        if (mounted) {
-          setNotifications(
-            Array.isArray(data) ? data : [],
-          );
+        if (!mounted) {
+          return;
         }
+
+        const filtered = Array.isArray(data)
+          ? data.filter(
+              (notification) =>
+                !notification.associationId ||
+                notification.associationId === associationId,
+            )
+          : [];
+
+        setNotifications(filtered);
       } catch (error) {
         console.error(
           "Errore caricamento notifiche:",
@@ -75,13 +89,23 @@ export function NotificationBell() {
       }
     }
 
-    void loadNotifications();
+    void loadNotifications(activeAssociationId);
 
     const socket = getSocket();
 
     const handleNewNotification = (
       notification: Notification,
     ) => {
+      const currentAssociationId =
+        getActiveAssociationId();
+
+      if (
+        notification.associationId &&
+        notification.associationId !== currentAssociationId
+      ) {
+        return;
+      }
+
       setNotifications((prev) => {
         const alreadyExists = prev.some(
           (item) => item.id === notification.id,
@@ -132,8 +156,28 @@ export function NotificationBell() {
       handleReminderCompleted,
     );
 
+    const associationCheck = window.setInterval(() => {
+      const nextAssociationId =
+        getActiveAssociationId();
+
+      setActiveAssociationId((current) => {
+        if (current === nextAssociationId) {
+          return current;
+        }
+
+        setNotifications([]);
+        setOpen(false);
+
+        void loadNotifications(nextAssociationId);
+
+        return nextAssociationId;
+      });
+    }, 300);
+
     return () => {
       mounted = false;
+
+      window.clearInterval(associationCheck);
 
       socket.off(
         "notification:new",
@@ -190,7 +234,8 @@ export function NotificationBell() {
       );
     }
   }
-    async function completeReminder(
+
+  async function completeReminder(
     notification: Notification,
   ) {
     const reminderId = notification.reminderId;
@@ -384,9 +429,7 @@ export function NotificationBell() {
                         className="inline-flex items-center gap-1.5 rounded-md bg-emerald-600 px-2.5 py-1.5 text-xs font-medium text-white transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-60"
                       >
                         {isCompleting ? (
-                          <Loader2
-                            className="h-3.5 w-3.5 animate-spin"
-                          />
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
                         ) : (
                           <Check className="h-3.5 w-3.5" />
                         )}
@@ -406,4 +449,6 @@ export function NotificationBell() {
     </div>
   );
 }
+
+
 
