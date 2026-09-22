@@ -92,7 +92,7 @@ export default function ChatPage() {
   const [message, setMessage] =
     useState('');
 
-  const [associationId] = useState(() => getActiveAssociationId());
+  const [associationId, setAssociationId] = useState(() => getActiveAssociationId());
 
   const token = getAccessToken();
 
@@ -421,6 +421,7 @@ export default function ChatPage() {
     </div>
   );
 }
+
 
 
 
