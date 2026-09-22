@@ -195,7 +195,6 @@ setCurrentAssociation(associationId);
 setOpen(false);
 
 // Forza Next.js a ricaricare i dati della pagina
-      router.push("/dashboard");
 router.refresh();
     } catch (error) {
       console.error("Errore cambio associazione:", error);
@@ -312,4 +311,5 @@ router.refresh();
     </div>
   );
 }
+
 
