@@ -17,6 +17,7 @@ import {
 } from "@/lib/api";
 
 import type { Notification } from "@/types/notification";
+import { getActiveAssociationId } from "@/lib/association";
 
 type ToastState = {
   type: "success" | "error";
@@ -827,6 +828,7 @@ export default function NotificationsPage() {
     </div>
   );
 }
+
 
 
 
