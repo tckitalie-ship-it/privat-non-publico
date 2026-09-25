@@ -12,7 +12,7 @@ async function bootstrap() {
       'http://127.0.0.1:3000',
       'http://localhost:3001',
       'http://127.0.0.1:3001',
-      'https://privat-non-publico-web-tckitalie-ship-its-projects.vercel.app',
+      'https://privat-non-publico-web-rmbh.vercel.app',
     ],
     credentials: true,
   });
