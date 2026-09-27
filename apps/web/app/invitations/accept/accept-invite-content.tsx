@@ -137,13 +137,13 @@ export default function AcceptInviteContent({
       }
 
       try {
-        const response = await fetch(
-          `${API_URL}/invitations/check/${encodeURIComponent(token)}`,
-          {
-            method: "GET",
-            cache: "no-store",
-          },
-        );
+         const response = await fetch(
+  `/api/invitations/check/${encodeURIComponent(token)}`,
+  {
+    method: "GET",
+    cache: "no-store",
+  },
+);
 
         const data =
           await readResponse<InvitationResponse>(
