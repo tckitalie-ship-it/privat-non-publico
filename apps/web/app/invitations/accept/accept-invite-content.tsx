@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import {
   FormEvent,
@@ -252,7 +252,7 @@ export default function AcceptInviteContent({
 
       const registerResponse =
         await fetch(
-          `${API_URL}/invitations/accept-and-register`,
+          `/api/invitations/accept-and-register`,
           {
             method: "POST",
             headers: {
@@ -284,7 +284,7 @@ export default function AcceptInviteContent({
 
       const loginResponse =
         await fetch(
-          `${API_URL}/auth/login`,
+          `/api/auth/login`,
           {
             method: "POST",
             headers: {
