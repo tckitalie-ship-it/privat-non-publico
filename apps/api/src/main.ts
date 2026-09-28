@@ -24,8 +24,8 @@ async function bootstrap() {
 
     'http://192.168.1.138:3000',
     'http://192.168.1.138:3002',
-     'https://privat-non-publico-web-rmbh.vercel.app',
-      'https://www.npaassociation.com',
+      'https://privat-non-publico-web-tckitalie-ship-its-projects.vercel.app',
+          'https://www.npaassociation.com',
       'https://npaassociation.com', 
      ],
   credentials: true,
