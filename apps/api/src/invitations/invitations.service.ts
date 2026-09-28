@@ -1,3 +1,4 @@
+import { ConfigService } from '@nestjs/config';
 import {
   BadRequestException,
   ConflictException,
@@ -6,6 +7,7 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
+import { MailService } from "../mail/mail.service";
 import { NotificationsGateway } from "../notifications/notifications.gateway";
 import { randomUUID } from "crypto";
 import * as bcrypt from "bcrypt";
@@ -26,6 +28,8 @@ interface AcceptAndRegisterDto {
 export class InvitationsService {
   constructor(
     private readonly prisma: PrismaService,
+    private readonly configService: ConfigService,
+    private readonly mailService: MailService,
   ) {}
 
   private async notify(
@@ -301,6 +305,13 @@ export class InvitationsService {
           },
         },
       });
+    const inviteUrl = this.configService.get<string>("APP_FRONTEND_URL") + "/invite/accept?token=" + token;
+
+    await this.mailService.sendInvitationEmail({
+      to: invitation.email,
+      associationName: invitation.association?.name ?? "associazione",
+      inviteUrl,
+    });
 
     if (
       existingUser &&
@@ -742,6 +753,13 @@ export class InvitationsService {
           id: true,
         },
       });
+    const inviteUrl = this.configService.get<string>("APP_FRONTEND_URL") + "/invite/accept?token=" + token;
+
+    await this.mailService.sendInvitationEmail({
+      to: invitation.email,
+      associationName: invitation.association?.name ?? "associazione",
+      inviteUrl,
+    });
 
     if (
       existingUser &&
@@ -828,6 +846,3 @@ export class InvitationsService {
     };
   }
 }
-
-
-

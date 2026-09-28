@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import {
   type FormEvent,
@@ -831,6 +831,7 @@ export default function MembersPage() {
         members={filteredMembers}
         loading={loadingMembers}
         onRemove={removeMember}
+        canManageMembers={canManageMembers}
         onSelectMember={(member) => { window.location.href = '/members/' + member.id; }}
       />
       {canManageMembers && (

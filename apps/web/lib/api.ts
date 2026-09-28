@@ -33,3 +33,16 @@ export function clearAccessToken() {
   Cookies.remove(ACCESS_TOKEN_KEY);
   localStorage.removeItem(ACCESS_TOKEN_KEY);
 }
+
+export function authHeaders(headers: HeadersInit = {}) {
+  const token = getAccessToken();
+
+  return {
+    ...headers,
+    ...(token
+      ? {
+          Authorization: `Bearer ${token}`,
+        }
+      : {}),
+  };
+}

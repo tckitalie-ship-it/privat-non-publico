@@ -34,12 +34,20 @@ export class MailService {
     const from =
       this.configService.get<string>('INVITATION_FROM_EMAIL') ||
       'App <onboarding@resend.dev>';
-
-    return this.resend.emails.send({
+        const result = await this.resend.emails.send({
       from,
       to,
       subject: `Invito a ${associationName}`,
       html: `<a href="${inviteUrl}">Accetta invito</a>`,
     });
-  }
+
+    console.log('RESEND RESULT:', result);
+
+    if (result.error) {
+      console.error('RESEND ERROR:', result.error);
+      throw new Error(`Resend error: ${result.error.message}`);
+    }
+
+    return result;
+    }
 }

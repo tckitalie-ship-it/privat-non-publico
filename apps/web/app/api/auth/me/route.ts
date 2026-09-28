@@ -1,20 +1,35 @@
 import { getBackendApiUrl } from "@/lib/server-api";
 import { NextResponse } from "next/server";
 
-
-
 export async function GET(request: Request) {
   try {
     const authorization =
       request.headers.get("authorization");
+
+    const cookieHeader =
+      request.headers.get("cookie");
+
+    const accessToken = cookieHeader
+      ?.split(";")
+      .map((cookie) => cookie.trim())
+      .find((cookie) => cookie.startsWith("access_token="))
+      ?.split("=")
+      .slice(1)
+      .join("=");
+
+    const finalAuthorization =
+      authorization ??
+      (accessToken
+        ? `Bearer ${decodeURIComponent(accessToken)}`
+        : null);
 
     const response = await fetch(
       `${getBackendApiUrl("auth/me")}`,
       {
         method: "GET",
         headers: {
-          ...(authorization
-            ? { Authorization: authorization }
+          ...(finalAuthorization
+            ? { Authorization: finalAuthorization }
             : {}),
         },
         cache: "no-store",
@@ -39,4 +54,3 @@ export async function GET(request: Request) {
     );
   }
 }
-
